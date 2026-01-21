@@ -116,10 +116,10 @@ If your controller is advanced, with analog joystick and you want to map specifi
 
 ---
 
-## Experimental Firmware: Mouse Wheel Support (C64OS + AmigaOS)
+## Mouse Wheel Support (C64OS + AmigaOS)
 
-An additional **experimental firmware** is available under the folder **`experimental-wheel`**.  
-This build enables **mouse wheel (scroll) support** on both **C64OS** and **AmigaOS**.
+An additional **MouseMapping.h** is available to support the **mouse wheel (scroll)** on both **C64OS** and **AmigaOS**.
+In order to activate it in the code the variable **MOUSE_MAP_CUSTOM** must be set to **1** and the proper mouse mapping has to be added in the **MM_REPORT_MAPS**. This requires to know how the bytes of the mouse are mapped, I am working on a procedure to get this authomatically in the future.
 
 ### C64OS (Wheel Support)
 - Requires **C64OS version 1.03 or newer**.
