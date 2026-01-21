@@ -126,7 +126,7 @@ In order to activate it in the code the variable **MOUSE_MAP_CUSTOM** must be se
 - In the **Mouse** settings/menu, select the **Micromys** driver.
 
 ### AmigaOS (Wheel Support)
-- Install **FreeWheel** on your Amiga.
+- Install [FreeWheel](https://aminet.net/package/util/mouse/FreeWheel) on your Amiga.
 - Open **FreeWheel** settings, go to **Set Buttons**, and set the **Middle button** to enable scrolling.
 
 ---
