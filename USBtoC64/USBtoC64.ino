@@ -18,6 +18,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEAL
 #include "usb/usb_host.h"
 #include "hid_host.h"
 #include "hid_usage_mouse.h"
+#include "esp_log_buffer.h"
 #include "esp_timer.h"
 #include "Adafruit_NeoPixel.h"
 #include "EEPROM.h"
@@ -25,6 +26,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEAL
 #include "freertos/task.h"
 
 #include "JoystickMapping.h"
+#include "MouseMapping.h"
 
 #define PIN_WS2812B       21 // Pin for RGB LED
 #define NUM_PIXELS         1 // 1 LED
@@ -53,7 +55,7 @@ static inline uint32_t LED_RED()   { return ws2812b.Color(0, 25, 0); }
 #define SWITCH_MJ         13 // HIGH = mouse, LOW = joystick
 
 // Define the default timers for the mouse delay, all empirical for PAL version
-#define PAL                1 // Select if it is PAL or NTSC and adjust the timings
+#define PAL                0 // Select if it is PAL or NTSC and adjust the timings
 
 #if PAL
   #define MINdelayOnX   2450
@@ -338,12 +340,138 @@ typedef struct {
 
 static const char *hid_proto_name_str[] = {"NONE", "KEYBOARD", "MOUSE"};
 
+// -------------------- Micromys wheel -> C64 pulses (LEFT/RIGHT lines) --------------------
+// Protocol details: pulses active-low, ~50ms low, ~50ms high between pulses.
+// We implement non-blocking by using a FreeRTOS task fed by the USB callback.
+#define MICROMYS_LOW_MS  50
+#define MICROMYS_GAP_MS  50
+
+// If scrolling "up" gives wheel byte 0x01 (and down gives 0xFF), keep 1.
+// If it's inverted for your mouse, set to 0.
+#define WHEEL_01_IS_UP   1
+
+static TaskHandle_t micromysWheelTaskH = NULL;
+static volatile uint16_t mm_up_pending = 0;   // UP pulses  -> C64_LEFT  (bit2)
+static volatile uint16_t mm_dn_pending = 0;   // DN pulses  -> C64_RIGHT (bit3)
+static portMUX_TYPE mm_mux = portMUX_INITIALIZER_UNLOCKED;
+
+static inline void micromysEnqueueWheel(int8_t wheel)
+{
+  if (wheel == 0 || micromysWheelTaskH == NULL) return;
+
+  uint16_t steps = (wheel < 0) ? (uint16_t)(-wheel) : (uint16_t)wheel;
+
+#if WHEEL_01_IS_UP
+  bool up = (wheel > 0);
+#else
+  bool up = (wheel < 0);
+#endif
+
+  portENTER_CRITICAL(&mm_mux);
+  if (up) mm_up_pending += steps;
+  else    mm_dn_pending += steps;
+  portEXIT_CRITICAL(&mm_mux);
+
+  xTaskNotifyGive(micromysWheelTaskH);
+}
+
+static void micromysWheelTask(void *arg)
+{
+  (void)arg;
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    while (true) {
+      uint8_t pin = 0;
+
+      portENTER_CRITICAL(&mm_mux);
+      if (mm_up_pending) { mm_up_pending--; pin = C64_LEFT; }
+      else if (mm_dn_pending) { mm_dn_pending--; pin = C64_RIGHT; }
+      portEXIT_CRITICAL(&mm_mux);
+
+      if (pin == 0) break;
+
+      // Active-low pulse
+      pinMode(pin, OUTPUT);
+      digitalWrite(pin, LOW);
+      vTaskDelay(pdMS_TO_TICKS(MICROMYS_LOW_MS));
+
+      // Release line (C64 pull-up brings it to 1)
+      digitalWrite(pin, LOW);
+      pinMode(pin, INPUT);
+      vTaskDelay(pdMS_TO_TICKS(MICROMYS_GAP_MS));
+    }
+  }
+}
+
+// -------------------- Amiga wheel -> "middle button + vertical move" --------------------
+#define AMIGA_WHEEL_STEP_Y   30 // Scroll "intensity"
+#define AMIGA_WHEEL_INVERT   0 // Scroll direction
+
+static inline int8_t amigaWheelToDeltaY(int8_t wheel)
+{
+  if (wheel == 0) return 0;
+
+  uint16_t steps = (wheel < 0) ? (uint16_t)(-wheel) : (uint16_t)wheel;
+  int16_t delta = (int16_t)steps * (int16_t)AMIGA_WHEEL_STEP_Y;
+  if (delta > 127) delta = 127;
+
+#if WHEEL_01_IS_UP
+  bool up = (wheel > 0);
+#else
+  bool up = (wheel < 0);
+#endif
+
+#if AMIGA_WHEEL_INVERT
+  up = !up;
+#endif
+
+  // In a_mouse_m(): y_displacement > 0 => A_Down, y_displacement < 0 => A_Up
+  return (int8_t)(up ? -delta : delta);
+}
+
+static inline void amigaWheelEmulate(const hid_mouse_input_report_boot_t *base, int8_t wheel)
+{
+  int8_t y = amigaWheelToDeltaY(wheel);
+  if (y == 0) return;
+
+  hid_mouse_input_report_boot_t r = *base;
+  r.x_displacement = 0;
+  r.y_displacement = 0;
+  r.buttons.button3 = 1;
+  a_mouse_m(&r);
+  delayMicroseconds(25000);
+  r.x_displacement = 0;
+  r.y_displacement = y;
+  r.buttons.button3 = 1;
+  a_mouse_m(&r);
+  delayMicroseconds(25000);
+  r.x_displacement = 0;
+  r.y_displacement = 0;
+  r.buttons.button3 = 0;
+  a_mouse_m(&r);
+}
+
 // -------------------- HID callbacks --------------------
 static void hid_host_mouse_report_callback(const uint8_t *const data, const int length) {
-  hid_mouse_input_report_boot_t *mouse_report = (hid_mouse_input_report_boot_t *)data;
+  
+#if (MOUSE_MAP_CUSTOM == 0)
   if (length < (int)sizeof(hid_mouse_input_report_boot_t)) return;
+  hid_mouse_input_report_boot_t *mouse_report = (hid_mouse_input_report_boot_t *)data;
+  int8_t wheel = 0;
+#else
+  if (length < 3) return;
+  hid_mouse_input_report_boot_t boot;
+  int8_t wheel = 0;
+  MM_DecodeMouseReport(data, length, &boot, &wheel);
+  hid_mouse_input_report_boot_t *mouse_report = &boot;
+#endif
 
-  // Update the 5s hold detector (does not change motion logic)
+  // Micromys wheel support only in C64 + mouse mode:
+  if ((ISC64 > 0) && digitalRead(SWITCH_MJ)) {
+    micromysEnqueueWheel(wheel);
+  }
+
   updateModeHoldFromMouse(mouse_report);
 
   if (digitalRead(SWITCH_MJ)) {       // Mouse mode
@@ -353,7 +481,13 @@ static void hid_host_mouse_report_callback(const uint8_t *const data, const int 
     if (ISC64 > 0) c64_mouse_j(mouse_report);
     else           a_mouse_j(mouse_report);
   }
+  
+  // ---- NEW: wheel mapping for AMIGA in mouse mode ----
+  if ((ISC64 <= 0) && (ISAMIGA == 1) && digitalRead(SWITCH_MJ) && (wheel != 0)) {
+    amigaWheelEmulate(mouse_report, wheel);
+  }
 }
+
 
 static void hid_host_generic_report_callback(const uint8_t *const data, const int length) {
 #if (JOY_MAPPING_MODE == JOY_MAP_LEARN)
@@ -391,16 +525,16 @@ void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, con
       break;
 
     case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
-      ESP_LOGI(TAG, "HID Device, protocol '%s' DISCONNECTED", hid_proto_name_str[dev_params.proto]);
+//      ESP_LOGI(TAG, "HID Device, protocol '%s' DISCONNECTED", hid_proto_name_str[dev_params.proto]);
       ESP_ERROR_CHECK(hid_host_device_close(hid_device_handle));
       break;
 
     case HID_HOST_INTERFACE_EVENT_TRANSFER_ERROR:
-      ESP_LOGI(TAG, "HID Device, protocol '%s' TRANSFER_ERROR", hid_proto_name_str[dev_params.proto]);
+//      ESP_LOGI(TAG, "HID Device, protocol '%s' TRANSFER_ERROR", hid_proto_name_str[dev_params.proto]);
       break;
 
     default:
-      ESP_LOGE(TAG, "HID Device, protocol '%s' Unhandled event", hid_proto_name_str[dev_params.proto]);
+//      ESP_LOGE(TAG, "HID Device, protocol '%s' Unhandled event", hid_proto_name_str[dev_params.proto]);
       break;
   }
 }
@@ -412,12 +546,23 @@ void hid_host_device_event(hid_host_device_handle_t hid_device_handle, const hid
 
   switch (event) {
     case HID_HOST_DRIVER_EVENT_CONNECTED:
-      ESP_LOGI(TAG, "HID Device, protocol '%s' CONNECTED", hid_proto_name_str[dev_params.proto]);
+//      ESP_LOGI(TAG, "HID Device, protocol '%s' CONNECTED", hid_proto_name_str[dev_params.proto]);
       ESP_ERROR_CHECK(hid_host_device_open(hid_device_handle, &dev_config));
       if (HID_SUBCLASS_BOOT_INTERFACE == dev_params.sub_class) {
-        ESP_ERROR_CHECK(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_BOOT));
-        if (HID_PROTOCOL_KEYBOARD == dev_params.proto) {
-          ESP_ERROR_CHECK(hid_class_request_set_idle(hid_device_handle, 0, 0));
+
+        // Mouse: REPORT (needed for wheel + packed 12-bit XY), or BOOT for compatibility.
+        // Keyboard: keep BOOT
+        if (HID_PROTOCOL_MOUSE == dev_params.proto) {
+#if (MOUSE_MAP_CUSTOM == 1)
+          ESP_ERROR_CHECK(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_REPORT));
+#else
+          ESP_ERROR_CHECK(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_BOOT));
+#endif
+        } else {
+          ESP_ERROR_CHECK(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_BOOT));
+          if (HID_PROTOCOL_KEYBOARD == dev_params.proto) {
+            ESP_ERROR_CHECK(hid_class_request_set_idle(hid_device_handle, 0, 0));
+          }
         }
       }
       ESP_ERROR_CHECK(hid_host_device_start(hid_device_handle));
@@ -437,10 +582,10 @@ static void usb_lib_task(void *arg) {
     usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
     if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
       usb_host_device_free_all();
-      ESP_LOGI(TAG, "USB Event flags: NO_CLIENTS");
+//      ESP_LOGI(TAG, "USB Event flags: NO_CLIENTS");
     }
     if (event_flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE) {
-      ESP_LOGI(TAG, "USB Event flags: ALL_FREE");
+//      ESP_LOGI(TAG, "USB Event flags: ALL_FREE");
     }
   }
 }
@@ -463,7 +608,7 @@ void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, const 
 
 void app_main(void) {
   BaseType_t task_created;
-  ESP_LOGI(TAG, "HID Host example");
+//  ESP_LOGI(TAG, "HID Host example");
   task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 4096, xTaskGetCurrentTaskHandle(), 2, NULL, 0);
   assert(task_created == pdTRUE);
   ulTaskNotifyTake(false, 1000);
@@ -1091,6 +1236,9 @@ void setup() {
       pinMode(C64_INT, INPUT_PULLUP);
       attachInterrupt(digitalPinToInterrupt(C64_INT), handleInterrupt, RISING);
 
+      // Start Micromys wheel pulser task (only used in C64 mouse mode)
+      xTaskCreatePinnedToCore(micromysWheelTask, "mm_wheel", 2048, NULL, 2, &micromysWheelTaskH, 1);
+
       ws2812b.setPixelColor(0, LED_BLUE());
       ws2812b.show();
     } else {
@@ -1138,4 +1286,3 @@ void setup() {
 }
 
 void loop() {}
-

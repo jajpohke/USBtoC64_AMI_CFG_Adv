@@ -320,3 +320,4 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
 #define JM_ATARI_PULSE_SCALE 18.6f
 
 #endif
+
