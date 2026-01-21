@@ -73,7 +73,7 @@ To select PAL or NTSC timing the `#define PAL` line has to be set as true or fal
 
 ## Installation From the Binary File
 
-Alternatively, you can load the binary file **USBtoC64.bin**, which is located in the `BIN` folder.  
+Alternatively, you can load the binary file **USBtoC64-AMIGA-ATARI-PAL.bin** or **USBtoC64-AMIGA-ATARI-NTSC.bin**, which are located in the `BIN` folder.
 The tool to upload the binary is `esptool`. This is available as a web page or as python. The web page should be compatible with Chrome browser or similar, probably not with Firefox, but on some operating system (like Mac OS) there can be a problem of binding the port to the web page. Anyway my suggestion is to try the web page first because it is very fast, and if it does not work try with the python installation.
 
 ### From the web page
