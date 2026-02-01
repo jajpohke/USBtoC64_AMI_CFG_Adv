@@ -32,13 +32,16 @@ enum JM_Func : uint8_t {
   JM_LEFT,
   JM_LEFT_UP,
   JM_FIRE,
+  JM_FIRE2,
+  JM_FIRE3,
   JM_AUTOFIRE_ON,
   JM_AUTOFIRE_OFF,
   JM_AUTOLEFTRIGHT_ON,
   JM_AUTOLEFTRIGHT_OFF,
 
   // Extra mouse button for Amiga/Atari in joystick-as-mouse mode
-  JM_BUTTON2
+  JM_BUTTON2,
+  JM_BUTTON3
 };
 
 struct JM_Rule {
@@ -70,8 +73,8 @@ static const JM_Rule JM_JOY_RULES[] = {
   { 8, 8, JM_EQ, JM_UP },
 
   // Fire sources (example: data[8] == 64 or 128 or 1)
-  { 8, 64,  JM_EQ, JM_FIRE },
-  { 8, 128, JM_EQ, JM_FIRE },
+  { 8, 64,  JM_EQ, JM_FIRE2 },
+  { 8, 128, JM_EQ, JM_FIRE3 },
   { 8, 1,   JM_EQ, JM_FIRE },
 
   // Autofire toggles
@@ -98,9 +101,9 @@ static const size_t JM_MOUSE_BTN_RULES_C64_COUNT = sizeof(JM_MOUSE_BTN_RULES_C64
 // -------------------- Custom rules (JOYSTICK AS MOUSE MODE - Amiga/Atari buttons) --------------------
 // Typical: fire + button2 (right mouse button line).
 static const JM_Rule JM_MOUSE_BTN_RULES_A[] = {
-  { 8, 64,  JM_EQ, JM_FIRE },
   { 8, 1,   JM_EQ, JM_FIRE },
-  { 8, 128, JM_EQ, JM_BUTTON2 },   // Your custom firmware behavior
+  { 8, 64,  JM_EQ, JM_BUTTON2 },
+  { 8, 128, JM_EQ, JM_BUTTON3 },
   { 8, 16,  JM_EQ, JM_AUTOFIRE_ON },
   { 8, 2,   JM_EQ, JM_AUTOFIRE_OFF }
 };
@@ -140,7 +143,8 @@ static inline bool JM_match(const JM_Rule &r, const uint8_t *data, int length) {
   return ((v & r.value) != 0);
 }
 
-static inline void JM_applyDirFunc(JM_Func f, bool &up, bool &down, bool &left, bool &right, bool &fire) {
+static inline void JM_applyDirFunc(JM_Func f, bool &up, bool &down, bool &left, bool &right,
+                                   bool &fire, bool &fire2, bool &fire3) {
   switch (f) {
     case JM_UP:         up = true; break;
     case JM_UP_RIGHT:   up = true; right = true; break;
@@ -151,15 +155,18 @@ static inline void JM_applyDirFunc(JM_Func f, bool &up, bool &down, bool &left, 
     case JM_LEFT:       left = true; break;
     case JM_LEFT_UP:    up = true; left = true; break;
     case JM_FIRE:       fire = true; break;
+    case JM_FIRE2:      fire2 = true; break;
+    case JM_FIRE3:      fire3 = true; break;
     default: break;
   }
 }
 
 // Decode joystick mode rules into flags + persistent toggles.
 static inline void JM_DecodeJoystickMode(const uint8_t *data, int length,
-                                        bool &up, bool &down, bool &left, bool &right, bool &fire,
+                                        bool &up, bool &down, bool &left, bool &right,
+                                        bool &fire, bool &fire2, bool &fire3,
                                         bool &autofireEnabled, bool &autoleftrightEnabled) {
-  up = down = left = right = fire = false;
+  up = down = left = right = fire = fire2 = fire3 = false;
 
   for (size_t i = 0; i < JM_JOY_RULES_COUNT; i++) {
     const JM_Rule &r = JM_JOY_RULES[i];
@@ -170,7 +177,7 @@ static inline void JM_DecodeJoystickMode(const uint8_t *data, int length,
     if (r.func == JM_AUTOLEFTRIGHT_ON)   { JM_autoleftright = true;  continue; }
     if (r.func == JM_AUTOLEFTRIGHT_OFF)  { JM_autoleftright = false; continue; }
 
-    JM_applyDirFunc(r.func, up, down, left, right, fire);
+    JM_applyDirFunc(r.func, up, down, left, right, fire, fire2, fire3);
   }
 
   autofireEnabled = JM_autofire;
@@ -199,9 +206,10 @@ static inline void JM_DecodeMouseModeButtons_C64(const uint8_t *data, int length
 
 // Decode joystick-as-mouse buttons for Amiga/Atari.
 static inline void JM_DecodeMouseModeButtons_A(const uint8_t *data, int length,
-                                              bool &fire, bool &button2, bool &autofireEnabled) {
+                                              bool &fire, bool &button2, bool &button3, bool &autofireEnabled) {
   fire = false;
   button2 = false;
+  button3 = false;
 
   for (size_t i = 0; i < JM_MOUSE_BTN_RULES_A_COUNT; i++) {
     const JM_Rule &r = JM_MOUSE_BTN_RULES_A[i];
@@ -212,6 +220,7 @@ static inline void JM_DecodeMouseModeButtons_A(const uint8_t *data, int length,
 
     if (r.func == JM_FIRE)     fire = true;
     if (r.func == JM_BUTTON2)  button2 = true;
+    if (r.func == JM_BUTTON3)  button3 = true;
   }
 
   autofireEnabled = JM_autofire;
@@ -285,9 +294,10 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t *data, int length, int 
 
 // Stubs for LEARN mode (main sketch uses EEPROM learned mapping)
 static inline void JM_DecodeJoystickMode(const uint8_t*, int,
-                                        bool &up, bool &down, bool &left, bool &right, bool &fire,
+                                        bool &up, bool &down, bool &left, bool &right,
+                                        bool &fire, bool &fire2, bool &fire3,
                                         bool &autofireEnabled, bool &autoleftrightEnabled) {
-  up = down = left = right = fire = false;
+  up = down = left = right = fire = fire2 = fire3 = false;
   autofireEnabled = false;
   autoleftrightEnabled = false;
 }
@@ -300,9 +310,10 @@ static inline void JM_DecodeMouseModeButtons_C64(const uint8_t*, int,
 }
 
 static inline void JM_DecodeMouseModeButtons_A(const uint8_t*, int,
-                                              bool &fire, bool &button2, bool &autofireEnabled) {
+                                              bool &fire, bool &button2, bool &button3, bool &autofireEnabled) {
   fire = false;
   button2 = false;
+  button3 = false;
   autofireEnabled = false;
 }
 
@@ -320,4 +331,3 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
 #define JM_ATARI_PULSE_SCALE 18.6f
 
 #endif
-

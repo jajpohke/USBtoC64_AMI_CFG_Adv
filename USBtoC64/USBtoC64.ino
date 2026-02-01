@@ -713,12 +713,14 @@ static inline void applyPins_C64(bool up, bool down, bool left, bool right, bool
   if (fire)  { pinMode(C64_FIRE, OUTPUT);  digitalWrite(C64_FIRE, LOW); }  else { digitalWrite(C64_FIRE, LOW);  pinMode(C64_FIRE, INPUT); }
 }
 
-static inline void applyPins_A(bool up, bool down, bool left, bool right, bool fire) {
+static inline void applyPins_A(bool up, bool down, bool left, bool right, bool fire, bool fire2, bool fire3) {
   if (up)    { pinMode(A_UP, OUTPUT);    digitalWrite(A_UP, LOW); }    else { digitalWrite(A_UP, LOW);    pinMode(A_UP, INPUT); }
   if (down)  { pinMode(A_DOWN, OUTPUT);  digitalWrite(A_DOWN, LOW); }  else { digitalWrite(A_DOWN, LOW);  pinMode(A_DOWN, INPUT); }
   if (left)  { pinMode(A_LEFT, OUTPUT);  digitalWrite(A_LEFT, LOW); }  else { digitalWrite(A_LEFT, LOW);  pinMode(A_LEFT, INPUT); }
   if (right) { pinMode(A_RIGHT, OUTPUT); digitalWrite(A_RIGHT, LOW); } else { digitalWrite(A_RIGHT, LOW); pinMode(A_RIGHT, INPUT); }
   if (fire)  { pinMode(A_FIRE, OUTPUT);  digitalWrite(A_FIRE, LOW); }  else { digitalWrite(A_FIRE, LOW);  pinMode(A_FIRE, INPUT); }
+  if (fire2) { pinMode(A_BUTTON2, OUTPUT); digitalWrite(A_BUTTON2, LOW); } else { digitalWrite(A_BUTTON2, LOW); pinMode(A_BUTTON2, INPUT); }
+  if (fire3) { pinMode(A_BUTTON3, OUTPUT); digitalWrite(A_BUTTON3, LOW); } else { digitalWrite(A_BUTTON3, LOW); pinMode(A_BUTTON3, INPUT); }
 }
 
 static inline void applyAutofirePulse_C64(bool enabled) {
@@ -780,11 +782,12 @@ static inline void applyAutoLeftRight_A(bool enabled) {
 // -------------------- Joystick (joystick mode) --------------------
 void c64_joystick_j(const uint8_t *const data, const int length) {
 #if (JOY_MAPPING_MODE == JOY_MAP_CUSTOM)
-  bool up=false, down=false, left=false, right=false, fire=false;
+  bool up=false, down=false, left=false, right=false, fire=false, fire2=false, fire3=false;
   bool autofireEnabled = false;
   bool autoleftrightEnabled = false;
 
-  JM_DecodeJoystickMode(data, length, up, down, left, right, fire, autofireEnabled, autoleftrightEnabled);
+  JM_DecodeJoystickMode(data, length, up, down, left, right, fire, fire2, fire3,
+                        autofireEnabled, autoleftrightEnabled);
 
   applyAutofirePulse_C64(autofireEnabled);
   applyAutoLeftRight_C64(autoleftrightEnabled);
@@ -814,15 +817,16 @@ void c64_joystick_j(const uint8_t *const data, const int length) {
 
 void a_joystick_j(const uint8_t *const data, const int length) {
 #if (JOY_MAPPING_MODE == JOY_MAP_CUSTOM)
-  bool up=false, down=false, left=false, right=false, fire=false;
+  bool up=false, down=false, left=false, right=false, fire=false, fire2=false, fire3=false;
   bool autofireEnabled = false;
   bool autoleftrightEnabled = false;
 
-  JM_DecodeJoystickMode(data, length, up, down, left, right, fire, autofireEnabled, autoleftrightEnabled);
+  JM_DecodeJoystickMode(data, length, up, down, left, right, fire, fire2, fire3,
+                        autofireEnabled, autoleftrightEnabled);
 
   applyAutofirePulse_A(autofireEnabled);
   applyAutoLeftRight_A(autoleftrightEnabled);
-  applyPins_A(up, down, left, right, fire);
+  applyPins_A(up, down, left, right, fire, fire2, fire3);
 #else
   if (data[joyPos[0]] == joyVal[0]) { pinMode(A_UP, OUTPUT); digitalWrite(A_UP, LOW); }
   else { digitalWrite(A_UP, LOW); pinMode(A_UP, INPUT); }
@@ -921,9 +925,10 @@ void a_joystick_m(const uint8_t *const data, const int length) {
 #if (JOY_MAPPING_MODE == JOY_MAP_CUSTOM)
   bool fire = false;
   bool button2 = false;
+  bool button3 = false;
   bool autofireEnabled = false;
 
-  JM_DecodeMouseModeButtons_A(data, length, fire, button2, autofireEnabled);
+  JM_DecodeMouseModeButtons_A(data, length, fire, button2, button3, autofireEnabled);
 
   // Apply buttons (same behavior as your custom firmware: fire + button2)
   if (fire) { pinMode(A_FIRE, OUTPUT); digitalWrite(A_FIRE, LOW); }
@@ -931,6 +936,9 @@ void a_joystick_m(const uint8_t *const data, const int length) {
 
   if (button2) { pinMode(A_BUTTON2, OUTPUT); digitalWrite(A_BUTTON2, LOW); }
   else         { digitalWrite(A_BUTTON2, LOW); pinMode(A_BUTTON2, INPUT); }
+
+  if (button3) { pinMode(A_BUTTON3, OUTPUT); digitalWrite(A_BUTTON3, LOW); }
+  else         { digitalWrite(A_BUTTON3, LOW); pinMode(A_BUTTON3, INPUT); }
 
   // Analog -> signed steps (same concept as your custom function)
   int xStepsSigned = 0;
