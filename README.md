@@ -3,7 +3,7 @@
  This fork is about use fire 2 and 3 on C64 and Amiga. Base board is the same.
  Mouse funcions are at the moment non implemented.
  The Aim of this fork is use Original HTML configurator and give precompiled joystick profiles; its also possible to map some joystick like Hori Fighting Stich, WiFiDongle Snes.
- THIS PROCJECT IS SPERIMENTAL AND NOT COMMERCIAL SO USE ONLY AT YOUR RISK!!!!! Please refear to original prokect for more informations <a href="https://github.com/emanuelelaface/USBtoC64/">https://github.com/emanuelelaface/USBtoC64/</a>
+ THIS PROJECT IS SPERIMENTAL AND NOT COMMERCIAL SO USE ONLY AT YOUR RISK!!!!! Please refear to original prokect for more informations <a href="https://github.com/emanuelelaface/USBtoC64/">https://github.com/emanuelelaface/USBtoC64/</a>
 
 ### Features ###
 
