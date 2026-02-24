@@ -100,6 +100,18 @@ Connect the ESP32 to your PC, open a Serial Terminal (115200 baud), and type `se
 
 ---
 
+## ⚠️ Known Issues & Hardware Quirks
+
+When dealing with a vast array of third-party USB controllers, some specific devices may exhibit unusual initialization behaviors due to their internal hardware design. Here are the known quirks and their simple workarounds:
+
+* **Hori Mini Fighting Stick (PS3/PS4):**
+  * **The Issue:** If plugged in before powering on the ESP32, or if cold-booted, the stick might not be recognized or might fail to send inputs.
+  * **The Fix:** Simply press the physical **RESET** button on the ESP32 board *after* the controller is plugged in, or quickly unplug and re-plug the controller's USB cable while the system is already powered on.
+
+* **SNES Pad Clones with 2.4GHz Wi-Fi/Wireless Dongles:**
+  * **The Issue:** Some cheap wireless clones fail to initialize their USB descriptor correctly if their proprietary USB receiver (dongle) is plugged into the adapter *before* the system is powered up. The ESP32's USB Host might get stuck waiting for a response that never arrives.
+  * **The Fix:** Always turn on your C64/Amiga and wait for the ESP32 to fully boot (the LED will show the Orange or White idle state). **Only after the boot sequence is complete**, plug the proprietary USB dongle into the adapter.
+
 ## 🤝 Credits
 * Original hardware concept and base firmware by **[Emanuele Laface](https://github.com/emanuelelaface/USBtoC64)**.
 * This Advanced fork (Native Engine, Auto-Dumper, and Polling Diagnostics) is the work of **Jahpohke** and **Thelowest**.
