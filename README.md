@@ -5,6 +5,61 @@
  The Aim of this fork is use Original HTML configurator and give precompiled joystick profiles; its also possible to map some joystick like Hori Fighting Stich, WiFiDongle Snes.
  THIS PROCJECT IS SPERIMENTAL AND NOT COMMERCIAL SO USE ONLY AT YOUR RISK!!!!! Please refear to original prokect for more informations <a href="https://github.com/emanuelelaface/USBtoC64/">https://github.com/emanuelelaface/USBtoC64/</a>
 
+### Features ###
+
+# 🕹️ USB to Commodore 64 & Amiga Joystick Adapter (Advanced Edition)
+
+An advanced, high-performance ESP32-S3 firmware to connect modern USB controllers to classic Commodore 64 and Amiga computers. 
+
+This project is an advanced fork of the excellent [Original USBtoC64 Project](https://github.com/emanuelelaface/USBtoC64). It supercharges the original WebHID HTML configurator concept by introducing a **Zero-Lag Native C++ Engine**, **Advanced Diagnostics**, and a **Smart Auto-Dumper**.
+
+## 🔌 Hardware Setup & Wiring
+
+For the complete schematic, wiring instructions, and crucial safety precautions (such as using diodes to protect the C64's delicate SID chip), **please refer exclusively to the original project's documentation**: 
+
+👉 **[Original Project Hardware Guide](https://github.com/emanuelelaface/USBtoC64)**
+
+---
+
+## ✨ Advanced "Killer" Features
+
+* 🚀 **Zero-Lag Hybrid Engine:** Use the flexible HTML Web configurator to test unknown pads, or rely on the blazing-fast Native C++ Engine for permanently mapped controllers.
+* 🧠 **Smart Auto-Dumper:** Created a great profile via the Web HTML tool? Open the serial monitor, type `sniffer`, and the ESP32 will automatically translate your HTML rules into pure C++ code ready to be pasted into the Native Engine!
+* ⏱️ **Polling Rate Tester:** Ever wonder if your cheap USB pad is causing input lag? Type `polling` in the serial monitor to run a 3-second hardware benchmark. The ESP32 will calculate the exact Polling Rate (Hz) and input latency (ms) of your controller.
+* 🎮 **Dual-Analog & Hat-Switch Support:** Fully supports modern controllers (PS3/PS4/GameCube clones), mapping both left/right analog sticks and complex D-Pads simultaneously.
+
+---
+
+## 💻 The Interactive Service Menu (Serial Console)
+
+Connect the ESP32 to your PC, open a Serial Terminal (115200 baud), and type `service` to access the advanced dashboard.
+
+### Available Commands:
+* `sniffer` - **The Magic Tool.** If you have an HTML profile active, it auto-converts it to C++. If no profile is active, it starts a step-by-step wizard to map a new unknown gamepad manually.
+* `polling` - Starts the hardware latency benchmark. Move the sticks for 3 seconds to get your controller's exact Hz and ms rating.
+* `gpio` - Opens a real-time visual dashboard showing the electrical state (HIGH/LOW) of every single DB9 pin.
+* `debug` - Prints logical button presses to the screen (useful for testing mappings).
+* `play` - Returns the device to standard Zero-Lag gaming mode.
+* `reboot` - Soft reboots the ESP32.
+* `flash` - Reboots the ESP32 directly into **DFU/Programming Mode** (No need to press the physical BOOT button on the board!).
+
+---
+
+## 🛠️ How to map a Controller Permanently (Auto-Dump)
+
+1. Connect your unknown USB controller.
+2. Use the HTML WebHID page to map your buttons and verify they work perfectly in-game.
+3. Open the Serial Monitor and type `sniffer`.
+4. The ESP32 will ask: `HTML Profile detected! Do you want to Auto-Import it? (Y/N)`
+5. Type `Y`, give your controller a name, and press Enter.
+6. Copy the generated C++ block and paste it into the `JoystickProfiles.h` file.
+7. Recompile. Your controller is now running on the pure Native Engine!
+
+---
+
+## 🤝 Credits
+* Original hardware concept and base firmware by **[Emanuele Laface](https://github.com/emanuelelaface/USBtoC64)**.
+* This Advanced fork (Native Engine, Auto-Dumper, and Polling Diagnostics) is the work of **Jahpohke** and **Thelowest**.
 
 ## Pre-assembled and Tested Board
 
