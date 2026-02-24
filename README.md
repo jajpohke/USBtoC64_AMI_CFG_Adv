@@ -27,8 +27,6 @@ Once you have finished the assembly, you can instantly verify if the firmware an
 
 If the LED matches your computer, the auto-detection is successful and you are ready to plug in your USB controller!
 
----
-
 ## ✨ Advanced "Killer" Features
 
 * 🚀 **Zero-Lag Hybrid Engine:** Use the flexible HTML Web configurator to test unknown pads, or rely on the blazing-fast Native C++ Engine for permanently mapped controllers.
@@ -36,16 +34,6 @@ If the LED matches your computer, the auto-detection is successful and you are r
 * ⏱️ **Polling Rate Tester:** Ever wonder if your cheap USB pad is causing input lag? Type `polling` in the serial monitor to run a 3-second hardware benchmark. The ESP32 will calculate the exact Polling Rate (Hz) and input latency (ms) of your controller.
 * 🎮 **Dual-Analog & Hat-Switch Support:** Fully supports modern controllers (PS3/PS4/GameCube clones), mapping both left/right analog sticks and complex D-Pads simultaneously.
 
----
-
-## 🚥 LED Status & Visual Feedback
-
-The WS2812B RGB LED provides instant visual feedback on the adapter's state and your inputs. It's your primary diagnostic tool without needing a PC.
-
-### 1. Boot & Auto-Detection (Idle State)
-When the adapter is powered on and no buttons are pressed, the LED indicates the connected system:
-* 🟠 **Orange/Amber:** Detected a **Commodore 64** (Breadbin style).
-* ⚪ **White:** Detected an **Amiga**.
 
 ### 2. Engine Mode Indication
 The adapter features two different processing engines, and the LED tells you which one is currently driving your controller:
