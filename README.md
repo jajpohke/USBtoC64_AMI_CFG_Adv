@@ -86,8 +86,8 @@ The WS2812B RGB LED provides instant visual feedback on the adapter's state and 
 
 ### 1. Boot & Auto-Detection (Idle State)
 Once you have finished the assembly, you can instantly verify if the firmware and auto-detection are working correctly. Power on your classic computer **without connecting any USB joystick yet**:
-* 🟠 **Orange/Amber:** Detected a **Commodore 64** (Breadbin style).
-* ⚪ **White:** Detected an **Amiga**.
+* 🟠 **Orange/Amber:** Detected a **Commodore 64** (just like a yellowed breadbin case).
+* ⚪ **White:** Detected an **Amiga** (I know that CD32 and CDTV are black but....).
 
 ### 2. Engine Mode Indication
 The adapter features two different processing engines, and the LED tells you which one is currently driving your controller:
