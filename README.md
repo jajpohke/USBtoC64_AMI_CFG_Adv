@@ -1,43 +1,10 @@
-# USB Adapter for Commodore 64, AMIGA and ATARI Joystick and Mouse Port
+### Sperimental ### 
 
-This adapter interfaces a USB device with the CONTROL Port of the C64, AMIGA and ATARI, allowing it to be used as a mouse or joystick.
+ This fork is about use fire 2 and 3 on C64 and Amiga. Base board is the same.
+ Mouse funcions are at the moment non implemented.
+ The Aim of this fork is use Original HTML configurator and give precompiled joystick profiles; its also possible to map some joystick like Hori Fighting Stich, WiFiDongle Snes.
+ THIS PROCJECT IS SPERIMENTAL AND NOT COMMERCIAL SO USE ONLY AT YOUR RISK!!!!! Please refear to original prokect for more informations <a href="https://github.com/emanuelelaface/USBtoC64/">https://github.com/emanuelelaface/USBtoC64/</a>
 
-The joystick connects via pins 1, 2, 3, 4, and 6 of the CONTROL port, with the GPIOs simply set as open circuits or shorted to ground when a joystick direction is pressed.
-
-On the C64, the mouse uses the analog part of the port (Pot X and Pot Y). The Commodore 64 has these two pins for evaluating an analog resistor that charges an internal capacitor. The charging time is decoded as a resistor value with a digital value from 0 to 255. The trick used by Commodore engineers to use it as a mouse was to send a pulse at the right moment, making the C64 believe that the capacitor is fully charged. To establish the right moment, the C64 goes through 512 cycles (almost 512 microseconds, since the clock frequencies of PAL and NTSC are not exactly 1 MHz: PAL is 0.985248 MHz, NTSC is 1.022727 MHz). During the first 256 cycles, the potentiometer is set to ground, then it charges the capacitor.
-
-The idea is to use an ESP32 board to wait for the discharge drop and then an additional 256 cycles, finally sending the proper value to the C64 at the right moment. The ESP32 allows interrupts when an input signal is falling; however, the voltage from the C64 is a bit too low for the ESP32 interrupt because the board requires at least 3 volts, while the C64 provides around 1.2 volts. Therefore, a BJT is used to amplify the signal (and invert it, so it is HIGH when the C64 is LOW, which reduces noise in detecting the status).
-
-The initial variable values are the timing for a PAL C64 and are obtained empirically. The NTSC version of the timings are calculated scaling for the ratio of the frequencies NTSC/PAL. It is possible that another C64 may use slightly different timing, though it should be quite stable since Commodore sold the same mouse to everyone. When I will have one NTSC Commodore, I will test it and adjust the timings if needed.
-
-On AMIGA and ATARI the mouse is encoded in the quadrature signal using two trains of pulses with 90 degrees of shift in order to identify the steps and the directions of the motion.
-
-There is an additional switch to make the board work in mouse mode or joystick mode. In mouse mode, any connected device will use the analog mouse, so a program like GEOS can be controlled with a USB mouse or a gamepad. In joystick mode, the board uses the joystick pins for any kind of device. This means that some games, like graphic adventure games (e.g., Maniac Mansion), can be played with a mouse even if they were originally designed for a game controller.
-
-The target computer selection (C64 / AMIGA / ATARI) is user-selectable and stored in non-volatile memory, so it persists across reboots. To change it you must connect a USB mouse to the adapter, turn on the computer and, within the first 30 seconds from the boot, press and hold one mouse button for about 5 seconds until the LED blinks. The button you hold selects the target machine:
-- **Left button**: Commodore 64
-- **Right button**: AMIGA
-- **Middle button**: ATARI
-
-After the LED blink feedback, the adapter reboots and returns to the normal LED behavior (mouse mode or joystick mode depending on the switch position).
-
-The PCB are in two versions: THT (version 3.2) and SMD (version 4.1). The functionalities are identical.
-
-<p align="center">
-  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/schematic.jpeg" alt="Schematic" style="width: 50%;">
-</p>
-
-<div style="display: flex; justify-content: space-between;">
-  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-smd.JPG" alt="SMD" style="width: 32%;">
-  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-smd-c64.JPG" alt="SMD C64" style="width: 32%;">
-  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-smd-amiga.JPG" alt="SMD Amiga" style="width: 32%;">
-</div>
-
-<div style="display: flex; justify-content: space-between;">
-  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-tht.JPG" alt="THT" style="width: 32%;">
-  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-tht-c64.jpg" alt="THT C64" style="width: 32%;">
-  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-tht-c64-mouse.jpg" alt="THT C64 Mouse" style="width: 32%;">
-</div>
 
 ## Pre-assembled and Tested Board
 
@@ -73,12 +40,12 @@ To select PAL or NTSC timing the `#define PAL` line has to be set as true or fal
 
 ## Installation From the Binary File
 
-Alternatively, you can load the binary file **USBtoC64-AMIGA-ATARI-PAL.bin** or **USBtoC64-AMIGA-ATARI-NTSC.bin**, which are located in the `BIN` folder.
+Alternatively, you can load the binary file **USBtoC64_Amiga_Joy.bin** located in the `BIN` folder.
 The tool to upload the binary is `esptool`. This is available as a web page or as python. The web page should be compatible with Chrome browser or similar, probably not with Firefox, but on some operating system (like Mac OS) there can be a problem of binding the port to the web page. Anyway my suggestion is to try the web page first because it is very fast, and if it does not work try with the python installation.
 
 ### From the web page
 
-1. Disconnect the adapter from the Commodore 64 / AMIGA / ATARI.
+1. Disconnect the adapter from the Commodore 64 / AMIGA.
 2. Press and hold the **BOOT** button before connecting the board to the USB cable on the computer. Then, connect the board, wait a second, and release the button.
 3. Go to the [esptool](https://espressif.github.io/esptool-js/) website, click on **Connect**, select the port for your adapter, change the Flash Address into `0x0000` and upload the firmware.
 
@@ -89,7 +56,7 @@ The tool to upload the binary is `esptool`. This is available as a web page or a
 3. Press and hold the **BOOT** button before connecting the board to the USB cable on the computer. Then, connect the board, wait a second, and release the button.
 4. On the computer, run:
 
-   `esptool.py -b 921600 -c esp32s3 -p <PORT> write_flash --flash_freq 80m 0x00000 USBtoC64-<PAL|NTSC>.bin`
+   `esptool.py -b 921600 -c esp32s3 -p <PORT> write_flash --flash_freq 80m 0x00000 USBtoC64_Amiga_Joy.bin`
 
    where `<PORT>` is the USB port created once the board is connected. On Windows, it is probably COM3 or something similar. On Linux and Mac, it will be `/dev/tty.USBsomething` or `/dev/cu.usbsomething`. `<PAL|NTSC>` is the version with the timings for PAL or for NTSC version of the Commodore 64.
 
@@ -97,37 +64,24 @@ The tool to upload the binary is `esptool`. This is available as a web page or a
 
 ## Joystick Configuration
 
-Each joystick or gamepad presents data to the USB in a different way. The library used for ESP32 receives an array of `uint8_t` where each element of the array is connected to a button or an axis, and it is not possible to predict in advance how the joystick will associate this data to the buttons. Therefore, the user has to configure the USBtoC64 manually. To do this, follow the procedure below:
 
-- Identify the **BOOT** button on the board. It is the left button when the USB port is oriented towards the top.
-- Disconnect the joystick from the controller.
-- When the controller is connected to the Commodore 64, it will boot with a `RED` LED for one second, then it will change to green (for Joystick) or blue (for mouse) depending on the position of the switch mode.
-- To set the controller in configuration mode, the **BOOT** button must be pressed during the red light. This can be done by rebooting the board (pressing the other button on the board, which is the reset button) and then holding the **BOOT** button during the red LED.
-- If pressed correctly, the red light will flash 10 times quickly, and then a `GREEN` LED will indicate that the board is in configuration mode.
-- Insert the USB controller to configure; the green light should turn off, and the controller is ready to be programmed.
-- The procedure now requires the insertion of 7 controls: the 4 directions in the exact sequence **UP, DOWN, LEFT, RIGHT**, and then 3 buttons for **FIRE**. (3 because most controllers have many buttons and it can be useful to map more than one to fire. Additionally, when the joystick is used in mouse mode, the first 2 fire buttons are assigned as left and right buttons.)
-- To associate the controls, press the **BOOT** button each time and then the controller direction.
-- Press the **BOOT** button; a `BLUE` LED should appear, and the controller will wait for the UP direction. Once the UP direction is pressed on the controller, the blue LED will turn off.
-- Repeat the previous step for DOWN, LEFT, RIGHT, FIRE1, FIRE2, FIRE3.
-- After the last button, the controller will flash a `GREEN` LED and will be set to work with that controller.
-- It is now possible to reboot the controller and use it with the configured joystick.
 
-If your controller is advanced, with analog joystick and you want to map specifically as mouse or you want some more advanced customization you can discover how your values are mapped following this [Configurator](https://raw.githack.com/emanuelelaface/USBtoC64/main/configurator/config.html) (it works on Chrome and similar browsers, not on Firefox) and once you download the JoystickMapping file you can contact me for a specific configuration, or if you know your business you can code your controls directly in the firmware source replacing the example JoystickMapping.h file and upload to your controller.
+you can discover how your values are mapped following this [Configurator](https://raw.githack.com/emanuelelaface/USBtoC64/main/configurator/config.html) (it works on Chrome and similar browsers, not on Firefox) and once you download the JoystickMapping.h file you can code your controls directly in the firmware source replacing the example JoystickMapping.h file and upload to your controller.
 
----
+If you connect your ESP to SerialMonitor and type "service" then the following dialog txt will provide some features:
+- 'sniffer'  : Map a new pad via wizard OR Auto-Convert HTML
+- 'raw'      : Show raw USB matrix
+- 'debug'    : Print logical buttons to screen
+- 'gpio'     : Real-time visual dashboard of hardware states
+- 'polling'  : Measure USB Polling Rate (Input Lag)
+- 'play'     : Return to ZERO-LAG gaming
+- 'c64'      : Set Fire 2 to POT (Default) (for bench test or Amiga disconnected)
+- 'amiga'    : Set Fire 2 to Pin 9 (for bench test or C64 disconnected)
+- 'reboot'   : Restart the device softly
+- 'flash'    : Reboot into Programming/DFU Mode
 
-## Mouse Wheel Support (C64OS + AmigaOS)
 
-An additional **MouseMapping.h** is available to support the **mouse wheel (scroll)** on both **C64OS** and **AmigaOS**.
-In order to activate it in the code the variable **MOUSE_MAP_CUSTOM** must be set to **1** and the proper mouse mapping has to be added in the **MM_REPORT_MAPS**. This requires to know how the bytes of the mouse are mapped, I am working on a procedure to get this authomatically in the future.
 
-### C64OS (Wheel Support)
-- Requires **C64OS version 1.03 or newer**.
-- In the **Mouse** settings/menu, select the **Micromys** driver.
-
-### AmigaOS (Wheel Support)
-- Install [FreeWheel](https://aminet.net/package/util/mouse/FreeWheel) on your Amiga.
-- Open **FreeWheel** settings, go to **Set Buttons**, and set the **Middle button** to enable scrolling.
 
 ---
 
