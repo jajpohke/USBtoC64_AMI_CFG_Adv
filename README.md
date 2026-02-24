@@ -27,10 +27,6 @@ Once you have finished the assembly, you can instantly verify if the firmware an
 
 If the LED matches your computer, the auto-detection is successful and you are ready to plug in your USB controller!
 
-For the complete schematic, wiring instructions, and crucial safety precautions (such as using diodes to protect the C64's delicate SID chip), **please refer exclusively to the original project's documentation**: 
-
-👉 **[Original Project Hardware Guide](https://github.com/emanuelelaface/USBtoC64)**
-
 ---
 
 ## ✨ Advanced "Killer" Features
@@ -39,6 +35,41 @@ For the complete schematic, wiring instructions, and crucial safety precautions 
 * 🧠 **Smart Auto-Dumper:** Created a great profile via the Web HTML tool? Open the serial monitor, type `sniffer`, and the ESP32 will automatically translate your HTML rules into pure C++ code ready to be pasted into the Native Engine!
 * ⏱️ **Polling Rate Tester:** Ever wonder if your cheap USB pad is causing input lag? Type `polling` in the serial monitor to run a 3-second hardware benchmark. The ESP32 will calculate the exact Polling Rate (Hz) and input latency (ms) of your controller.
 * 🎮 **Dual-Analog & Hat-Switch Support:** Fully supports modern controllers (PS3/PS4/GameCube clones), mapping both left/right analog sticks and complex D-Pads simultaneously.
+
+---
+
+## 🚥 LED Status & Visual Feedback
+
+The WS2812B RGB LED provides instant visual feedback on the adapter's state and your inputs. It's your primary diagnostic tool without needing a PC.
+
+### 1. Boot & Auto-Detection (Idle State)
+When the adapter is powered on and no buttons are pressed, the LED indicates the connected system:
+* 🟠 **Orange/Amber:** Detected a **Commodore 64** (Breadbin style).
+* ⚪ **White:** Detected an **Amiga**.
+
+### 2. Engine Mode Indication
+The adapter features two different processing engines, and the LED tells you which one is currently driving your controller:
+* 🟢 **Solid Green (`0, 100, 0`):** The controller is running via the **HTML WebHID Engine** (`JoystickMapping.h`). 
+* 🌈 **Multi-Color Feedback:** The controller has been recognized by the **Native C++ Engine** (`JoystickProfiles.h`). In this mode, the LED is off (`Black`) while idle and changes color instantly based on your inputs.
+
+### 3. Native Engine Color Mapping (Action Feedback)
+When using a Native C++ profile, the LED provides zero-latency visual confirmation of your actions. 
+
+*💡 **Customization Tip:** You can easily personalize the LED colors for each individual gamepad! Just open the `JoystickProfiles.h` file and modify the hex color definitions assigned to each specific controller profile.*
+
+| Action | Default LED Color |
+| :--- | :--- |
+| **UP** | 🟣 Bright Purple |
+| **RIGHT** | 🟣 Purple |
+| **LEFT** | 🟣 Dark Purple |
+| **DOWN** | 🟣 Very Dark Purple |
+| **FIRE 1** | 🟢 Green |
+| **FIRE 2** | 🔴 Red |
+| **FIRE 3** | 🩵 Cyan |
+| **ALT UP (Jump)** | 🔵 Blue |
+| **AUTOFIRE (Active)** | 🟡 Yellow (Blinking on firing rhythm) |
+
+*Tip: If you press multiple buttons simultaneously, the LED prioritizes Action Buttons over Directional inputs.*
 
 ---
 
@@ -60,7 +91,7 @@ Connect the ESP32 to your PC, open a Serial Terminal (115200 baud), and type `se
 ## 🛠️ How to map a Controller Permanently (Auto-Dump)
 
 1. Connect your unknown USB controller.
-2. Use the HTML WebHID page to map your buttons and verify they work perfectly in-game.
+2. Use the **[HTML WebHID Configurator](https://raw.githack.com/emanuelelaface/USBtoC64/main/configurator/config.html)** to map your buttons and verify they work perfectly in-game.
 3. Open the Serial Monitor and type `sniffer`.
 4. The ESP32 will ask: `HTML Profile detected! Do you want to Auto-Import it? (Y/N)`
 5. Type `Y`, give your controller a name, and press Enter.
