@@ -19,6 +19,18 @@ For the complete schematic, wiring instructions, and crucial safety precautions 
 
 👉 **[Original Project Hardware Guide](https://github.com/emanuelelaface/USBtoC64)**
 
+### 💡 Visual Status Check (First Startup)
+Once you have finished the assembly, you can instantly verify if the firmware and auto-detection are working correctly. Power on your classic computer **without connecting any USB joystick yet**:
+
+* **🟠 Orange/Amber LED:** The adapter has detected a **Commodore 64** (color inspired by the classic "Breadbin" case).
+* **⚪ White LED:** The adapter has detected an **Amiga** (color inspired by the iconic white/cream cases).
+
+If the LED matches your computer, the auto-detection is successful and you are ready to plug in your USB controller!
+
+For the complete schematic, wiring instructions, and crucial safety precautions (such as using diodes to protect the C64's delicate SID chip), **please refer exclusively to the original project's documentation**: 
+
+👉 **[Original Project Hardware Guide](https://github.com/emanuelelaface/USBtoC64)**
+
 ---
 
 ## ✨ Advanced "Killer" Features
