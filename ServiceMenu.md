@@ -14,7 +14,7 @@ The Advanced Service Menu is a powerful command-line interface built directly in
 ### `new` Command
 **Maps a new unknown gamepad manually or auto-converts an HTML profile.**
 When you type `new`, the system checks if a generic HTML HID profile is currently active:
-* **Auto-Import:** If an HTML profile is detected, it will ask if you want to convert it. It will instantly generate the clean C++ code for your `JoystickProfiles.h`.
+* **Auto-Import Suggested method:** If an HTML profile is detected, it will ask if you want to convert it. It will instantly generate the clean C++ code for your `JoystickProfiles.h`.
 * **Manual Wizard (Sniffer):** If no HTML profile is active, it arms the Sniffer Wizard. Do not touch the pad for 1 second (to record the neutral state), then follow the on-screen prompts to press each button sequentially. It will generate a custom C++ profile at the end.
 
 ### `raw` Command
