@@ -4,7 +4,7 @@ The Advanced Service Menu is a powerful command-line interface built directly in
 
 ### How to access the menu
 1. Connect the ESP32 to your PC using a USB-to-TTL Serial Adapter (See hardware setup in the main README).
-2. Open a Serial Terminal (e.g., Arduino IDE Serial Monitor, PuTTY) set to **115200 Baud**, `8N1`, with `Newline` enabled.
+2. Open a Serial Terminal (Arduino IDE Serial Monitor) set to **115200 Baud**, `8N1`, with `Newline` enabled.
 3. Type `service` and press Enter.
 
 ---
