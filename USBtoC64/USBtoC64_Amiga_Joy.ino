@@ -1,399 +1,19 @@
+// ==========================================
+// USB to C64/Amiga Adapter - Advanced 2.8
+// File: USBtoC64_Amiga_Joy.ino
+// Description: Main Application and Service Menu
+// ==========================================
 #include <Arduino.h>
 #include <stdint.h>
 #include "soc/rtc_cntl_reg.h" 
-#include "Adafruit_NeoPixel.h"
-#include "JoystickProfiles.h" 
 
-String sniff_profile_name = "NEW_PAD"; 
+// --- Custom Modular Architecture ---
+#include "Globals.h"
+#include "Hardware.h"
+#include "AutoDumper.h"
+#include "JoystickEngine.h"
 
-#include "JoySniffer.h"
-
-// 🪄 --- HTML CONFIGURATOR FILE DETECTION --- 🪄
-#if __has_include("JoystickMapping.h")
-#include "JoystickMapping.h"
-#endif
-
-#if defined(JOY_MAPPING_MODE) && (JOY_MAPPING_MODE == JOY_MAP_CUSTOM)
-#define HAS_HTML_CONFIGURATOR 1
-#else
-#define HAS_HTML_CONFIGURATOR 0
-#endif
-
-extern "C" {
-  #include "freertos/FreeRTOS.h"
-  #include "freertos/task.h"
-  #include "freertos/queue.h"
-  #include "usb/usb_host.h"
-  #include "usb/usb_helpers.h"
-}
-
-// ⚡ --- GPIO PIN CONFIGURATION --- ⚡
-#define PIN_WS2812B 21 
-#define GP_RX 44
-#define GP_TX 43
-
-#define GP_UP 8
-#define GP_DOWN 9
-#define GP_LEFT 10
-#define GP_RIGHT 11
-#define GP_FIRE1 7   
-#define GP_FIRE2 5       
-#define GP_POTY 3        
-#define GP_POTY_GND 6    
-#define GP_C64_SIG_MODE_SW 4 
-#define GP1 1            
-
-Adafruit_NeoPixel ws2812b(1, PIN_WS2812B, NEO_GRB + NEO_KHZ800);
-
-// 🎨 --- SYSTEM LED COLORS DEFINITIONS --- 🎨
-#define LED_IDLE_AMIGA  ws2812b.Color(255, 255, 255) 
-#define LED_IDLE_C64    ws2812b.Color(255, 128, 0)   
-#define LED_DIR_UP      ws2812b.Color(180, 0, 255)   
-#define LED_DIR_RIGHT   ws2812b.Color(120, 0, 180)   
-#define LED_DIR_LEFT    ws2812b.Color(60, 0, 100)    
-#define LED_DIR_DOWN    ws2812b.Color(20, 0, 40)     
-#define LED_DIR_IDLE    ws2812b.Color(5, 0, 8)       
-#define LED_HTML_MODE   ws2812b.Color(0, 100, 0)     
-#define LED_OFF         ws2812b.Color(0, 0, 0)       
-
-// 🖥️ --- USB HOST VARIABLES --- 🖥️
-static usb_host_client_handle_t s_client = nullptr;
-static usb_device_handle_t      s_dev    = nullptr;
-static usb_transfer_t* s_in_xfer = nullptr;
-static uint8_t s_in_ep = 0, s_if_num = 0;
-static uint16_t s_in_mps = 0;
-static volatile uint8_t s_new_dev_addr = 0;
-
-// 🕹️ --- SYSTEM MODES & VARIABLES --- 🕹️
-enum SystemMode { MODE_PLAY, MODE_SERVICE, MODE_SNIFFER, MODE_RAW, MODE_DEBUG, MODE_GPIO, MODE_POLLING };
-SystemMode current_mode = MODE_PLAY;
-
-enum CmdState { CMD_IDLE, CMD_WAIT_IMPORT, CMD_WAIT_NAME_IMPORT, CMD_WAIT_NAME_MANUAL };
-CmdState cmd_state = CMD_IDLE;
-
-uint16_t last_gpio_state = 0xFFFF; 
-bool is_amiga = false;
-PadConfig current_profile; 
-bool device_connected = false;
-bool use_html_configurator = false; 
-
-uint16_t connected_vid = 0;
-uint16_t connected_pid = 0;
-
-bool joy_u = false, joy_d = false, joy_l = false, joy_r = false;
-bool joy_f1 = false, joy_f2 = false, joy_f3 = false, joy_up_alt = false, joy_auto = false;
-
-struct pkt_t { uint16_t len; uint8_t data[64]; };
-static QueueHandle_t s_pkt_q = nullptr;
-
-// ⏱️ --- POLLING TESTER VARIABLES --- ⏱️
-unsigned long polling_start_time = 0;
-uint32_t polling_packet_count = 0;
-bool polling_active = false;
-uint8_t polling_neutral_data[64]; 
-bool polling_neutral_saved = false;
-
-// 🔌 --- HARDWARE PIN MANAGEMENT --- 🔌
-void configure_console_mode(bool amiga_mode) {
-    is_amiga = amiga_mode;
-    if (is_amiga) {
-        pinMode(GP_POTY, INPUT); pinMode(GP_POTY_GND, INPUT); pinMode(GP_C64_SIG_MODE_SW, INPUT); 
-        Serial2.println("\n>>> SYSTEM SET TO: AMIGA (Fire 2 on Pin 9, Fire 3 on Pin 5) <<<");
-    } else {
-        pinMode(GP_POTY, OUTPUT); digitalWrite(GP_POTY, LOW);
-        pinMode(GP_POTY_GND, OUTPUT); digitalWrite(GP_POTY_GND, LOW);
-        pinMode(GP_C64_SIG_MODE_SW, OUTPUT); digitalWrite(GP_C64_SIG_MODE_SW, LOW);
-        Serial2.println("\n>>> SYSTEM SET TO: COMMODORE 64 (Fire 2 on POT X, Fire 3 on POT Y) <<<");
-    }
-}
-
-void set_joy_pin(int pin, bool pressed) {
-    if (pressed) { pinMode(pin, OUTPUT); digitalWrite(pin, LOW); } 
-    else { digitalWrite(pin, LOW); pinMode(pin, INPUT_PULLUP); }
-    if (!is_amiga && pin == GP_FIRE2) {
-        digitalWrite(GP_C64_SIG_MODE_SW, pressed ? HIGH : LOW);
-        pinMode(pin, INPUT_PULLUP); 
-    } 
-}
-
-void set_fire3_pin(bool pressed) {
-    if (is_amiga) {
-        if (pressed) { pinMode(GP_POTY, OUTPUT); digitalWrite(GP_POTY, LOW); } 
-        else { pinMode(GP_POTY, INPUT); }
-    } else {
-        if (pressed) {
-            pinMode(GP_POTY, INPUT); pinMode(GP_POTY_GND, OUTPUT); digitalWrite(GP_POTY_GND, HIGH);       
-        } else {
-            pinMode(GP_POTY_GND, OUTPUT); digitalWrite(GP_POTY_GND, LOW); 
-            pinMode(GP_POTY, OUTPUT); digitalWrite(GP_POTY, LOW);         
-        }
-    }
-}
-
-// 🧠 --- AUTO-DUMPER EXECUTION --- 🧠
-void execute_html_dump() {
-    Serial2.println("\n>>> HTML TO NATIVE AUTO-CONVERTER RUNNING... <<<");
-    int b_up=0, b_down=0, b_left=0, b_right=0;
-    int b_f1=0, b_f2=0, b_f3=0, b_up_alt=0, b_auto=0, b_auto_off=0;
-    uint8_t v_up=0, v_down=0, v_left=0, v_right=0;
-    uint8_t v_f1=0, v_f2=0, v_f3=0, v_up_alt=0, v_auto=0, v_auto_off=0;
-    int b_analog_x=0, b_analog_y=0, b_analog_rx=0, b_analog_ry=0;
-    bool is_bitmask = false;
-
-#if HAS_HTML_CONFIGURATOR
-    // Extract Analog Sticks properly
-#if JM_USE_ANALOG_MOUSE == 1
-    size_t count_x = sizeof(JM_MOUSE_X_INDEXES)/sizeof(JM_MOUSE_X_INDEXES[0]);
-    size_t count_y = sizeof(JM_MOUSE_Y_INDEXES)/sizeof(JM_MOUSE_Y_INDEXES[0]);
-    if (count_x > 0) b_analog_x = JM_MOUSE_X_INDEXES[0];
-    if (count_y > 0) b_analog_y = JM_MOUSE_Y_INDEXES[0];
-    if (count_x > 1) b_analog_rx = JM_MOUSE_X_INDEXES[1]; 
-    if (count_y > 1) b_analog_ry = JM_MOUSE_Y_INDEXES[1]; 
-#endif
-
-    for (size_t i = 0; i < JM_JOY_RULES_COUNT; i++) {
-        const JM_Rule &r = JM_JOY_RULES[i];
-        if (r.op == JM_BITANY) is_bitmask = true;
-
-        if (r.func == JM_UP) { 
-            if (r.index == JM_DPAD_INDEX && r.value <= 15) { b_up = r.index; v_up = r.value; }
-            else { b_up_alt = r.index; v_up_alt = r.value; }
-        }
-        if (r.func == JM_DOWN && r.index == JM_DPAD_INDEX && r.value <= 15) { b_down = r.index; v_down = r.value; }
-        if (r.func == JM_LEFT && r.index == JM_DPAD_INDEX && r.value <= 15) { b_left = r.index; v_left = r.value; }
-        if (r.func == JM_RIGHT && r.index == JM_DPAD_INDEX && r.value <= 15) { b_right = r.index; v_right = r.value; }
-        
-        if (r.func == JM_FIRE) { b_f1 = r.index; v_f1 = r.value; }
-        if (r.func == JM_FIRE2) { b_f2 = r.index; v_f2 = r.value; }
-        if (r.func == JM_FIRE3) { b_f3 = r.index; v_f3 = r.value; }
-        if (r.func == JM_AUTOFIRE_ON) { b_auto = r.index; v_auto = r.value; }
-        if (r.func == JM_AUTOFIRE_OFF) { b_auto_off = r.index; v_auto_off = r.value; }
-    }
-#endif
-
-    String type_str = is_bitmask ? "BITMASK" : "EXACT_VALUE";
-    if (!is_bitmask && v_up == 0 && v_right == 2 && v_down == 4 && v_left == 6) {
-        type_str = "HAT_SWITCH";
-    }
-
-    Serial2.println("\n// --- COPY THIS INTO YOUR JoystickProfiles.h ---");
-    Serial2.println("{");
-    Serial2.printf("  .name = \"%s\",\n", sniff_profile_name.c_str());
-    Serial2.printf("  .vid = %d, .pid = %d,\n", connected_vid, connected_pid);
-    Serial2.printf("  .dpad_type = %s,\n", type_str.c_str());
-    Serial2.printf("  .byte_x = %d, .byte_y = %d, .byte_analog_x = %d, .byte_analog_y = %d, .byte_analog_right_x = %d, .byte_analog_right_y = %d,\n", b_left, b_up, b_analog_x, b_analog_y, b_analog_rx, b_analog_ry);
-    Serial2.printf("  .byte_fire1 = %d, .byte_fire2 = %d, .byte_fire3 = %d, .byte_up_alt = %d, .byte_autofire = %d, .byte_autofire_off = %d,\n", b_f1, b_f2, b_f3, b_up_alt, b_auto, b_auto_off);
-    Serial2.printf("  .val_up = %d, .val_down = %d, .val_left = %d, .val_right = %d,\n", v_up, v_down, v_left, v_right);
-    Serial2.printf("  .val_fire1 = %d, .val_fire2 = %d, .val_fire3 = %d, .val_up_alt = %d, .val_autofire = %d, .val_autofire_off = %d,\n", v_f1, v_f2, v_f3, v_up_alt, v_auto, v_auto_off);
-    Serial2.println("  .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW");
-    Serial2.println("},");
-    Serial2.println("// ----------------------------------------------\n");
-}
-
-
-// 🎮 --- JOYSTICK PROCESSING --- 🎮
-void process_joystick(const uint8_t *raw_data, int len) {
-    if (current_mode == MODE_POLLING) {
-        if (polling_active) {
-            if (!polling_neutral_saved) {
-                memcpy(polling_neutral_data, raw_data, len > 64 ? 64 : len);
-                polling_neutral_saved = true;
-                return; 
-            }
-            if (polling_start_time == 0) {
-                bool changed = false;
-                for (int i = 0; i < len; i++) {
-                    if (abs((int)raw_data[i] - (int)polling_neutral_data[i]) > 2) { changed = true; break; }
-                }
-                if (changed) {
-                    polling_start_time = millis();
-                    polling_packet_count = 1;      
-                    Serial2.println("\n[!] Input detected! Starting 3-second test...");
-                }
-            } else { polling_packet_count++; }
-        }
-        return; 
-    }
-
-    if (current_mode == MODE_SNIFFER) { run_sniffer(connected_vid, connected_pid, raw_data, len); return; }
-    if (current_mode == MODE_RAW)     { run_raw_sniffer(raw_data, len); return; }
-    if (current_mode == MODE_SERVICE) return; 
-    if (!device_connected || len < 3) return;
-
-    bool u = false, d = false, l = false, r = false;
-    bool f1 = false, f2 = false, f3 = false, f_alt = false, auto_btn = false;
-
-#if HAS_HTML_CONFIGURATOR
-    if (use_html_configurator) {
-        bool f3_html = false;
-        for (size_t i = 0; i < JM_JOY_RULES_COUNT; i++) {
-            const JM_Rule &rule = JM_JOY_RULES[i];
-            if (rule.index >= len) continue;
-            uint8_t raw_val = raw_data[rule.index];
-            bool matched = false;
-
-            if (rule.op == JM_BITANY) { matched = ((raw_val & rule.value) != 0); } 
-            else if (rule.op == JM_EQ) {
-                if (raw_val == rule.value) { matched = true; } 
-                else if (rule.index == JM_DPAD_INDEX) {
-                    uint8_t hat_val = raw_val & 0x0F; 
-                    uint8_t btn_val = raw_val & 0xF0; 
-                    if (rule.value <= 15) { if (hat_val == rule.value) matched = true; } 
-                    else {
-                        uint8_t rule_btn_bits = rule.value & 0xF0;
-                        if (rule_btn_bits != 0 && (btn_val & rule_btn_bits) == rule_btn_bits) matched = true;
-                    }
-                }
-            }
-
-            if (matched) {
-                if (rule.func == JM_UP || rule.func == JM_UP_RIGHT || rule.func == JM_LEFT_UP) u = true;
-                if (rule.func == JM_DOWN || rule.func == JM_RIGHT_DOWN || rule.func == JM_DOWN_LEFT) d = true;
-                if (rule.func == JM_LEFT || rule.func == JM_DOWN_LEFT || rule.func == JM_LEFT_UP) l = true;
-                if (rule.func == JM_RIGHT || rule.func == JM_UP_RIGHT || rule.func == JM_RIGHT_DOWN) r = true;
-                
-                if (rule.func == JM_FIRE) f1 = true;
-                if (rule.func == JM_FIRE2) f2 = true;
-                if (rule.func == JM_FIRE3) f3_html = true;
-                if (rule.func == JM_AUTOFIRE_ON) JM_autofire = true;
-                if (rule.func == JM_AUTOFIRE_OFF) JM_autofire = false;
-            }
-        }
-        f3 = f3_html; f_alt = false; auto_btn = JM_autofire;
-        
-        #if JM_USE_ANALOG_MOUSE == 1
-        for (size_t i = 0; i < (sizeof(JM_MOUSE_X_INDEXES)/sizeof(JM_MOUSE_X_INDEXES[0])); i++) {
-            uint8_t idx = JM_MOUSE_X_INDEXES[i];
-            if (idx < len) {
-                uint8_t val = raw_data[idx];
-                if (val < JM_ANALOG_DEAD_LOW) l = true;
-                if (val > JM_ANALOG_DEAD_HIGH) r = true;
-            }
-        }
-        for (size_t i = 0; i < (sizeof(JM_MOUSE_Y_INDEXES)/sizeof(JM_MOUSE_Y_INDEXES[0])); i++) {
-            uint8_t idx = JM_MOUSE_Y_INDEXES[i];
-            if (idx < len) {
-                uint8_t val = raw_data[idx];
-                if (val < JM_ANALOG_DEAD_LOW) u = true;
-                if (val > JM_ANALOG_DEAD_HIGH) d = true;
-            }
-        }
-        #endif
-
-    } else {
-#endif
-        // --- NATIVE ENGINE ---
-        
-        // Step 1: Independently compute Analog values
-        bool a_u = false, a_d = false, a_l = false, a_r = false;
-        
-        if (current_profile.byte_analog_x != 0 || current_profile.byte_analog_y != 0) {
-            if (len > current_profile.byte_analog_x) {
-                uint8_t ax = raw_data[current_profile.byte_analog_x]; 
-                if (ax < 64) a_l = true; if (ax > 192) a_r = true;
-            }
-            if (len > current_profile.byte_analog_y) {
-                uint8_t ay = raw_data[current_profile.byte_analog_y];
-                if (ay < 64) a_u = true; if (ay > 192) a_d = true;
-            }
-        }
-        if (current_profile.byte_analog_right_x != 0 || current_profile.byte_analog_right_y != 0) {
-            if (len > current_profile.byte_analog_right_x) {
-                uint8_t rx = raw_data[current_profile.byte_analog_right_x]; 
-                if (rx < 64) a_l = true; if (rx > 192) a_r = true;
-            }
-            if (len > current_profile.byte_analog_right_y) {
-                uint8_t ry = raw_data[current_profile.byte_analog_right_y];
-                if (ry < 64) a_u = true; if (ry > 192) a_d = true;
-            }
-        }
-
-        // Step 2: Independently compute Digital D-Pad values
-        bool d_u = false, d_d = false, d_l = false, d_r = false;
-
-        if (current_profile.dpad_type == HYBRID_16BIT_BITMASK) {
-            int idx_x = current_profile.byte_analog_x; int idx_y = current_profile.byte_analog_y;
-            if (len > idx_y + 1) { 
-                int16_t axis_x = (int16_t)(raw_data[idx_x] | (raw_data[idx_x + 1] << 8));
-                int16_t axis_y = (int16_t)(raw_data[idx_y] | (raw_data[idx_y + 1] << 8));
-                a_u = a_u || (axis_y > 16000); a_d = a_d || (axis_y < -16000);
-                a_r = a_r || (axis_x > 16000); a_l = a_l || (axis_x < -16000);
-                
-                uint8_t dpad = raw_data[current_profile.byte_x];
-                d_u = (dpad & current_profile.val_up) != 0; d_d = (dpad & current_profile.val_down) != 0;
-                d_l = (dpad & current_profile.val_left) != 0; d_r = (dpad & current_profile.val_right) != 0;
-            }
-        }
-        else if (current_profile.dpad_type == AXIS) {
-            if (len > current_profile.byte_y) {
-                uint8_t x = raw_data[current_profile.byte_x]; uint8_t y = raw_data[current_profile.byte_y];
-                d_l = (x < 64); d_r = (x > 192); d_u = (y < 64); d_d = (y > 192);
-            }
-        } 
-        else if (current_profile.dpad_type == HAT_SWITCH) {
-            if (len > current_profile.byte_x) {
-                uint8_t hat = raw_data[current_profile.byte_x] & 0x0F;
-                if (hat <= 7) {
-                    d_u = (hat == 0 || hat == 1 || hat == 7); d_d = (hat == 3 || hat == 4 || hat == 5);
-                    d_l = (hat == 5 || hat == 6 || hat == 7); d_r = (hat == 1 || hat == 2 || hat == 3);
-                }
-            }
-        }
-        else if (current_profile.dpad_type == EXACT_VALUE) {
-            if (len > current_profile.byte_x) {
-                uint8_t val = raw_data[current_profile.byte_x];
-                d_u = (val == current_profile.val_up); d_d = (val == current_profile.val_down);
-                d_l = (val == current_profile.val_left); d_r = (val == current_profile.val_right);
-            }
-        }
-        else if (current_profile.dpad_type == BITMASK) {
-            if (len > current_profile.byte_x) {
-                d_u = (raw_data[current_profile.byte_x] & current_profile.val_up) != 0;
-                d_d = (raw_data[current_profile.byte_x] & current_profile.val_down) != 0;
-                d_l = (raw_data[current_profile.byte_x] & current_profile.val_left) != 0;
-                d_r = (raw_data[current_profile.byte_x] & current_profile.val_right) != 0;
-            }
-        }
-
-        // Step 3: MERGE Analog and Digital properly!
-        u = a_u || d_u;
-        d = a_d || d_d;
-        l = a_l || d_l;
-        r = a_r || d_r;
-
-        // --- Process Buttons ---
-        bool f_auto_on = false;
-        bool f_auto_off = false;
-
-        if (current_profile.dpad_type == EXACT_VALUE || current_profile.dpad_type == HAT_SWITCH) {
-            if (len > current_profile.byte_fire1)   f1 = (raw_data[current_profile.byte_fire1] == current_profile.val_fire1);
-            if (len > current_profile.byte_fire2)   f2 = (raw_data[current_profile.byte_fire2] == current_profile.val_fire2);
-            if (len > current_profile.byte_fire3)   f3 = (raw_data[current_profile.byte_fire3] == current_profile.val_fire3);
-            if (len > current_profile.byte_up_alt)  f_alt = (raw_data[current_profile.byte_up_alt] == current_profile.val_up_alt);
-            if (len > current_profile.byte_autofire) f_auto_on = (raw_data[current_profile.byte_autofire] == current_profile.val_autofire);
-            if (len > current_profile.byte_autofire_off) f_auto_off = (raw_data[current_profile.byte_autofire_off] == current_profile.val_autofire_off);
-        } else {
-            if (len > current_profile.byte_fire1)   f1 = (raw_data[current_profile.byte_fire1] & current_profile.val_fire1) != 0;
-            if (len > current_profile.byte_fire2)   f2 = (raw_data[current_profile.byte_fire2] & current_profile.val_fire2) != 0;
-            if (len > current_profile.byte_fire3)   f3 = (raw_data[current_profile.byte_fire3] & current_profile.val_fire3) != 0;
-            if (len > current_profile.byte_up_alt)  f_alt = (raw_data[current_profile.byte_up_alt] & current_profile.val_up_alt) != 0;
-            if (len > current_profile.byte_autofire) f_auto_on = (raw_data[current_profile.byte_autofire] & current_profile.val_autofire) != 0;
-            if (len > current_profile.byte_autofire_off) f_auto_off = (raw_data[current_profile.byte_autofire_off] & current_profile.val_autofire_off) != 0;
-        }
-
-        static bool autofire_latch = false;
-        if (f_auto_on) autofire_latch = true;
-        if (f_auto_off) autofire_latch = false;
-        auto_btn = autofire_latch;
-
-#if HAS_HTML_CONFIGURATOR
-    }
-#endif
-
-    joy_u = u; joy_d = d; joy_l = l; joy_r = r;
-    joy_f1 = f1; joy_f2 = f2; joy_f3 = f3; joy_up_alt = f_alt; joy_auto = auto_btn;
-}
-
+// 🖥️ --- USB HOST CALLBACKS & SETUP --- 🖥️
 static void in_transfer_cb(usb_transfer_t *xfer) {
     if (xfer->status == USB_TRANSFER_STATUS_COMPLETED) {
         pkt_t p;
@@ -514,12 +134,6 @@ void setup() {
     usb_host_client_register(&client_cfg, &s_client);
 }
 
-String get_pin_status(int pin, bool is_active_low) {
-    int val = digitalRead(pin);
-    if (is_active_low) return (val == LOW) ? "[ PRESSED ]" : "[ IDLE    ]";
-    else return (val == HIGH) ? "[ ACTIVE  ]" : "[ IDLE    ]";
-}
-
 // 🔄 --- MAIN LOOP --- 🔄
 void loop() {
     
@@ -528,7 +142,44 @@ void loop() {
         input.trim(); 
         
         // 🗣️ --- INTERACTIVE SERIAL PROMPTS --- 🗣️
-        if (cmd_state == CMD_WAIT_IMPORT) {
+        if (cmd_state == CMD_WAIT_COLOR_CHOICE) {
+            if (input == "exit") {
+                cmd_state = CMD_IDLE;
+                current_mode = MODE_SERVICE;
+                ws2812b.setBrightness(40);
+                Serial2.println("\n>> Exited Color Test. Returned to Service Menu.");
+            } else {
+                int choice = input.toInt();
+                if (choice >= 1 && choice <= 13) {
+                    
+                    cmd_state = CMD_IDLE; // <-- FIX: Sblocca la lettura del joystick
+                    
+                    switch(choice) {
+                        case 1:  mix_r = 255; mix_g = 255; mix_b = 255; break; // Amiga Idle
+                        case 2:  mix_r = 255; mix_g = 128; mix_b = 0;   break; // C64 Idle
+                        case 3:  mix_r = 0;   mix_g = 100; mix_b = 0;   break; // HTML Config
+                        case 4:  mix_r = 180; mix_g = 0;   mix_b = 255; break; // D-Pad Up
+                        case 5:  mix_r = 120; mix_g = 0;   mix_b = 180; break; // D-Pad Right
+                        case 6:  mix_r = 20;  mix_g = 0;   mix_b = 40;  break; // D-Pad Down
+                        case 7:  mix_r = 60;  mix_g = 0;   mix_b = 100; break; // D-Pad Left
+                        case 8:  mix_r = 5;   mix_g = 0;   mix_b = 8;   break; // D-Pad Idle
+                        case 9:  mix_r = 0;   mix_g = 255; mix_b = 0;   break; // Fire 1
+                        case 10: mix_r = 255; mix_g = 0;   mix_b = 0;   break; // Fire 2
+                        case 11: mix_r = 0;   mix_g = 255; mix_b = 255; break; // Fire 3
+                        case 12: mix_r = 0;   mix_g = 0;   mix_b = 255; break; // Up Alt
+                        case 13: mix_r = 255; mix_g = 255; mix_b = 0;   break; // Autofire
+                    }
+                    ws2812b.setPixelColor(0, mix_r, mix_g, mix_b);
+                    ws2812b.show();
+                    Serial2.printf("\n>>> COLOR SET! Base Values -> R:%d, G:%d, B:%d\n", mix_r, mix_g, mix_b);
+                    Serial2.println(">>> LIVE TWEAK ACTIVE: Move Joystick UP/DOWN for brightness, FIRE 1 to switch RGB, LEFT/RIGHT to change color.");
+                } else {
+                    Serial2.println(">>> Invalid choice. Enter a number between 1 and 13, or 'exit'.");
+                }
+            }
+            return;
+        }
+        else if (cmd_state == CMD_WAIT_IMPORT) {
             String ans = input; ans.toLowerCase();
             if (ans == "y" || ans == "yes") {
                 Serial2.print(">>> Enter a NAME for this profile: ");
@@ -551,7 +202,7 @@ void loop() {
             current_mode = MODE_SNIFFER; 
             reset_sniffer(); 
             xQueueReset(s_pkt_q); 
-            Serial2.println("\n>>> SNIFFER WIZARD ARMED! <<<");
+            Serial2.println("\n>>> WIZARD ARMED! <<<");
             Serial2.println("⏳ Waiting for neutral position calibration... (DO NOT touch the gamepad)");
             Serial2.println("If nothing happens within 2 seconds, press and release a button to 'wake' it.");
             return;
@@ -560,25 +211,26 @@ void loop() {
         // --- NORMAL COMMAND PARSER ---
         String comando = input; comando.toLowerCase();
 
-        if (comando == "service") {
+if (comando == "service") {
             current_mode = MODE_SERVICE;
-            Serial2.println("\n=== SERVICE MENU ===");
-            Serial2.printf("  ACTIVE ENGINE: %s\n", use_html_configurator ? "HTML HID Configurator" : "Internal Profiler");
-            Serial2.println("--------------------");
-            Serial2.println("- 'sniffer'  : Map a new pad via wizard OR Auto-Convert HTML");
-            Serial2.println("- 'raw'      : Show raw USB matrix");
-            Serial2.println("- 'debug'    : Print logical buttons to screen");
-            Serial2.println("- 'gpio'     : Real-time visual dashboard of hardware states");
-            Serial2.println("- 'polling'  : Measure USB Polling Rate (Input Lag)");
-            Serial2.println("- 'play'     : Return to ZERO-LAG gaming");
-            Serial2.println("- 'c64'      : Set Fire 2 to POT (Default)");
-            Serial2.println("- 'amiga'    : Set Fire 2 to Pin 9");
-            Serial2.println("- 'reboot'   : Restart the device softly");
-            Serial2.println("- 'flash'    : Reboot into Programming/DFU Mode");
-            Serial2.println("====================\n");
-        } 
-        else if (current_mode != MODE_PLAY || comando == "play") {
-            if (comando == "sniffer") { 
+            Serial2.println("\n=== 🛠️  SERVICE MENU  🛠️ ===");
+            Serial2.printf("  ⚙️  ENGINE: %s\n", use_html_configurator ? "HTML HID Configurator" : "Internal Profiler");
+            Serial2.println("--------------------------------");
+            Serial2.println(" 🪄 'new'     : Map a new pad or Auto-Import HTML");
+            Serial2.println(" 👁️ 'raw'     : Show raw USB hex data stream");
+            Serial2.println(" 🎮 'test'    : Test logical buttons mapping (Up, Fire...)");
+            Serial2.println(" ⏱️ 'lag'     : Measure USB Polling Rate and Input Lag");
+            Serial2.println(" 🎛️ 'gpio'    : Real-time dashboard of hardware states");
+            Serial2.println(" 🟠 'c64'     : Force C64 mode (Bench testing only)");
+            Serial2.println(" ⚪ 'amiga'   : Force Amiga mode (Bench testing only)");
+            Serial2.println(" 🎨 'color'   : Live RGB Color Mixer (Use gamepad)");
+            Serial2.println(" 🔄 'reboot'  : Restart the device softly");
+            Serial2.println(" ⚡ 'flash'   : Reboot into Programming/DFU Mode");
+            Serial2.println(" 🚪 'exit'    : Exit menu and return to normal play");
+            Serial2.println("================================\n");
+        }
+        else if (current_mode != MODE_PLAY || comando == "exit") {
+            if (comando == "new") { 
                 if (device_connected && use_html_configurator) {
                     Serial2.println("\n>>> HTML Profile detected! Do you want to Auto-Import it? (Y/N)");
                     cmd_state = CMD_WAIT_IMPORT;
@@ -588,12 +240,12 @@ void loop() {
                 }
             }
             else if (comando == "raw")   { current_mode = MODE_RAW; Serial2.println(">>> RAW mode active!"); }
-            else if (comando == "debug") { current_mode = MODE_DEBUG; Serial2.println(">>> DEBUG mode active!"); }
+            else if (comando == "test")  { current_mode = MODE_DEBUG; Serial2.println(">>> TEST mode active!"); }
             else if (comando == "gpio")  { 
                 current_mode = MODE_GPIO; last_gpio_state = 0xFFFF; 
                 Serial2.println(">>> Starting GPIO Dashboard..."); 
             }
-            else if (comando == "polling") {
+            else if (comando == "lag") {
                 current_mode = MODE_POLLING;
                 polling_packet_count = 0;
                 polling_start_time = 0; 
@@ -609,7 +261,47 @@ void loop() {
                     Serial2.println("🕹️  Timer is waiting... Move the stick and press buttons to trigger it!");
                 }
             }
-            else if (comando == "play")  { current_mode = MODE_PLAY; Serial2.println("\n\n>>> PLAY mode (Zero-Lag) restored! <<<"); }
+            else if (comando == "color") {
+                current_mode = MODE_COLOR_MIXER;
+                cmd_state = CMD_WAIT_COLOR_CHOICE;
+                
+                Serial2.println("\n=== LED COLOR TEST MENU ===");
+                Serial2.println("Select a color to test on your WS2812B:\n");
+                
+                Serial2.println("[ SYSTEM STATES ]");
+                Serial2.println("1.  Amiga Idle     (White)");
+                Serial2.println("2.  C64 Idle       (Orange)");
+                Serial2.println("3.  HTML Config    (Green)\n");
+                
+                Serial2.println("[ DIRECTIONAL PAD ]");
+                Serial2.println("4.  D-Pad Up       (Bright Purple)");
+                Serial2.println("5.  D-Pad Right    (Purple)");
+                Serial2.println("6.  D-Pad Down     (Very Dark Purple)");
+                Serial2.println("7.  D-Pad Left     (Dark Purple)");
+                Serial2.println("8.  D-Pad Idle     (Dark)\n");
+                
+                Serial2.println("[ ACTION BUTTONS ]");
+                Serial2.println("9.  Fire 1         (Green)");
+                Serial2.println("10. Fire 2         (Red)");
+                Serial2.println("11. Fire 3         (Cyan)");
+                Serial2.println("12. Up Alt         (Blue)");
+                Serial2.println("13. Autofire       (Yellow)\n");
+                
+                Serial2.println("Type a number (1-13) to set the color.");
+                Serial2.println("Type 'exit' to return to the Service Menu.\n");
+                
+                Serial2.println("[!] LIVE BRIGHTNESS CONTROL:");
+                Serial2.println("Move your connected gamepad UP or DOWN to adjust the LED brightness dynamically!");
+                Serial2.println("[!] LIVE RGB COLOR TWEAKING:");
+                Serial2.println("Press FIRE 1 to switch between R, G, B channels, and move LEFT or RIGHT to change the color value!");
+                Serial2.println("Press FIRE 2 to print the final C++ code.");
+                Serial2.println("===========================");
+            }
+            else if (comando == "exit")  { 
+                current_mode = MODE_PLAY; 
+                ws2812b.setBrightness(40); 
+                Serial2.println("\n\n>>> PLAY mode (Zero-Lag) restored! Normal operation resumed. <<<"); 
+            }
             else if (comando == "amiga") { configure_console_mode(true); }
             else if (comando == "c64")   { configure_console_mode(false); }
             else if (comando == "reboot") {
@@ -652,7 +344,6 @@ void loop() {
             } else if (hz >= 100) {
                 Serial2.println("[ RATING: ACCEPTABLE 🟠 ]");
                 Serial2.println("Standard pad (latency ~8ms). Fine for RPGs/Adventures.");
-                Serial2.println("Hardcore players might notice lag in fast platformers.");
             } else {
                 Serial2.println("[ RATING: POOR 🔴 ]");
                 Serial2.println("High latency (over 10ms). Not recommended for Action/Fighting games.");
@@ -698,17 +389,79 @@ void loop() {
             Serial2.printf(" RIGHT     |  %02d  |   %s    | %s\n", GP_RIGHT, digitalRead(GP_RIGHT) ? "HIGH" : "LOW ", get_pin_status(GP_RIGHT, true).c_str());
             Serial2.printf(" FIRE 1    |  %02d  |   %s    | %s\n", GP_FIRE1, digitalRead(GP_FIRE1) ? "HIGH" : "LOW ", get_pin_status(GP_FIRE1, true).c_str());
             Serial2.printf(" FIRE 2    |  %02d  |   %s    | %s\n", GP_FIRE2, digitalRead(GP_FIRE2) ? "HIGH" : "LOW ", get_pin_status(GP_FIRE2, true).c_str());
-            Serial2.printf(" FIRE 3    |  %02d  |   %s    | %s\n", GP_POTY, digitalRead(GP_POTY) ? "HIGH" : "LOW ", get_pin_status(GP_POTY, true).c_str());
+            Serial2.printf(" FIRE 3    |  %02d  |   %s    | %s\n", GP_POTY, digitalRead(GP_POTY) ? "HIGH" : "LOW ", get_pin_status(GP_POTY, is_amiga).c_str());
             
             if (!is_amiga) {
                 Serial2.printf(" C64_SIG   |  %02d  |   %s    | %s\n", GP_C64_SIG_MODE_SW, digitalRead(GP_C64_SIG_MODE_SW) ? "HIGH" : "LOW ", get_pin_status(GP_C64_SIG_MODE_SW, false).c_str());
             }
             Serial2.println("------------------------------------------");
-            Serial2.println(">> Type 'play' to return to game <<\n");
+            Serial2.println(">> Type 'exit' to return to normal operation <<\n");
         }
     }
 
     if (device_connected) {
+        
+        // 🎨 --- LIVE COLOR MIXER LOGIC --- 🎨
+        if (current_mode == MODE_COLOR_MIXER) {
+            if (cmd_state == CMD_IDLE) {
+                static bool last_f1_mix = false, last_f2_mix = false;
+                static unsigned long last_move_time = 0;
+
+                // Cycle Red, Green, Blue on Fire 1 press
+                if (joy_f1 && !last_f1_mix) {
+                    mix_channel = (mix_channel + 1) % 3;
+                    String ch_name = (mix_channel == 0) ? "RED 🔴" : (mix_channel == 1) ? "GREEN 🟢" : "BLUE 🔵";
+                    Serial2.printf("\n>>> ACTIVE MIX CHANNEL: %s\n", ch_name.c_str());
+                }
+                
+                // Print the final code with Fire 2
+                if (joy_f2 && !last_f2_mix) {
+                    Serial2.printf("\n>>> COPY THIS: ws2812b.Color(%d, %d, %d)\n", mix_r, mix_g, mix_b);
+                }
+
+                // Hardware live update with joystick movement
+                if (millis() - last_move_time > 20) { 
+                    bool changed = false;
+                    if (joy_l) {
+                        if (mix_channel == 0 && mix_r > 0) { mix_r--; changed = true; }
+                        if (mix_channel == 1 && mix_g > 0) { mix_g--; changed = true; }
+                        if (mix_channel == 2 && mix_b > 0) { mix_b--; changed = true; }
+                    }
+                    if (joy_r) {
+                        if (mix_channel == 0 && mix_r < 255) { mix_r++; changed = true; }
+                        if (mix_channel == 1 && mix_g < 255) { mix_g++; changed = true; }
+                        if (mix_channel == 2 && mix_b < 255) { mix_b++; changed = true; }
+                    }
+                    if (joy_d) {
+                        if (mix_brightness > 0) { mix_brightness--; changed = true; }
+                    }
+                    if (joy_u) {
+                        if (mix_brightness < 255) { mix_brightness++; changed = true; }
+                    }
+
+                    if (changed) {
+                        last_move_time = millis();
+                        
+                        ws2812b.setBrightness(mix_brightness);
+                        ws2812b.setPixelColor(0, mix_r, mix_g, mix_b);
+                        ws2812b.show(); 
+                        
+                        static unsigned long last_print = 0;
+                        if (millis() - last_print > 200) { 
+                            Serial2.printf("Live Mix: R:%d G:%d B:%d | Brightness: %d\n", mix_r, mix_g, mix_b, mix_brightness);
+                            last_print = millis();
+                        }
+                    }
+                }
+
+                last_f1_mix = joy_f1;
+                last_f2_mix = joy_f2;
+            }
+            
+            return; // <-- FIX: Blocca il motore di gioco normale sempre, finché sei nel mixer!
+        }
+        
+        // --- NORMAL GAMING LOGIC ---
         bool final_up = joy_u || joy_up_alt;
         bool out_fire = joy_f1;
         
@@ -774,7 +527,7 @@ void loop() {
             last_fire = out_fire; last_f2 = joy_f2; last_f3 = joy_f3;
         }
     } 
-    else {
+    else if (current_mode != MODE_COLOR_MIXER) { // <-- FIX: Non rimettere il colore di base se sei nel mixer!
         uint32_t idle_color = is_amiga ? LED_IDLE_AMIGA : LED_IDLE_C64; 
         static uint32_t last_idle_color = 0;
         if (idle_color != last_idle_color) {
