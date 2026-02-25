@@ -7,11 +7,25 @@
 
 ## Pre-assembled and Tested Board
 
+If you like this project and want a fully assembled and tested board, you can purchase it from its creator, Emanuele, on [Tindie](https://www.tindie.com/products/burglar_ot/usbtoc64/). By doing so, you can also benefit from his customized configuration and support the future development of the project and this current fork.
+
+The PCB are in two versions: THT (version 3.2) and SMD (version 4.1). The functionalities are identical.
+
+<p align="center">
+  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/schematic.jpeg" alt="Schematic" style="width: 50%;">
+</p>
+
 <div style="display: flex; justify-content: space-between;">
-  <a href="https://www.tindie.com/products/burglar_ot/usbtoc64/"><img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/tindie-logo.png" alt="Tindie Logo Link" width="150" height="78"></a>
+  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-smd.JPG" alt="SMD" style="width: 32%;">
+  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-smd-c64.JPG" alt="SMD C64" style="width: 32%;">
+  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-smd-amiga.JPG" alt="SMD Amiga" style="width: 32%;">
 </div>
 
-If you like this project and want a fully assembled and tested board, you can purchase it on [Tindie](https://www.tindie.com/products/burglar_ot/usbtoc64/). By doing so, you can also benefit from a customized configuration and support the future development of the project.
+<div style="display: flex; justify-content: space-between;">
+  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-tht.JPG" alt="THT" style="width: 32%;">
+  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-tht-c64.jpg" alt="THT C64" style="width: 32%;">
+  <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/adapter-tht-c64-mouse.jpg" alt="THT C64 Mouse" style="width: 32%;">
+</div>
 
 ## Components
 
@@ -24,7 +38,31 @@ If you like this project and want a fully assembled and tested board, you can pu
 - **Two BAT 43 Schottky Diodes**.
 - **DE-9 (also known as D-SUB 9 or DB 9) female connector**: It's good practice to remove the metallic enclosure because it can easily short the +5V line of the C64 when inserted, potentially damaging your computer.
 
----
+## 🔌 Hardware Setup: Connecting the Serial Debugger
+To access the advanced **Service Menu**, view live diagnostics, or use the RGB Color Mixer, you need to connect a USB-to-TTL Serial Adapter to the ESP32. 
+
+The adapter officially used and tested for this project is [this FTDI module from Amazon](https://amzn.eu/d/06kwXx67).
+
+### Serial Monitor Comunication Wiring Instructions (optional, but required to user service menu' features).
+Connect the adapter to your ESP32 following this pinout (Remember: TX goes to RX, and RX goes to TX):
+
+| USB Serial Adapter | ESP32 Board | Description |
+| :--- | :--- | :--- |
+| **TX** | **RX (GPIO 44)** | Transmits data to the ESP32 |
+| **RX** | **TX (GPIO 43)** | Receives data from the ESP32 |
+| **GND** | **GND** | Common Ground (Mandatory) |
+| **5V / VCC** | **5V / VIN** | Power Supply (See warning below) |
+
+> **⚠️ Important Power Warning:** > If you are testing the board standalone on your desk, connect all 4 pins (including 5V) to power the ESP32 from the adapter. 
+> However, if your ESP32 is **already plugged into the Commodore 64 / Amiga DB9 port** or powered via its own USB-C port, **DO NOT connect the 5V pin** from the serial adapter to avoid power conflicts. In this case, only connect TX, RX, and GND.
+
+### Serial Terminal Settings
+Open your favorite Serial Monitor (e.g., Arduino IDE, PuTTY, or Termite) and use the following settings to interact with the Service Menu:
+* **Baud Rate:** `115200`
+* **Data Bits:** `8`
+* **Parity:** `None`
+* **Stop Bits:** `1`
+* **Line Ending:** `Newline` (`\n`)
 
 ## Installation From Arduino IDE
 
@@ -117,14 +155,17 @@ When using a Native C++ profile, the LED provides zero-latency visual confirmati
 
 Connect the ESP32 to your PC, open a Serial Terminal (115200 baud), and type `service` to access the advanced dashboard.
 
-### Available Commands:
-* `sniffer` - **The Magic trial Tool.** If you have an HTML profile active, it auto-converts it to C++. If no profile is active, it starts a step-by-step wizard to map a new unknown gamepad manually.
-* `polling` - Starts the hardware latency benchmark. Move the sticks for 3 seconds to get your controller's exact Hz and ms rating.
-* `gpio` - Opens a real-time visual dashboard showing the electrical state (HIGH/LOW) of every single DB9 pin.
-* `debug` - Prints logical button presses to the screen (useful for testing mappings).
-* `play` - Returns the device to standard Zero-Lag gaming mode.
-* `reboot` - Soft reboots the ESP32.
-* `flash` - Reboots the ESP32 directly into **DFU/Programming Mode** (No need to press the physical BOOT button on the board!).
+### 🛠️ Available Service Commands:
+* **`new`** - Map a new unknown gamepad manually via wizard or auto-convert an active HTML profile to C++. [[📖 Read more](ServiceMenu.md#new-command)]
+* **`raw`** - Displays the raw USB hex data stream coming from the controller. [[📖 Read more](ServiceMenu.md#raw-command)]
+* **`test`** - Prints logical button outputs to the screen to verify your current mappings. [[📖 Read more](ServiceMenu.md#test-command)]
+* **`lag`** - Starts the hardware latency benchmark to get your controller's exact polling rate (Hz) and input lag (ms). [[📖 Read more](ServiceMenu.md#lag-command)]
+* **`gpio`** - Opens a real-time visual dashboard showing the electrical state (HIGH/LOW) of every DB9 pin. [[📖 Read more](ServiceMenu.md#gpio-command)]
+* **`color`** - Opens the Live RGB Color Mixer to tweak system LED colors in real-time using your gamepad. [[📖 Read more](ServiceMenu.md#color-command)]
+* **`c64` / `amiga`** - Forces the system into Commodore 64 or Amiga logic mode for bench testing without the physical console. [[📖 Read more](ServiceMenu.md#c64-amiga-commands)]
+* **`reboot`** - Soft reboots the ESP32. [[📖 Read more](ServiceMenu.md#reboot-command)]
+* **`flash`** - Reboots the ESP32 directly into **DFU/Programming Mode** (No need to press the physical BOOT button on the board!). [[📖 Read more](ServiceMenu.md#flash-command)]
+* **`exit`** - Closes the service menu and returns the device to standard Zero-Lag gaming mode. [[📖 Read more](ServiceMenu.md#exit-command)]
 
 ---
 ## 🛠️ How to map a Controller Permanently (Auto-Dump)
@@ -152,6 +193,9 @@ When dealing with a vast array of third-party USB controllers, some specific dev
   * **The Fix:** Always turn on your C64/Amiga and wait for the ESP32 to fully boot (the LED will show the Orange or White idle state). **Only after the boot sequence is complete**, plug the proprietary USB dongle into the adapter.
  
 * **Xbox One Controller not supported ATM**
+
+* **LED COLORS**
+  * Some Boards have different internal RGB driver that can vary beahiours; this can be fixed changing in Globals.h from Adafruit_NeoPixel ws2812b(1, PIN_WS2812B, NEO_RGB + NEO_KHZ800) to Adafruit_NeoPixel ws2812b(1, PIN_WS2812B, NEO_GRB + NEO_KHZ800); and viceversa. 
 
 ---
 
