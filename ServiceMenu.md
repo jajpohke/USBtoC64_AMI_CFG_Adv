@@ -26,7 +26,7 @@ Useful for low-level debugging. It prints the raw byte array coming from the USB
 This mode translates the raw USB data into logical console actions. Pressing a button on your gamepad will print `[UP]`, `[FIRE 1]`, `[AUTOFIRE]`, etc., to the screen. Perfect for verifying if your custom `PadConfig` is mapped correctly.
 
 ### `lag` Command
-**Measures USB Polling Rate and Input Lag.**
+**Measures USB Polling Rate and Input Lag....very experimental!.**
 Starts a highly accurate hardware latency benchmark.
 1. Type `lag`. The system enters a "Smart Trigger" waiting state.
 2. The timer will not start until you physically move the joystick or press a button.
@@ -68,4 +68,4 @@ Performs a soft reset of the ESP32, re-initializing the USB Host and the LED sta
 Reboots the ESP32 directly into **DFU (Device Firmware Upgrade) / Programming Mode**. This is extremely useful if your ESP32 board is inside a 3D-printed case and you cannot easily reach the physical "BOOT" button to upload new firmware via Arduino IDE.
 
 ### `exit` Command
-Closes the Service Menu, shuts down all serial printing overhead, and returns the device to the standard **Zero-Lag gaming mode**. Always use this command before actually playing a game on real hardware!
+Closes the Service Menu, shuts down all serial printing overhead, and returns the device to the standard **normal gaming mode**. Always use this command before actually playing a game on real hardware!
