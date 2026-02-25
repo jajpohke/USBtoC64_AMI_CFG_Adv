@@ -130,7 +130,39 @@ const PadConfig PROFILES[] = {
         .val_up = 0, .val_down = 4, .val_left = 6, .val_right = 2,
         .val_fire1 = 40, .val_fire2 = 24, .val_fire3 = 136, .val_up_alt = 72, .val_autofire = 1, .val_autofire_off = 2,
         .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
+    },
+    {
+  .name = "China Arcade PS3 PC",
+  .vid = 2064, .pid = 3,
+  .dpad_type = AXIS,
+  .byte_x = 3, .byte_y = 4, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
+  .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 5, .byte_up_alt = 5, .byte_autofire = 6, .byte_autofire_off = 0,
+  .val_up = 0, .val_down = 255, .val_left = 0, .val_right = 255,
+  .val_fire1 = 64, .val_fire2 = 128, .val_fire3 = 16, .val_up_alt = 32, .val_autofire = 4, .val_autofire_off = 0x00,
+  .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
+    },
+    {
+  .name = "Zero_Lag_China",
+  .vid = 121, .pid = 6,
+  .dpad_type = AXIS,
+  .byte_x = 0, .byte_y = 1, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
+  .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 5, .byte_up_alt = 5, .byte_autofire = 5, .byte_autofire_off = 0,
+  .val_up = 0, .val_down = 255, .val_left = 0, .val_right = 255,
+  .val_fire1 = 16, .val_fire2 = 32, .val_fire3 = 48, .val_up_alt = 64, .val_autofire = 128, .val_autofire_off = 0x00,
+  .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
+    },
+    {
+  .name = "NES2USB_RetroBit",
+  .vid = 4754, .pid = 17987,
+  .dpad_type = HAT_SWITCH,
+  .byte_x = 0, .byte_y = 0, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
+  .byte_fire1 = 1, .byte_fire2 = 1, .byte_fire3 = 1, .byte_up_alt = 1, .byte_autofire = 1, .byte_autofire_off = 0,
+  .val_up = 8, .val_down = 4, .val_left = 2, .val_right = 1,
+  .val_fire1 = 2, .val_fire2 = 8, .val_fire3 = 4, .val_up_alt = 1, .val_autofire = 4, .val_autofire_off = 0x00,
+  .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
     }
+ 
+
 };
 
 const int NUM_PROFILES = sizeof(PROFILES) / sizeof(PadConfig);
