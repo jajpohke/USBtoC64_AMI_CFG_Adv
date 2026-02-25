@@ -21,7 +21,7 @@ THE POWER WILL ARRIVE DIRECTLY TO THE SID OF THE COMMODORE AND MAY DESTROY IT.
 
 If you like this project and want a fully assembled and tested board, you can purchase it from its creator, Emanuele, on [Tindie](https://www.tindie.com/products/burglar_ot/usbtoc64/). By doing so, you can also benefit from his customized configuration and support the future development of the project and this current fork.
 
-The PCB are in two versions: THT (version 3.2) and SMD (version 4.1). The functionalities are identical.
+The PCB are in two versions: THT (version 3.2) and SMD (version 4.1). The functionalities are identical; at the moment the switch implemented in original project is unused since mouse functions are not yet available.
 
 <p align="center">
   <img src="https://github.com/emanuelelaface/USBtoC64/blob/main/images/schematic.jpeg" alt="Schematic" style="width: 50%;">
