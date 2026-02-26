@@ -1,5 +1,5 @@
 // ==========================================
-// USB to C64/Amiga Adapter - Advanced 2.8
+// USB to C64/Amiga Adapter - Advanced 2.8.1
 // File: JoystickEngine.h
 // Description: Core input processing engine (HTML & Native)
 // ==========================================
@@ -10,7 +10,6 @@
 #include "JoySniffer.h"
 
 // 🎮 --- JOYSTICK PROCESSING ENGINE --- 🎮
-
 inline void process_joystick(const uint8_t *raw_data, int len) {
     if (current_mode == MODE_POLLING) {
         if (polling_active) {
@@ -39,6 +38,7 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
     if (current_mode == MODE_SERVICE) return; 
     if (!device_connected || len < 3) return;
 
+    // --- Variables declaration ---
     bool u = false, d = false, l = false, r = false;
     bool f1 = false, f2 = false, f3 = false, f_alt = false, auto_btn = false;
 
@@ -92,7 +92,6 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
         for (size_t i = 0; i < JM_JOY_RULES_COUNT; i++) {
             if (JM_JOY_RULES[i].func == JM_AUTOFIRE_OFF) { has_html_off_btn = true; break; }
         }
-        // Se c'è il tasto OFF usa il Latch, altrimenti spara solo finché tieni premuto (Hold)
         auto_btn = has_html_off_btn ? html_autofire_latch : html_auto_on;
         
         #if JM_USE_ANALOG_MOUSE == 1
@@ -219,13 +218,11 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
         static bool native_autofire_latch = false;
         
         if (current_profile.byte_autofire != 0 && current_profile.byte_autofire_off != 0) {
-            // Modalità Interruttore (Latch) se l'utente ha configurato sia ON che OFF
             if (f_auto_on) native_autofire_latch = true;
             if (f_auto_off) native_autofire_latch = false;
             auto_btn = native_autofire_latch;
         } 
         else if (current_profile.byte_autofire != 0) {
-            // Modalità Hold (a pressione) se l'utente ha configurato solo il tasto ON
             auto_btn = f_auto_on; 
             native_autofire_latch = false;
         }
@@ -234,6 +231,29 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
     }
 #endif
 
-    joy_u = u; joy_d = d; joy_l = l; joy_r = r;
-    joy_f1 = f1; joy_f2 = f2; joy_f3 = f3; joy_up_alt = f_alt; joy_auto = auto_btn;
+    // --- SMART MULTIPORT MERGE (CO-PILOT MODE) ---
+    if (current_profile.use_report_id) {
+        static bool p_u[3], p_d[3], p_l[3], p_r[3], p_f1[3], p_f2[3], p_f3[3], p_alt[3], p_auto[3];
+        uint8_t id = raw_data[0]; 
+
+        if (id == 1 || id == 2) {
+            p_u[id] = u; p_d[id] = d; p_l[id] = l; p_r[id] = r;
+            p_f1[id] = f1; p_f2[id] = f2; p_f3[id] = f3; 
+            p_alt[id] = f_alt; p_auto[id] = auto_btn;
+        }
+
+        joy_u = p_u[1] | p_u[2];
+        joy_d = p_d[1] | p_d[2];
+        joy_l = p_l[1] | p_l[2];
+        joy_r = p_r[1] | p_r[2];
+        joy_f1 = p_f1[1] | p_f1[2];
+        joy_f2 = p_f2[1] | p_f2[2];
+        joy_f3 = p_f3[1] | p_f3[2];
+        joy_up_alt = p_alt[1] | p_alt[2];
+        joy_auto = p_auto[1] | p_auto[2];
+
+    } else {
+        joy_u = u; joy_d = d; joy_l = l; joy_r = r;
+        joy_f1 = f1; joy_f2 = f2; joy_f3 = f3; joy_up_alt = f_alt; joy_auto = auto_btn;
+    }
 }

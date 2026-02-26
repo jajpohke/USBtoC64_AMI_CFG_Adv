@@ -56,8 +56,8 @@ extern "C" {
 #define LED_HTML_MODE   ws2812b.Color(0, 100, 0)     // 🟢 Green
 #define LED_OFF         ws2812b.Color(0, 0, 0)       // ⚫ Black / Off
 
-//Adafruit_NeoPixel ws2812b(1, PIN_WS2812B, NEO_RGB + NEO_KHZ800); //My Test Board
-Adafruit_NeoPixel ws2812b(1, PIN_WS2812B, NEO_GRB + NEO_KHZ800); //My Play Board (could be the same, check led behaviour!)
+Adafruit_NeoPixel ws2812b(1, PIN_WS2812B, NEO_RGB + NEO_KHZ800); //My Test Board
+//Adafruit_NeoPixel ws2812b(1, PIN_WS2812B, NEO_GRB + NEO_KHZ800); //My Play Board (could be the same, check led behaviour!)
 
 // 🖥️ --- USB HOST VARIABLES --- 🖥️
 static usb_host_client_handle_t s_client = nullptr;

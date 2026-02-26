@@ -24,6 +24,8 @@ struct PadConfig {
     const char* name;
     uint16_t vid;
     uint16_t pid;
+    bool use_report_id;
+    uint8_t report_id_val;
     DpadType dpad_type;
 
     int byte_x;        
@@ -154,13 +156,32 @@ const PadConfig PROFILES[] = {
     {
   .name = "NES2USB_RetroBit",
   .vid = 4754, .pid = 17987,
-  .dpad_type = HAT_SWITCH,
+  .dpad_type = BITMASK,
   .byte_x = 0, .byte_y = 0, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
   .byte_fire1 = 1, .byte_fire2 = 1, .byte_fire3 = 1, .byte_up_alt = 1, .byte_autofire = 1, .byte_autofire_off = 0,
   .val_up = 8, .val_down = 4, .val_left = 2, .val_right = 1,
   .val_fire1 = 2, .val_fire2 = 8, .val_fire3 = 4, .val_up_alt = 1, .val_autofire = 4, .val_autofire_off = 0x00,
   .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
-    }
+    },
+{
+  .name = "USB2SNES Mayflower",
+  .vid = 3727, .pid = 12307,
+  .use_report_id = true, .report_id_val = 1,
+  .dpad_type = AXIS,
+  .byte_x = 3, .byte_y = 4, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
+  
+  // Buttons bytes mapping
+  .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 0, .byte_up_alt = 5, .byte_autofire = 6, .byte_autofire_off = 6,
+  
+  .val_up = 0, .val_down = 255, .val_left = 0, .val_right = 255,
+  
+  // Values swapped based on your request
+  // Fire 1 = B (64), Fire 2 = Y (128), Alt Up = A (32)
+  // Autofire ON = L (4), Autofire OFF = R (8)
+  .val_fire1 = 64, .val_fire2 = 128, .val_fire3 = 0, .val_up_alt = 32, .val_autofire = 4, .val_autofire_off = 8,
+  
+  .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
+}
  
 
 };

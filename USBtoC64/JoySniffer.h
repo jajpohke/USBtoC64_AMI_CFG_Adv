@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-
+// 2.4.2
 #define SNIFFER_SERIAL Serial2
 
 extern String sniff_profile_name; 
@@ -36,11 +36,17 @@ static bool config_printed = false;
 static unsigned long sniff_timer = 0; 
 static bool first_packet_received = false; 
 
+// --- v2.4.2: Multiplexer Detection Variables ---
+static bool detected_multiplexer = false;
+static uint8_t detected_report_id = 0;
+
 static void reset_sniffer() {
     sniff_step = S_INIT;
     config_printed = false;
     b_ls_x = 0; b_ls_y = 0; b_rs_x = 0; b_rs_y = 0;
     first_packet_received = false; 
+    detected_multiplexer = false;
+    detected_report_id = 0;
     sniff_timer = millis();
     for(int i = 0; i < 64; i++) dat_thresh[i] = 2; 
 }
@@ -86,21 +92,33 @@ static void run_sniffer(uint16_t vid, uint16_t pid, const uint8_t *data, int len
             return; 
         }
 
+        // --- FIX v2.4.2: Multiplexer Check ---
+        if (dat_max[0] != dat_min[0]) {
+            detected_multiplexer = true;
+            detected_report_id = dat_neutral[0]; // Lock to one of the alternating IDs
+        }
+
         for(int i = 0; i < len; i++) {
             int noise_level = dat_max[i] - dat_min[i]; 
 
-            if (noise_level > 10) { 
+            // Ignore jittery axes (>10) OR multiplexer alternating IDs on byte 0 (>0)
+            if (noise_level > 10 || (noise_level > 0 && i == 0)) { 
                 dat_thresh[i] = 255; 
             } else {
                 if (dat_neutral[i] >= 100 && dat_neutral[i] <= 155) dat_thresh[i] = 60; 
                 else dat_thresh[i] = 0; 
             }
         }
+        
+        if (detected_multiplexer) {
+             SNIFFER_SERIAL.printf(">>> MULTIPLEXER DETECTED! Locked to Port/ID: %d\n", detected_report_id);
+        }
+
         sniff_step = S_START;
     }
 
     if (sniff_step == S_START) {
-        SNIFFER_SERIAL.println("\n--- SNIFFER v2.4.1 (GLOBAL NEUTRAL LOCK) ---");
+        SNIFFER_SERIAL.println("\n--- SNIFFER v2.4.2 (GLOBAL NEUTRAL LOCK) ---");
         sniff_step = S_WAIT_UP;
         SNIFFER_SERIAL.println(">>> Noise filtered. Smart sensors active.");
         SNIFFER_SERIAL.println("[?] PRESS AND HOLD: UP on D-PAD");
@@ -123,8 +141,7 @@ static void run_sniffer(uint16_t vid, uint16_t pid, const uint8_t *data, int len
         }
     }
 
-    // FIX v2.4.1: Tutti gli stati di "Release" ora pretendono un "is_neutral == true" globale.
-    // Nessun comando successivo verrà stampato se il pad non è tornato in quiete totale.
+    // FIX v2.4.1 logic remains unchanged below
     switch (sniff_step) {
         case S_WAIT_UP: 
             if (!is_neutral) { b_up = changed_byte; v_up = changed_val; SNIFFER_SERIAL.printf("OK! B:%d, V:%d\n", b_up, v_up); sniff_step = S_REL_UP; } break;
@@ -257,6 +274,7 @@ static void run_sniffer(uint16_t vid, uint16_t pid, const uint8_t *data, int len
                 SNIFFER_SERIAL.println("{");
                 SNIFFER_SERIAL.printf("  .name = \"%s\",\n", sniff_profile_name.c_str());
                 SNIFFER_SERIAL.printf("  .vid = %d, .pid = %d,\n", vid, pid);
+                SNIFFER_SERIAL.printf("  .use_report_id = %s, .report_id_val = %d,\n", detected_multiplexer ? "true" : "false", detected_report_id);
                 SNIFFER_SERIAL.printf("  .dpad_type = %s,\n", type_str.c_str());
                 SNIFFER_SERIAL.printf("  .byte_x = %d, .byte_y = %d, .byte_analog_x = %d, .byte_analog_y = %d, .byte_analog_right_x = %d, .byte_analog_right_y = %d,\n", b_left, b_up, b_ls_x, b_ls_y, b_rs_x, b_rs_y);
                 SNIFFER_SERIAL.printf("  .byte_fire1 = %d, .byte_fire2 = %d, .byte_fire3 = %d, .byte_up_alt = %d, .byte_autofire = %d, .byte_autofire_off = 0,\n", b_f1, b_f2, b_f3, b_up_alt, b_auto);
