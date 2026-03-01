@@ -3,7 +3,10 @@
  This fork has been born mainly to use fire 2 and 3 on C64 and Amiga with configurable buttons. Base board is the same of Main Project.
  Release note!
  
- 1.1 Mouse functions implemented; if an mouse is connected it will be autodetected in C64 and Amiga Mode.
+ Change log: 
+
+ 
+ - v.1.1: Mouse functions implemented; if an mouse is connected it will be autodetected in C64 and Amiga Mode.
 
  The Aim of this fork is use Original HTML configurator and give precompiled joystick profiles; its also possible to map some joystick like Hori Fighting Stich, WiFiDongle Snes.
 
