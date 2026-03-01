@@ -8,6 +8,8 @@
  
  - v.1.1: Mouse functions implemented; if an mouse is connected it will be autodetected in C64 and Amiga Mode.
 
+   Next Features? Reintroduce Joystick Programming mode, available in original firmware project, to use a new controller on fly without use Arduino IDE to compile and write.
+
  The Aim of this fork is use Original HTML configurator and give precompiled joystick profiles; its also possible to map some joystick like Hori Fighting Stich, WiFiDongle Snes.
 
 🕹️ **Supported Gamepads:** Want to know if your usb game controller is actually preconfigured for plug & play?  
