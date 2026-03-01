@@ -136,7 +136,7 @@ The WS2812B RGB LED provides instant visual feedback on the adapter's state and 
 ### 1. Boot & Auto-Detection (Idle State)
 Once you have finished the assembly, you can use the installed slide switch to select: 
 * 🟠 **Orange/Amber:** Detected a **Commodore 64** (just like a yellowed breadbin case).
-* ⚪ **White:** Detected an **Amiga** (I know that CD32 and CDTV are black but....).
+* ⚪ **White:** Detected an **Amiga** (I know that CD32 and CDTV have a black case but....).
 
 NOTE: A watchdog has been implemeted if you forget C64 mode plugged to Amiga; it will go to Amiga mode. Some Amigas however will trigger this watchdog only when you load a game or a diagnostic that initialize joy1/2 ports; in this scenario watchdog cant work if you plan to use a mouse (you'll see the orange light, so just unplug and move switch to amiga mode and led will become correctly white).
   If you experience issues you can turnoff watchdog from Globals.h.
