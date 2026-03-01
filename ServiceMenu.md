@@ -43,6 +43,10 @@ This creates a live, auto-refreshing table showing the exact electrical state of
 * Displays the physical ESP32 GPIO pin number.
 * Shows the electrical state (`HIGH` or `LOW`).
 * Shows the logical state (`[ IDLE ]` or `[ PRESSED ]` / `[ ACTIVE ]`).
+
+  You can type: "GP xxx (where xxx is GPIO pin number) to have its state printed in real time on serial monitor.
+
+  
 * *Note:* The system automatically adjusts the logic display for Amiga (Pin 9 Active-Low) and C64 (POT Y / POT X logic) depending on your current boot mode.
 
 ### `color` Command
