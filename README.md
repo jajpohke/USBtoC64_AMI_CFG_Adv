@@ -1,10 +1,9 @@
-### Sperimental ### 
+### Version 1.1 (need some more tests and love, so consider experimental!) ### 
 
- This fork is about use fire 2 and 3 on C64 and Amiga. Base board is the same.
-
-
- Mouse functions are at the moment non implemented.
-
+ This fork has been born mainly to use fire 2 and 3 on C64 and Amiga with configurable buttons. Base board is the same of Main Project.
+ Release note!
+ 
+ 1.1 Mouse functions implemented; if an mouse is connected it will be autodetected in C64 and Amiga Mode.
 
  The Aim of this fork is use Original HTML configurator and give precompiled joystick profiles; its also possible to map some joystick like Hori Fighting Stich, WiFiDongle Snes.
 
@@ -14,7 +13,7 @@
  THIS PROJECT IS SPERIMENTAL AND NOT COMMERCIAL SO USE ONLY AT YOUR RISK!!!!! 
  Please refer to original project for more informations <a href="https://github.com/emanuelelaface/USBtoC64/">https://github.com/emanuelelaface/USBtoC64/</a>
 
- 3) Must Read me first WARNING:
+ !!!) Must Read me first WARNING:
  - Some controllers may use the USB port to charge a battery (especially if they are also Bluetooth), and this could draw more than 100 mA from the C64, potentially shutting down the Commodore (and possibly damaging it). If you use a controller with a battery, you should remove the battery before connecting it or disable the charging functionality if possible.
    
   - WARNING: DON'T CONNECT THE COMMODORE 64 AND THE USB PORT TO A SOURCE OF POWER AT THE SAME TIME.  
@@ -112,16 +111,13 @@ where `<PORT>` is the USB port created once the board is connected. On Windows, 
 
 An advanced, high-performance ESP32-S3 firmware to connect modern USB controllers to classic Commodore 64 and Amiga computers. 
 
-This project is an advanced fork of the excellent [Original USBtoC64 Project](https://github.com/emanuelelaface/USBtoC64). It supercharges the original WebHID HTML configurator concept by introducing a **Zero-Lag Native C++ Engine**, **Advanced Diagnostics**, and a **Smart Auto-Dumper**.
+This project if a modified version of the  [Original USBtoC64 Project](https://github.com/emanuelelaface/USBtoC64). 
 
-## ✨ Advanced "Killer" Features
+It supercharges the original with:
+- you can have multiple joystick configuration without reprogram its logic or recompile again with a HTML generated file;
+- use original WebHID HTML configurator and/or use it to create a new internal configuration that will be saved,
+- Advanced Diagnostics and utilities **, see service menù.
 
-* 🚀 **Hybrid Configurator Engine:** Use the flexible HTML Web configurator to test unknown pads, or rely on the blazing-fast Native C++ Engine for permanently mapped controllers.
-* 🧠 **Smart Auto-Dumper:** Created a great profile via the Web HTML tool? Open the serial monitor, type `new`, and the ESP32 will automatically translate your HTML rules into pure C++ code ready to be pasted into the Native Engine!
-* ⏱️ **Polling Rate Tester:** Ever wonder if your cheap USB pad is causing input lag? Type `lag` in the serial monitor to run a 3-second hardware benchmark. The ESP32 will calculate the exact Polling Rate (Hz) and input latency (ms) of your controller.
-* 🎮 **Dual-Analog & Hat-Switch Support:** Fully supports modern controllers (PS3/PS4/GameCube clones), mapping both left/right analog sticks and complex D-Pads simultaneously.
-
----
 
 ## 🔌 Hardware Setup & Wiring
 
@@ -129,16 +125,18 @@ For the complete schematic, wiring instructions, and crucial safety precautions 
 
 👉 **[Original Project Hardware Guide](https://github.com/emanuelelaface/USBtoC64)**
 
----
 
 ## 🚥 LED Status & Visual Feedback
 
-The WS2812B RGB LED provides instant visual feedback on the adapter's state and your inputs. It's your primary diagnostic tool without needing a PC.
+The WS2812B RGB LED provides instant visual feedback on the adapter's state and your inputs. It's your primary diagnostic tool without needing a PC; if your behaviour is wrong maybe your board has RGB driver swapped with GBR....just change it in global.h
 
 ### 1. Boot & Auto-Detection (Idle State)
-Once you have finished the assembly, you can instantly verify if the firmware and auto-detection are working correctly. Power on your classic computer **without connecting any USB joystick yet**:
+Once you have finished the assembly, you can use the installed slide switch to select: 
 * 🟠 **Orange/Amber:** Detected a **Commodore 64** (just like a yellowed breadbin case).
 * ⚪ **White:** Detected an **Amiga** (I know that CD32 and CDTV are black but....).
+
+NOTE: A watchdog has been implemeted if you forget C64 mode plugged to Amiga; it will go to Amiga mode. Some Amigas however will trigger this watchdog only when you load a game or a diagnostic that initialize joy1/2 ports; in this scenario watchdog cant work if you plan to use a mouse (you'll see the orange light, so just unplug and move switch to amiga mode and led will become correctly white).
+  If you experience issues you can turnoff watchdog from Globals.h.
 
 ### 2. Engine Mode Indication
 The adapter features two different processing engines, and the LED tells you which one is currently driving your controller:
@@ -158,6 +156,7 @@ When using a Native C++ profile, the LED provides zero-latency visual confirmati
 | **FIRE 3** | 🩵 Cyan |
 | **ALT UP (Jump)** | 🔵 Blue |
 | **AUTOFIRE (Active)** | 🟡 Yellow (Blinking on firing rhythm) |
+|**MOUSE moves and buttonss** | 🔵 Blue |
 
 *Tip: If you press multiple buttons simultaneously, the LED prioritizes Action Buttons over Directional inputs.*
 ** Note: some Pads in presets have different colors, link Hori Game Cube Peach USB Controller has everything in pink and variants!
@@ -172,6 +171,7 @@ Connect the ESP32 to your PC, open a Serial Terminal (115200 baud), and type `se
 * **`test`** - Prints logical button outputs to the screen to verify your current mappings. [[📖 Read more](ServiceMenu.md#test-command)]
 * **`lag`** - Starts the hardware latency benchmark to get your controller's exact polling rate (Hz) and input lag (ms). [[📖 Read more](ServiceMenu.md#lag-command)]
 * **`gpio`** - Opens a real-time visual dashboard showing the electrical state (HIGH/LOW) of every DB9 pin. [[📖 Read more](ServiceMenu.md#gpio-command)]
+* **`mousetest`'**: Mouse speed and Packets"); 
 * **`color`** - Opens the Live RGB Color Mixer to tweak system LED colors in real-time using your gamepad. [[📖 Read more](ServiceMenu.md#color-command)]
 * **`c64` / `amiga`** - Forces the system into Commodore 64 or Amiga logic mode for bench testing without the physical console. [[📖 Read more](ServiceMenu.md#c64-amiga-commands)]
 * **`reboot`** - Soft reboots the ESP32. [[📖 Read more](ServiceMenu.md#reboot-command)]
@@ -211,11 +211,11 @@ When dealing with a vast array of third-party USB controllers, some specific dev
 ---
 
 ## 🤝 Credits
-* Original hardware concept and base firmware by **[Emanuele Laface](https://github.com/emanuelelaface/USBtoC64)**.
+* Original hardware concept and base firmware by **[Emanuele Laface](https://github.com/emanuelelaface/USBtoC64)**: He did a very deep and professional investigations with SID signals to make the magic works. I hope to not mess up all his work.
 * Thanks to:
 * - Kenobisboch productions, featuring Andrea Babich in Commodore 64 Advent Show 2025, giving to my mind the existance of a configurable USB2C64 adapters.
 * - Davide Bottino: pushing and implementing 2nd button option in his Bubble Bobble Remastered and Lost Cave
-* This Advanced fork (Native Engine, Auto-Dumper, and Polling Diagnostics) is the work of **Jahpohke** and **Thelowest** but seriously written with Gemini Pro AI assistance.
+* This Advanced fork is the work of **Jahpohke** and **Thelowest** but seriously written with Gemini Pro AI assistance.
 
 
 
