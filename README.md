@@ -2,9 +2,12 @@
 
  This fork has been born mainly to use fire 2 and 3 on C64 and Amiga with configurable buttons. Base board is the same of Main Project.
  Release note!
+
+08/03/2026 Next Changes very very coming soon (in testing):
+ - 1.2:  - Mouse in C64 fixed (I know this forks with some sids and some mouse sucks in C64 mode)
+         - Integrated Built Web In Server configuration, you can trash IDE, Serial and stuff....easy plug and play user "experienced" experience :)
  
  Change log: 
-
  
  - v.1.1: Mouse functions implemented; if an mouse is connected it will be autodetected in C64 and Amiga Mode.
 
