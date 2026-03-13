@@ -87,15 +87,15 @@ esptool.py -b 921600 -c esp32s3 -p <PORT> write_flash --flash_freq 80m 0x00000 U
 
 ## 💻 Web UI — Browser Configuration (v1.2)
 
-Once the firmware is running, connect the adapter via USB-C to your PC. Open any of the web pages in the `configurator/` folder in Chrome (WebSerial and WebHID are required — Firefox is not supported).
+Once the firmware is running, connect the adapter via USB-C to your PC. Open any of the web pages in the [`configurator/` folder](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html) in Chrome (WebSerial and WebHID are required — Firefox is not supported).
 
 | Page | Purpose |
 |---|---|
-| `index.html` | Main hub — access all pages |
-| `configurator.html` | Map USB controller buttons visually, save mapping to ESP32 |
-| `led.html` | Customize all LED colors, select GRB/RGB format |
-| `memory.html` | System settings, NVS memory status, factory reset |
-| `mouse.html` | Mouse speed and mode settings |
+| [`index.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html) | Main hub — access all pages |
+| [`configurator.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/configurator.html) | Map USB controller buttons visually, save mapping to ESP32 |
+| [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) | Customize all LED colors, select GRB/RGB format |
+| [`memory.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/memory.html) | System settings, NVS memory status, factory reset |
+| [`mouse.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/mouse.html) | Mouse speed and mode settings |
 
 All settings are saved to NVS and survive reboots. When you change the **LED format (GRB/RGB)**, the page will prompt you to refresh after saving — this is expected.
 
@@ -121,9 +121,9 @@ All settings are saved to NVS and survive reboots. When you change the **LED for
 | 🔵 Blue | Alt UP (Jump) |
 | 🟡 Yellow (blinking) | Autofire active |
 
-> All colors are customizable via `led.html` or via `coloradj` in the service menu.
+> All colors are customizable via [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) or via `coloradj` in the service menu.
 
-> **Wrong colors?** Your board may have RGB/GRB swapped. Fix it in `led.html` → LED Format selector, or via `service → coloradj`.
+> **Wrong colors?** Your board may have RGB/GRB swapped. Fix it in [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) → LED Format selector, or via `service → coloradj`.
 
 ---
 
@@ -162,7 +162,7 @@ back                         → return without saving
 reset                        → restore all firmware defaults
 ```
 
-The LED updates in real time as you type. Changes are shared with `led.html` — both write to the same NVS blob.
+The LED updates in real time as you type. Changes are shared with [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) — both write to the same NVS blob.
 
 ---
 
@@ -188,12 +188,12 @@ The LED updates in real time as you type. Changes are shared with `led.html` —
 ### Mapping a New Controller
 
 **Quick way — Web UI (no recompile):**
-1. Connect the controller and open `configurator.html`.
+1. Connect the controller and open [`configurator.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/configurator.html).
 2. Map all buttons visually and click **💾 SAVE**.
 3. Done — the mapping is saved to NVS and active immediately on every boot.
 
 **Permanent way — native C++ profile (zero latency, built-in):**
-1. Map the controller via `configurator.html` first to understand the button layout.
+1. Map the controller via [`configurator.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/configurator.html) first to understand the button layout.
 2. Open a serial terminal, type `service` → `new` → choose option **2 (Serial Sniffer)**.
 3. Press each button when prompted. The adapter outputs a ready-to-paste C++ block.
 4. Copy it into `JoystickProfiles.h` and recompile.
