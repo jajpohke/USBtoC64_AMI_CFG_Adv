@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAMEPAD MAPPING - LCARS INTERFACE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Base Theme - LCARS Okudagram Aesthetic */
+        :root {
+            --lcars-bg: #000;
+            --lcars-purple: #9C27B0;
+            --lcars-mauve: #CC99CC;
+            --lcars-teal: #009688;
+            --lcars-cyan: #00BCD4;
+            --lcars-magenta: #E91E63;
+            --lcars-gold: #FF9800;
+            --lcars-amber: #FFC107;
+            --lcars-green: #32CD32;
+            --lcars-red: #dc3545;
+            --lcars-text: #e0e0e0;
+            --lcars-fuchsia: #FF99CC;
+            --lcars-orange-pastel: #FFB366;
+        }
+
+        /* scanline overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        body { 
+            background-color: var(--lcars-bg); 
+            color: var(--lcars-text); 
+            font-family: 'Oswald', sans-serif; 
+            text-transform: uppercase;
+            padding: 20px; 
+            margin: 0; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ── HYBRID LCARS FRAME ── */
+        .lcars-frame {
+            display: flex;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        /* ── SPINE ── */
+        .lcars-spine {
+            width: 130px;
+            display: flex;
+            flex-direction: column;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+        .spine-elbow {
+            background-color: var(--lcars-teal);
+            height: 120px;
+            border-top-left-radius: 60px;
+            border-bottom-left-radius: 0;
+            border-radius: 60px 0 0 60px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 12px;
+            font-weight: bold;
+            font-size: 0.95em;
+            color: #000;
+            text-decoration: none;
+            margin-bottom: 10px;
+            transition: filter 0.2s;
+        }
+        .spine-elbow:hover { filter: brightness(1.2); }
+        .spine-bar-top  { background-color: var(--lcars-mauve);        flex-grow: 2; margin-bottom: 10px; }
+        .spine-bar-mid  { background-color: var(--lcars-orange-pastel); flex-grow: 3; margin-bottom: 10px; }
+        .spine-block-1  { height: 60px;  background-color: var(--lcars-amber); margin-bottom: 10px; }
+        .spine-block-2  { height: 100px; background-color: var(--lcars-cyan);  border-bottom-left-radius: 35px; }
+
+        /* ── CONTENT ── */
+        .lcars-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 80px;
+        }
+
+        /* ── HEADER (title inlay — cyan band like index GAMEPAD button) ── */
+        .lcars-header { display: flex; align-items: stretch; height: 70px; margin-bottom: 20px; }
+        .header-cap   { background-color: var(--lcars-cyan); width: 30px; border-top-left-radius: 15px; border-bottom-left-radius: 15px; flex-shrink: 0; }
+        .header-title-band {
+            background-color: var(--lcars-cyan);
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #000;
+            margin: 0 4px;
+        }
+        .header-status-pill {
+            font-size: 0.65em;
+            color: var(--lcars-amber);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .header-end-cap { background-color: var(--lcars-cyan); width: 20px; border-top-right-radius: 15px; border-bottom-right-radius: 15px; flex-shrink: 0; }
+
+        /* --- Panels --- */
+        .lcars-panel {
+            background: #111;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 0 10px rgba(200,200,200,0.1);
+        }
+        .panel-nav { border-left: 10px solid var(--lcars-mauve); }
+        .panel-visual { border-left: 10px solid var(--lcars-cyan); }
+        .panel-data { border-left: 10px solid var(--lcars-gold); }
+
+        .section-title { font-size: 1.1em; font-weight: bold; color: #aaa; margin-bottom: 15px; border-bottom: 1px dashed #333; padding-bottom: 5px; }
+
+        /* Top Buttons LCARS Pills */
+        .top-buttons { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; margin-bottom: 15px; }
+        .top-buttons button, .top-buttons label { 
+            flex: 1; min-width: 140px; border: none; font-weight: bold; padding: 12px 10px; 
+            border-radius: 20px; cursor: pointer; font-size: 1.1em; transition: 0.2s; 
+            font-family: 'Oswald', sans-serif; text-transform: uppercase; text-align: center;
+        }
+        
+        #connectBtn { background-color: var(--lcars-cyan); color: #000; }
+        #connectBtn:hover { background-color: var(--lcars-teal); color: #fff; }
+        
+        #importBtnLabel { background-color: var(--lcars-mauve); color: #000; display: inline-block; box-sizing: border-box; }
+        #importBtnLabel:hover { filter: brightness(1.2); }
+        
+        #exportBtn { background-color: var(--lcars-purple); color: #000; }
+        #exportBtn:hover { filter: brightness(1.2); color: #fff; }
+
+        #saveSerialBtn { background-color: var(--lcars-green); color: #000; }
+        #saveSerialBtn:hover { filter: brightness(1.2); }
+
+        #diagToggle { background-color: #444; color: var(--lcars-gold); border: 1px solid var(--lcars-gold); }
+        #diagToggle:hover { background-color: var(--lcars-gold); color: #000;}
+        #diagToggle.active { background-color: var(--lcars-gold); color: #000; }
+        
+        /* Status Banner */
+        .status-banner {
+            background: rgba(220, 53, 69, 0.15); border: 1px solid var(--lcars-red); color: var(--lcars-red); 
+            padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; font-size: 1.1em; text-align: center;
+        }
+        .status-banner.connected {
+            background: rgba(50, 205, 50, 0.15); border-color: var(--lcars-green); color: var(--lcars-green);
+        }
+
+        /* Layout Selector */
+        .layout-selector { margin-bottom: 15px; padding: 10px; background: #000; border-radius: 10px; border: 1px solid var(--lcars-cyan); display: flex; align-items: center; justify-content: center; gap: 10px;}
+        .layout-selector select { padding: 5px 10px; background: #111; color: var(--lcars-cyan); border: 1px solid var(--lcars-cyan); border-radius: 5px; font-size: 14px; cursor: pointer; font-family: 'Oswald', sans-serif; text-transform: uppercase;}
+
+        /* SVG Layouts */
+        .svg-container { position: relative; margin: 10px auto; width: 100%; max-width: 550px; user-select: none; }
+        .svg-container > svg { width: 100%; height: auto; display: none; }
+        .svg-container > svg.active { display: block; }
+        
+        .btn-zone { cursor: pointer; transition: all 0.2s; }
+        .btn-zone .shape { fill: #444; stroke: #222; stroke-width: 2; transition: 0.2s; } 
+        .btn-zone:hover .shape { fill: #555; stroke: #fff; } 
+        
+        .base-arrow { font-size: 16px; pointer-events: none; transition: opacity 0.2s; }
+        .dynamic-label { font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity 0.2s; letter-spacing: 1px;}
+        
+        .btn-zone.bound .dynamic-label { opacity: 1; fill: #ffffff; } 
+        
+        .btn-zone.mandatory:not(.bound) .shape {
+            stroke: var(--lcars-red); fill: rgba(220, 53, 69, 0.2); animation: pulseMandatory 1.5s infinite; 
+        }
+        @keyframes pulseMandatory { 0% { stroke: var(--lcars-red); } 50% { stroke: var(--lcars-gold); } 100% { stroke: var(--lcars-red); } } 
+
+        .btn-zone.listening .shape { animation: pulseListen 0.8s infinite !important; }
+        @keyframes pulseListen { 0% { fill: var(--lcars-gold); stroke: #fff; } 50% { fill: #cc7a00; stroke: var(--lcars-gold); } 100% { fill: var(--lcars-gold); stroke: #fff; } }
+
+        /* PANELS CONTAINER (Table + Grid side by side) */
+        .data-panel { display: flex; gap: 20px; align-items: flex-start; justify-content: center; width: 100%; transition: all 0.3s; margin-top: 10px;}
+        .table-wrap { flex: 1; min-width: 400px; }
+
+        /* Mapping Table */
+        .mapping-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 1em; }
+        .mapping-table tr { display: flex; gap: 10px; border-bottom: 1px solid #333; align-items: center; transition: background 0.15s; padding: 5px 0;}
+        .mapping-table tr:hover { background: rgba(0, 188, 212, 0.1); }
+        .mapping-table th, .mapping-table td { padding: 8px 5px; border: none; }
+        .mapping-table th { color: var(--lcars-gold); border-bottom: 2px solid var(--lcars-gold); } 
+        
+        .col-zone { order: 1; width: 60px; text-align: center; }
+        .col-act  { order: 2; flex: 1; }
+        
+        .col-col  { order: 3; width: 60px; text-align: center; }
+        .col-hex  { order: 4; width: 150px; }
+        
+        body.diag-mode .col-col { order: 4; }
+        body.diag-mode .col-hex { order: 3; }
+
+        .action-select { width: 100%; padding: 8px; background: #000; color: var(--lcars-cyan); border: 1px solid #444; border-radius: 5px; font-family: 'Oswald', sans-serif; text-transform: uppercase;} 
+
+        /* Palette swatch in table */
+        .color-swatch-cell {
+            width: 34px; height: 34px; border-radius: 6px; border: 2px solid #555;
+            cursor: pointer; transition: border-color 0.2s, transform 0.15s;
+            margin: auto;
+        }
+        .color-swatch-cell:hover { border-color: #fff; transform: scale(1.1); }
+
+        /* Floating palette popup */
+        #swatchPopup {
+            display: none; position: fixed; z-index: 600;
+            background: #111; border: 2px solid var(--lcars-cyan); border-radius: 10px;
+            padding: 10px; box-shadow: 0 0 20px rgba(0,188,212,0.4);
+        }
+        #swatchPopup .pop-title {
+            font-size: 0.75em; color: var(--lcars-gold); text-align: center;
+            margin-bottom: 8px; letter-spacing: 1px;
+        }
+        .pop-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .pop-dot {
+            width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+            border: 2px solid transparent; transition: border-color 0.15s, transform 0.15s;
+        }
+        .pop-dot:hover { border-color: #fff; transform: scale(1.15); }
+        .pop-dot.selected { border-color: #fff; box-shadow: 0 0 6px #fff; }
+
+        /* USB Hex Input styling logic */
+        .val-manual { width: 100%; box-sizing: border-box; text-align: center; font-family: monospace; border-radius: 5px; transition: all 0.2s; font-size: 1.1em;}
+        
+        body:not(.diag-mode) .val-manual { background: transparent; color: #666; border: 1px solid transparent; cursor: default; }
+        body:not(.diag-mode) .val-manual:focus { outline: none; }
+        
+        body.diag-mode .val-manual { background: #000; color: var(--lcars-amber); border: 1px solid var(--lcars-amber); padding: 5px; } 
+        body.diag-mode .val-manual:focus { border-color: var(--lcars-green); outline: none; color: var(--lcars-green); }
+
+        /* Diagnostics Section */
+        .diag-section { width: 220px; background: #000; border: 2px solid var(--lcars-gold); border-radius: 10px; padding: 15px; display: none; box-sizing: border-box; }
+        .grid-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; text-align: center; }
+        .grid-64 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; } 
+        .cell { cursor: pointer; user-select: none; display: flex; flex-direction: column; background: #111; border-radius: 4px; border: 1px solid #333; overflow: hidden; transition: 0.1s; } 
+        .c-idx { font-size: 11px; background: #222; color: var(--lcars-gold); text-align: center; padding: 2px 0; font-family: sans-serif;} 
+        .c-val { font-family: monospace; font-size: 14px; color: var(--lcars-cyan); text-align: center; padding: 5px 0; transition: background 0.1s; } 
+        .c-val.spam { background: var(--lcars-amber); color: #000; } 
+        .cell.blocked { border-color: var(--lcars-red); } 
+        .cell.blocked .c-idx { background: var(--lcars-red); color: #000; } 
+        .cell.forced { border-color: var(--lcars-green); } 
+        .cell.forced .c-idx { background: var(--lcars-green); color: #000; } 
+
+        /* LCARS Modal (Red Alert Style) */
+        #listenModal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; color: #fff;
+        }
+        .modal-box { background: #111; border: 4px solid var(--lcars-red); padding: 30px; border-radius: 20px; text-align: center; max-width: 400px; width: 90%; box-shadow: 0 0 30px rgba(220, 53, 69, 0.4);}
+        .modal-box h3 { color: var(--lcars-red); margin-top: 0; font-size: 1.8em; letter-spacing: 2px;} 
+        .loader { border: 4px solid #333; border-top: 4px solid var(--lcars-red); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .btn-cancel { background: #000; color: var(--lcars-text); border: 2px solid #555; padding: 10px 25px; border-radius: 20px; cursor: pointer; margin-top: 15px; font-family: 'Oswald', sans-serif; font-size: 1.1em; text-transform: uppercase;} 
+        .btn-cancel:hover { border-color: var(--lcars-red); color: var(--lcars-red); }
+    </style>
+</head>
+<body>
+
+    <div class="lcars-frame">
+
+        <!-- SPINE -->
+        <div class="lcars-spine">
+            <a href="index.html" class="spine-elbow">← BACK</a>
+            <div class="spine-bar-top"></div>
+            <div class="spine-bar-mid"></div>
+            <div class="spine-block-1"></div>
+            <div class="spine-block-2"></div>
+        </div>
+
+        <!-- CONTENT -->
+        <div class="lcars-content">
+
+            <!-- HEADER -->
+            <div class="lcars-header">
+                <div class="header-cap"></div>
+                <div class="header-title-band">
+                    <span>🎮 GAMEPAD &amp; JOYSTICK CONFIGURATION</span>
+                </div>
+                <div class="header-end-cap"></div>
+            </div>
+
+        <div class="lcars-panel panel-nav">
+            <div class="top-buttons">
+                <button id="connectBtn" onclick="connectHID()">🔌 Connect USB Gamepad</button>
+                
+                <label id="importBtnLabel" for="importFileInput" style="cursor: pointer;">📂 Import Profile</label>
+                <input type="file" id="importFileInput" accept=".h" style="display:none">
+                
+                <button id="exportBtn">⬇️ Export .H File</button>
+                <button id="saveSerialBtn" onclick="sendSerialData()">💾 SAVE</button>
+                <button id="diagToggle">🛠️ Diagnostics</button>
+            </div>
+            
+            <div class="status-banner" id="connBanner">🔴 NO DEVICE CONNECTED. CLICK 'CONNECT USB GAMEPAD' TO INITIALIZE WEBHID.</div>
+        </div>
+
+        <div class="lcars-panel panel-visual">
+            <div class="section-title">VISUAL MAPPING INTERFACE</div>
+            <div class="layout-selector">
+                <label style="color:var(--lcars-cyan); font-weight:bold;">CHOOSE SCHEMATIC:</label>
+                <select id="layoutSelect" onchange="switchLayout()">
+                    <option value="svg-gamepad">Standard Gamepad (SNES-Style)</option>
+                    <option value="svg-arcade">Arcade Stick (Hori-Style)</option>
+                </select>
+            </div>
+
+            <p style="font-size:0.9em; color:#aaa; text-align:center; margin-bottom: 20px; font-family: sans-serif; text-transform: none;">
+                Click a blank button or direction arrow on the graphic below, then press the physical button on your controller. Adjust the assigned action in the table.
+            </p>
+
+            <div class="svg-container">
+                <svg id="svg-gamepad" class="active" viewBox="0 0 450 240" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="85" y="18" width="60" height="30" rx="8" fill="var(--lcars-mauve)" stroke="#111" stroke-width="2" /> <text x="115" y="38" text-anchor="middle" fill="#000" font-weight="bold" font-family="Oswald">L</text> <g class="btn-zone" id="pad_l1" onclick="startListening('pad_l1', 'Left Shoulder (L1)', 'NONE')">
+                        <rect x="85" y="18" width="60" height="30" rx="8" class="shape" style="fill:transparent; stroke:transparent;" />
+                        <text x="115" y="13" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    
+                    <rect x="310" y="18" width="60" height="30" rx="8" fill="var(--lcars-mauve)" stroke="#111" stroke-width="2" /> <text x="340" y="38" text-anchor="middle" fill="#000" font-weight="bold" font-family="Oswald">R</text> <g class="btn-zone" id="pad_r1" onclick="startListening('pad_r1', 'Right Shoulder (R1)', 'F3')">
+                        <rect x="310" y="18" width="60" height="30" rx="8" class="shape" style="fill:transparent; stroke:transparent;" />
+                        <text x="340" y="13" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <rect x="25" y="40" width="400" height="170" rx="60" fill="#222" stroke="var(--lcars-cyan)" stroke-width="2" /> <path d="M 100 65 h 30 v 30 h 30 v 30 h -30 v 30 h -30 v -30 h -30 v -30 h 30 z" fill="#111" stroke="#444" stroke-width="2" /> <g class="btn-zone" id="pad_up" onclick="startListening('pad_up', 'Gamepad UP', 'UP')">
+                        <rect x="100" y="65" width="30" height="30" class="shape" style="fill:transparent; stroke:transparent;" />
+                        <text x="115" y="85" text-anchor="middle" class="base-arrow" fill="var(--lcars-cyan)">⬆️</text> <text x="115" y="60" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="pad_down" onclick="startListening('pad_down', 'Gamepad DOWN', 'DOWN')">
+                        <rect x="100" y="125" width="30" height="30" class="shape" style="fill:transparent; stroke:transparent;" />
+                        <text x="115" y="145" text-anchor="middle" class="base-arrow" fill="var(--lcars-cyan)">⬇️</text> <text x="115" y="170" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="pad_left" onclick="startListening('pad_left', 'Gamepad LEFT', 'LEFT')">
+                        <rect x="70" y="95" width="30" height="30" class="shape" style="fill:transparent; stroke:transparent;" />
+                        <text x="85" y="115" text-anchor="middle" class="base-arrow" fill="var(--lcars-cyan)">⬅️</text> <text x="85" y="140" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="pad_right" onclick="startListening('pad_right', 'Gamepad RIGHT', 'RIGHT')">
+                        <rect x="130" y="95" width="30" height="30" class="shape" style="fill:transparent; stroke:transparent;" />
+                        <text x="145" y="115" text-anchor="middle" class="base-arrow" fill="var(--lcars-cyan)">➡️</text> <text x="145" y="140" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <g class="btn-zone" id="pad_btn_n" onclick="startListening('pad_btn_n', 'Top Action Button', 'A-HLD')">
+                        <circle cx="340" cy="75" r="18" class="shape" />
+                        <text x="340" y="80" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="pad_btn_e" onclick="startListening('pad_btn_e', 'Right Action Button', 'UP')">
+                        <circle cx="375" cy="110" r="18" class="shape" />
+                        <text x="375" y="115" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="pad_btn_w" onclick="startListening('pad_btn_w', 'Left Action Button', 'F2')">
+                        <circle cx="305" cy="110" r="18" class="shape" />
+                        <text x="305" y="115" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="pad_btn_s" onclick="startListening('pad_btn_s', 'Bottom Action Button', 'F1')">
+                        <circle cx="340" cy="145" r="18" class="shape" />
+                        <text x="340" y="150" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <g class="btn-zone" id="pad_sel" onclick="startListening('pad_sel', 'Select / Back', 'A-OFF')">
+                        <rect x="190" y="110" width="30" height="12" rx="6" class="shape" />
+                        <text x="205" y="105" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="pad_sta" onclick="startListening('pad_sta', 'Start / Forward', 'A-TOG')">
+                        <rect x="230" y="110" width="30" height="12" rx="6" class="shape" />
+                        <text x="245" y="105" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <circle cx="160" cy="175" r="28" fill="#111" stroke="#444" stroke-width="2"/> <g class="btn-zone mandatory" id="pad_ls_x" onclick="startListening('pad_ls_x', 'MOVE LEFT STICK RIGHT', 'LS-X')">
+                        <rect x="162" y="167" width="16" height="16" rx="4" class="shape" style="fill:transparent; stroke:none;" />
+                        <text x="170" y="180" text-anchor="middle" class="base-arrow" fill="#fff" font-size="12px">➡️</text> <text x="170" y="162" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone mandatory" id="pad_ls_y" onclick="startListening('pad_ls_y', 'MOVE LEFT STICK DOWN', 'LS-Y')">
+                        <rect x="142" y="179" width="16" height="16" rx="4" class="shape" style="fill:transparent; stroke:none;" />
+                        <text x="150" y="192" text-anchor="middle" class="base-arrow" fill="#fff" font-size="12px">⬇️</text> <text x="150" y="208" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <circle cx="290" cy="175" r="28" fill="#111" stroke="#444" stroke-width="2"/> <g class="btn-zone mandatory" id="pad_rs_x" onclick="startListening('pad_rs_x', 'MOVE RIGHT STICK RIGHT', 'RS-X')">
+                        <rect x="292" y="167" width="16" height="16" rx="4" class="shape" style="fill:transparent; stroke:none;" />
+                        <text x="300" y="180" text-anchor="middle" class="base-arrow" fill="#fff" font-size="12px">➡️</text> <text x="300" y="162" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone mandatory" id="pad_rs_y" onclick="startListening('pad_rs_y', 'MOVE RIGHT STICK DOWN', 'RS-Y')">
+                        <rect x="272" y="179" width="16" height="16" rx="4" class="shape" style="fill:transparent; stroke:none;" />
+                        <text x="280" y="192" text-anchor="middle" class="base-arrow" fill="#fff" font-size="12px">⬇️</text> <text x="280" y="208" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                </svg>
+
+                <svg id="svg-arcade" viewBox="0 0 450 240" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="25" y="40" width="400" height="170" rx="10" fill="#111" stroke="var(--lcars-cyan)" stroke-width="2" /> <g class="btn-zone" id="arc_t1" onclick="startListening('arc_t1', 'Top Panel 1', 'NONE')">
+                        <rect x="230" y="55" width="25" height="12" rx="2" class="shape" />
+                        <text x="242" y="64" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="arc_t2" onclick="startListening('arc_t2', 'Top Panel 2', 'NONE')">
+                        <rect x="270" y="55" width="25" height="12" rx="2" class="shape" />
+                        <text x="282" y="64" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="arc_t3" onclick="startListening('arc_t3', 'Top Panel 3', 'NONE')">
+                        <rect x="310" y="55" width="25" height="12" rx="2" class="shape" />
+                        <text x="322" y="64" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <circle cx="110" cy="140" r="45" fill="#000" stroke="#333" stroke-width="4" /> <line x1="110" y1="140" x2="110" y2="105" stroke="#777" stroke-width="8" /> <circle cx="110" cy="105" r="22" fill="var(--lcars-magenta)" /> <g class="btn-zone" id="arc_up" onclick="startListening('arc_up', 'Arcade UP', 'UP')">
+                        <rect x="95" y="60" width="30" height="30" rx="4" class="shape" />
+                        <text x="110" y="80" text-anchor="middle" class="base-arrow">⬆️</text>
+                        <text x="110" y="52" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="arc_down" onclick="startListening('arc_down', 'Arcade DOWN', 'DOWN')">
+                        <rect x="95" y="165" width="30" height="30" rx="4" class="shape" />
+                        <text x="110" y="185" text-anchor="middle" class="base-arrow">⬇️</text>
+                        <text x="110" y="212" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="arc_left" onclick="startListening('arc_left', 'Arcade LEFT', 'LEFT')">
+                        <rect x="45" y="115" width="30" height="30" rx="4" class="shape" />
+                        <text x="60" y="135" text-anchor="middle" class="base-arrow">⬅️</text>
+                        <text x="60" y="162" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="arc_right" onclick="startListening('arc_right', 'Arcade RIGHT', 'RIGHT')">
+                        <rect x="145" y="115" width="30" height="30" rx="4" class="shape" />
+                        <text x="160" y="135" text-anchor="middle" class="base-arrow">➡️</text>
+                        <text x="160" y="162" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <g class="btn-zone" id="arc_b1" onclick="startListening('arc_b1', 'Arcade Button 1 (Top-Left)', 'F1')">
+                        <circle cx="230" cy="115" r="20" class="shape" />
+                        <text x="230" y="119" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="arc_b2" onclick="startListening('arc_b2', 'Arcade Button 2 (Top-Mid)', 'F2')">
+                        <circle cx="290" cy="100" r="20" class="shape" />
+                        <text x="290" y="104" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="arc_b3" onclick="startListening('arc_b3', 'Arcade Button 3 (Top-Right)', 'F3')">
+                        <circle cx="350" cy="100" r="20" class="shape" />
+                        <text x="350" y="104" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <g class="btn-zone" id="arc_b4" onclick="startListening('arc_b4', 'Arcade Button 4 (Bot-Left)', 'A-TOG')">
+                        <circle cx="230" cy="165" r="20" class="shape" />
+                        <text x="230" y="169" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="arc_b5" onclick="startListening('arc_b5', 'Arcade Button 5 (Bot-Mid)', 'A-HLD')">
+                        <circle cx="290" cy="150" r="20" class="shape" />
+                        <text x="290" y="154" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone" id="arc_b6" onclick="startListening('arc_b6', 'Arcade Button 6 (Bot-Right)', 'A-OFF')">
+                        <circle cx="350" cy="150" r="20" class="shape" />
+                        <text x="350" y="154" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <div class="data-panel">
+            <div class="table-wrap lcars-panel panel-data">
+                <div class="section-title">ASSIGNMENT REGISTRY</div>
+                <table class="mapping-table" id="actionTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th class="col-zone" style="text-align:center;">ZONE</th>
+                            <th class="col-act">ASSIGNED ACTION</th>
+                            <th class="col-col" style="text-align:center;">COLOR</th>
+                            <th class="col-hex">USB HEX</th>
+                        </tr>
+                    </thead>
+                    <tbody id="actionTbody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="diag-section" id="diagSection">
+                <div class="grid-header">
+                    <h3 style="margin:0; color:var(--lcars-gold); font-size:1.2em;">LIVE DATA STREAM</h3>
+                    <div style="font-size:10px; color:#aaa; margin-top:3px; font-family:sans-serif; text-transform:none;">(Click cell to block/allow)</div>
+                </div>
+                <div class="grid-64" id="grid64"></div>
+            </div>
+        </div>
+
+        </div><!-- end lcars-content -->
+    </div><!-- end lcars-frame -->
+
+    <div id="listenModal">
+        <div class="modal-box">
+            <h3 id="modalTitle">LISTENING...</h3>
+            <p style="font-size: 1.2em;">TARGET ZONE: <strong id="modalZoneName" style="color:#fff;">---</strong></p>
+            <div class="loader"></div>
+            <p id="modalInstruction" style="font-size: 1em; color:var(--lcars-cyan); font-family: sans-serif; text-transform:none;">Press the button or move the stick NOW.</p> 
+            <div style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+                <p style="font-size: 0.9em; color: #aaa; margin: 0 0 10px 0; font-family: sans-serif; text-transform:none;">Or enter manually (e.g. 5:128 or IDX:3):</p>
+                <input type="text" id="manualHexInput" style="background:#000; color:var(--lcars-cyan); border:1px solid #555; padding:8px; border-radius:5px; text-align:center; font-family:monospace; width: 140px; font-size:1.1em;" placeholder="5:128">
+                <button onclick="submitManualHex()" style="background: var(--lcars-green); color: #000; border: none; padding: 8px 16px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-left: 5px; font-family: 'Oswald', sans-serif;">OK</button> 
+            </div>
+            <button class="btn-cancel" onclick="cancelListen()">ABORT</button>
+        </div>
+    </div>
+
+    <div id="swatchPopup">
+        <div class="pop-title">SELECT COLOR</div>
+        <div class="pop-grid" id="popGrid"></div>
+    </div>
+
+    <script>
+        // Custom dictionary provided by user
+        const ACTION_DICT = {
+            "NONE":  { name: "Unmapped", label: "", color: "#444444" },
+            "F1":    { name: "FIRE 1", label: "Fr_1", color: "#32cd32" },
+            "F2":    { name: "FIRE 2", label: "Fr_2", color: "#ff4444" },
+            "F3":    { name: "FIRE 3", label: "Fr_3", color: "#00BCD4" },
+            "A-TOG": { name: "AUTO Fr1 TOG", label: "AutoFr1. On", color: "#005500" },
+            "A-HLD": { name: "AUTO Fr1 HLD", label: "AutoFr1. Hold", color: "#ff9800" },
+            "A-OFF": { name: "AUTO Fr1 OFF", label: "AutoFr1 Off", color: "#9C27B0" },
+            "UP":    { name: "UP", label: "⬆️", color: "#9C27B0" },
+            "DOWN":  { name: "DOWN", label: "⬇️", color: "#9C27B0" },
+            "LEFT":  { name: "LEFT", label: "⬅️", color: "#9C27B0" },
+            "RIGHT": { name: "RIGHT", label: "➡️", color: "#9C27B0" },
+            "LS-X":  { name: "LS-X", label: "LS_Right ➡️", color: "#9C27B0" },
+            "LS-Y":  { name: "LS-Y", label: "LS_Down ⬇️", color: "#9C27B0" },
+            "RS-X":  { name: "RS-X", label: "RS_Right ➡️", color: "#9C27B0" },
+            "RS-Y":  { name: "RS-Y", label: "RS_Down ⬇️", color: "#9C27B0" }
+        };
+
+        // ==========================================
+        // 🎨 PALETTE COLOR SYSTEM (matches firmware + led.html)
+        // ==========================================
+        const PALETTE = [
+            { hex: "#000000", name: "BLACK"  },
+            { hex: "#FFFFFF", name: "WHITE"  },
+            { hex: "#FF0000", name: "RED"    },
+            { hex: "#FF9900", name: "ORANGE" },
+            { hex: "#FFFF00", name: "YELLOW" },
+            { hex: "#00FF00", name: "GREEN"  },
+            { hex: "#0000FF", name: "BLUE"   },
+            { hex: "#00FFFF", name: "CYAN"   },
+            { hex: "#FF00FF", name: "PURPLE" },
+            { hex: "#FF99CC", name: "PINK"   },
+        ];
+
+        function rgbToHex(rgb) {
+            if (!rgb || rgb.startsWith('#')) return (rgb || '#000000').toUpperCase();
+            const m = rgb.match(/\d+/g);
+            if (!m) return '#000000';
+            return '#' + m.slice(0,3).map(n => parseInt(n).toString(16).padStart(2,'0')).join('').toUpperCase();
+        }
+
+        // Closest palette hex for a given color string
+        function snapToPalette(hex) {
+            const h = hex.toUpperCase();
+            return PALETTE.find(p => p.hex.toUpperCase() === h) ? h : PALETTE[0].hex.toUpperCase();
+        }
+
+        let activeSwatchZoneId = null;
+
+        // Build popup grid once
+        (function buildPopup() {
+            const grid = document.getElementById('popGrid');
+            PALETTE.forEach(({hex, name}) => {
+                const dot = document.createElement('div');
+                dot.className = 'pop-dot';
+                dot.style.backgroundColor = hex;
+                dot.title = name;
+                dot.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (activeSwatchZoneId) {
+                        const sw = document.getElementById('col_' + activeSwatchZoneId);
+                        if (sw) {
+                            sw.style.backgroundColor = hex;
+                            updateSVG(activeSwatchZoneId);
+                        }
+                    }
+                    closeSwatchPopup();
+                });
+                grid.appendChild(dot);
+            });
+        })();
+
+        function openSwatchPicker(zoneId) {
+            activeSwatchZoneId = zoneId;
+            const popup = document.getElementById('swatchPopup');
+            const sw = document.getElementById('col_' + zoneId);
+            const currentHex = sw ? rgbToHex(sw.style.backgroundColor) : '#000000';
+
+            // Highlight current
+            document.querySelectorAll('.pop-dot').forEach(d => {
+                d.classList.toggle('selected', d.style.backgroundColor && rgbToHex(d.style.backgroundColor) === currentHex.toUpperCase());
+            });
+
+            const rect = sw.getBoundingClientRect();
+            popup.style.display = 'block';
+            const pw = popup.offsetWidth || 170;
+            const ph = popup.offsetHeight || 120;
+            let left = rect.right + 8;
+            let top  = rect.top;
+            if (left + pw > window.innerWidth - 10) left = rect.left - pw - 8;
+            if (top + ph > window.innerHeight - 10) top = window.innerHeight - ph - 10;
+            popup.style.left = left + 'px';
+            popup.style.top  = top  + 'px';
+        }
+
+        function closeSwatchPopup() {
+            document.getElementById('swatchPopup').style.display = 'none';
+            activeSwatchZoneId = null;
+        }
+
+        document.addEventListener('click', (e) => {
+            const popup = document.getElementById('swatchPopup');
+            if (popup.style.display !== 'none' && !popup.contains(e.target)) closeSwatchPopup();
+        });
+
+        // --- DICTIONARIES FOR IMPORT/EXPORT TRANSLATION ---
+        const IMPORT_ID_TRANSLATOR = {
+            "DU": "pad_up", "DD": "pad_down", "DL": "pad_left", "DR": "pad_right",
+            "LSH": "pad_ls_x", "LSV": "pad_ls_y", "RSH": "pad_rs_x", "RSV": "pad_rs_y",
+            "A": "pad_btn_s", "B": "pad_btn_e", "X": "pad_btn_w", "Y": "pad_btn_n",
+            "LT": "pad_l1", "RT": "pad_r1", "SEL": "pad_sel", "STA": "pad_sta"
+        };
+
+        const EXPORT_ID_TRANSLATOR = {
+            "pad_up": "DU", "pad_down": "DD", "pad_left": "DL", "pad_right": "DR", 
+            "pad_ls_x": "LSH", "pad_ls_y": "LSV", "pad_rs_x": "RSH", "pad_rs_y": "RSV",
+            "pad_btn_s": "A", "pad_btn_e": "B", "pad_btn_w": "X", "pad_btn_n": "Y",
+            "pad_l1": "LT", "pad_r1": "RT", "pad_sel": "SEL", "pad_sta": "STA",
+            "arc_up": "DU", "arc_down": "DD", "arc_left": "DL", "arc_right": "DR",
+            "arc_b1": "A", "arc_b2": "X", "arc_b3": "LT", 
+            "arc_b4": "B", "arc_b5": "Y", "arc_b6": "RT"
+        };
+
+        const IMPORT_ACTION_TRANSLATOR = {
+            "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT",
+            "Fire1": "F1", "Fire2": "F2", "Fire3": "F3", "Alt UP": "UP",
+            "Autofire Off": "A-OFF", "Autofire On": "A-TOG", "Autofire Hold": "A-HLD",
+            "X Axis": "LS-X", 
+            "Y Axis": "LS-Y"  
+        };
+
+        const EXPORT_ACTION_TRANSLATOR = {
+            "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT",
+            "F1": "Fire1", "F2": "Fire2", "F3": "Fire3", 
+            "A-TOG": "Autofire On", "A-OFF": "Autofire Off", "A-HLD": "Autofire Hold",
+            "LS-X": "X Axis", "LS-Y": "Y Axis", "RS-X": "X Axis", "RS-Y": "Y Axis"
+        };
+
+        const ENUM_ACTION_TRANSLATOR = {
+            "UP": "JM_UP", "DOWN": "JM_DOWN", "LEFT": "JM_LEFT", "RIGHT": "JM_RIGHT",
+            "F1": "JM_FIRE", "F2": "JM_FIRE2", "F3": "JM_FIRE3",
+            "A-TOG": "JM_AUTOFIRE_ON", "A-OFF": "JM_AUTOFIRE_OFF", "A-HLD": "JM_AUTOFIRE_HOLD"
+        };
+
+        let hidDevice = null;
+        let baselineData = null;
+        let activeZoneId = null;
+        let activeDefaultAction = null;
+        let activeZoneName = null;
+        let mappedZones = {}; 
+        let isDiagMode = false;
+
+        // --- SISTEMA DI NAVIGAZIONE ANTI-BLOCCO (LCARS) ---
+        document.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', async function(e) {
+                e.preventDefault(); 
+                const targetUrl = this.href;
+                
+                if (hidDevice && hidDevice.opened) {
+                    try { await hidDevice.close(); } catch(err) {}
+                    // Attesa vitale per sblocco driver OS
+                    await new Promise(r => setTimeout(r, 300));
+                }
+                
+                window.location.href = targetUrl;
+            });
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (hidDevice && hidDevice.opened) {
+                hidDevice.close().catch(()=>{});
+            }
+        });
+
+        // --- DIAGNOSTICS & GRID INIT ---
+        let noiseCount = new Uint32Array(64);
+        let cellState = new Uint8Array(64); 
+        
+        let latestData = new Uint8Array(64);
+        let lastReportUi = new Uint8Array(64); 
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const grid = document.getElementById('grid64');
+            for(let i=0; i<64; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell'; cell.id = `cell-${i}`;
+                cell.innerHTML = `<div class="c-idx">${i}</div><div class="c-val" id="cv-${i}">0</div>`;
+                cell.onclick = () => {
+                    if (cellState[i] === 0 || cellState[i] === 1) cellState[i] = 2; 
+                    else if (cellState[i] === 2) cellState[i] = 1; 
+                    updateCellUI(i);
+                };
+                grid.appendChild(cell);
+            }
+        });
+
+        function updateCellUI(i) {
+            const cl = document.getElementById(`cell-${i}`);
+            if (!cl) return;
+            cl.classList.toggle('blocked', cellState[i] === 1);
+            cl.classList.toggle('forced', cellState[i] === 2);
+        }
+
+        // Mode Toggle
+        document.getElementById('diagToggle').onclick = (e) => {
+            isDiagMode = !isDiagMode;
+            document.body.classList.toggle('diag-mode', isDiagMode);
+            e.target.classList.toggle('active', isDiagMode);
+            
+            const sec = document.getElementById('diagSection');
+            sec.style.display = isDiagMode ? 'block' : 'none';
+            
+            document.querySelectorAll('.val-manual').forEach(inp => {
+                inp.readOnly = !isDiagMode;
+            });
+        };
+
+        // --- EXPORT TO .H LOGIC ---
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const content = generateJoystickMappingHeader();
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+            const link = document.createElement('a'); 
+            link.href = URL.createObjectURL(blob);
+            link.download = 'JoystickMapping.h'; 
+            document.body.appendChild(link);
+            link.click(); 
+            document.body.removeChild(link);
+        });
+
+        function generateJoystickMappingHeader() {
+            const deviceName = hidDevice ? hidDevice.productName : "UNKNOWN_DEVICE";
+            const vid = hidDevice ? hidDevice.vendorId : 0;
+            const pid = hidDevice ? hidDevice.productId : 0;
+            const commodoreModel = "PAL"; 
+
+            let rules = [];
+            let analogX = [];
+            let analogY = [];
+            let metaArray = [];
+
+            for (const zoneId in mappedZones) {
+                if (!mappedZones[zoneId]) continue;
+                
+                let selInput = document.getElementById('sel_' + zoneId);
+                let hexInput = document.getElementById('hex_' + zoneId);
+                
+                if (!selInput || !hexInput) continue;
+                
+                let actionKey = selInput.value;
+                let hexStr = hexInput.value; 
+                const swCol = document.getElementById('col_' + zoneId);
+                let colorVal = swCol ? rgbToHex(swCol.style.backgroundColor) : "#000000";
+                
+                if (actionKey === "NONE") continue;
+
+                let index = 0;
+                let value = 0;
+
+                if (hexStr.includes("[B:")) {
+                    let match = hexStr.match(/\[B:(\d+)\s*=\s*0x([0-9A-Fa-f]+)\]/);
+                    if (match) {
+                        index = parseInt(match[1]);
+                        value = parseInt(match[2], 16);
+                    }
+                } else if (hexStr.includes("[IDX:")) {
+                    let match = hexStr.match(/\[IDX:\s*(\d+)\]/);
+                    if (match) {
+                        index = parseInt(match[1]);
+                        value = 255; 
+                    }
+                }
+
+                let oldId = EXPORT_ID_TRANSLATOR[zoneId] || zoneId;
+                let oldAction = EXPORT_ACTION_TRANSLATOR[actionKey] || actionKey;
+                
+                metaArray.push(`${oldId}:${index}:${value}:${oldAction}:${colorVal}`);
+
+                if (actionKey.includes("-X")) {
+                    analogX.push(index);
+                } else if (actionKey.includes("-Y")) {
+                    analogY.push(index);
+                } else {
+                    let funcEnum = ENUM_ACTION_TRANSLATOR[actionKey];
+                    if (funcEnum) {
+                        rules.push({ index, value, funcEnum });
+                    }
+                }
+            }
+
+            const metaString = "// WEB_META: " + metaArray.join("|") + "\n";
+            
+            let dpadIndex = -1;
+            let dirRules = rules.filter(r => ["JM_UP", "JM_DOWN", "JM_LEFT", "JM_RIGHT"].includes(r.funcEnum));
+            if (dirRules.length > 0) dpadIndex = dirRules[0].index;
+
+            const isDirFunc = (f) => ["JM_UP", "JM_DOWN", "JM_LEFT", "JM_RIGHT"].includes(f);
+
+            const rulesText = (rules.length === 0) ? "  // No rules defined\n" : rules.map(r => {
+                let op = "JM_EQ";
+                if (isDirFunc(r.funcEnum) && r.value <= 8) op = "JM_HAT";
+                else if (r.value === 0 || r.value === 255) op = "JM_EQ";
+                else op = "JM_BITANY";
+                return `  { ${r.index}, ${r.value}, ${op}, ${r.funcEnum} },`;
+            }).join("\n") + "\n";
+
+            const mouseBtnRules = rules.filter(r => (dpadIndex < 0) ? true : (r.index !== dpadIndex))
+                .filter(r => ["JM_FIRE","JM_FIRE2","JM_FIRE3","JM_UP","JM_AUTOFIRE_ON","JM_AUTOFIRE_OFF","JM_AUTOFIRE_HOLD"].includes(r.funcEnum));
+            
+            const mouseBtnText = (mouseBtnRules.length === 0) ? "  // No mouse-button rules defined\n" : mouseBtnRules.map(r => {
+                let op = "JM_EQ"; 
+                if ([1, 2, 4, 8, 16, 32, 64, 128].includes(r.value)) op = "JM_BITANY";
+                return `  { ${r.index}, ${r.value}, ${op}, ${r.funcEnum} },`;
+            }).join("\n") + "\n";
+
+            const useAnalogMacro = (analogX.length > 0 || analogY.length > 0) ? 1 : 0;
+            const xIdxList = analogX.length > 0 ? analogX.join(", ") : "2, 4";
+            const yIdxList = analogY.length > 0 ? analogY.join(", ") : "3, 5";
+
+            return `#pragma once
+#include <Arduino.h>
+#include <stdint.h>
+
+// Generated by Smart Web Configurator
+${metaString}// Device: ${deviceName}
+// Vendor ID: ${vid}
+// Product ID: ${pid}
+// Preferred C64 timing: ${commodoreModel}
+
+#define JOY_MAP_LEARN   0
+#define JOY_MAP_CUSTOM  1
+#define JOY_MAPPING_MODE JOY_MAP_CUSTOM
+
+#if (JOY_MAPPING_MODE == JOY_MAP_CUSTOM)
+
+enum JM_Op : uint8_t { JM_EQ = 0, JM_BITANY = 1, JM_HAT = 2 };
+enum JM_Func : uint8_t { JM_UP = 0, JM_UP_RIGHT, JM_RIGHT, JM_RIGHT_DOWN, JM_DOWN, JM_DOWN_LEFT, JM_LEFT, JM_LEFT_UP, JM_FIRE, JM_FIRE2, JM_FIRE3, JM_AUTOFIRE_ON, JM_AUTOFIRE_OFF, JM_AUTOFIRE_HOLD, JM_AUTOLEFTRIGHT_ON, JM_AUTOLEFTRIGHT_OFF };
+
+struct JM_Rule { uint8_t index; uint8_t value; JM_Op op; JM_Func func; };
+
+static bool JM_autofire = false;
+static bool JM_autoleftright = false;
+
+#define JM_DPAD_INDEX ${dpadIndex}
+#define JM_HAS_DPAD_INDEX ${dpadIndex >= 0 ? 1 : 0}
+
+static const JM_Rule JM_JOY_RULES[] = {
+${rulesText}};
+static const size_t JM_JOY_RULES_COUNT = sizeof(JM_JOY_RULES) / sizeof(JM_JOY_RULES[0]);
+
+static const JM_Rule JM_MOUSE_BTN_RULES[] = {
+${mouseBtnText}};
+static const size_t JM_MOUSE_BTN_RULES_COUNT = sizeof(JM_MOUSE_BTN_RULES) / sizeof(JM_MOUSE_BTN_RULES[0]);
+
+#define JM_USE_ANALOG_MOUSE  ${useAnalogMacro}
+
+static const uint8_t JM_MOUSE_X_INDEXES[] = { ${xIdxList} };
+static const uint8_t JM_MOUSE_Y_INDEXES[] = { ${yIdxList} };
+
+#define JM_ANALOG_CENTER      127
+#define JM_ANALOG_DEAD_LOW    64
+#define JM_ANALOG_DEAD_HIGH   190
+
+#define JM_C64_ANALOG_DIV      3
+#define JM_C64_Y_INVERT        1
+#define JM_A_STEP_DIV          40
+#define JM_A_Y_INVERT          0
+#define JM_ATARI_PULSE_SCALE   18.6f
+
+static inline bool JM_match(const JM_Rule &r, const uint8_t *data, int length) {
+  if ((int)r.index >= length) return false;
+  uint8_t v = data[r.index];
+  if (r.op == JM_EQ) return (v == r.value);
+  if (r.op == JM_HAT) return ((v & 0x0F) == r.value);
+  return ((v & r.value) != 0);
+}
+
+static inline void JM_applyDirFunc(JM_Func f, bool &up, bool &down, bool &left, bool &right) {
+  switch (f) {
+    case JM_UP: up = true; break;
+    case JM_UP_RIGHT: up = true; right = true; break;
+    case JM_RIGHT: right = true; break;
+    case JM_RIGHT_DOWN: down = true; right = true; break;
+    case JM_DOWN: down = true; break;
+    case JM_DOWN_LEFT: down = true; left = true; break;
+    case JM_LEFT: left = true; break;
+    case JM_LEFT_UP: up = true; left = true; break;
+    default: break;
+  }
+}
+
+static inline void JM_DecodeDirections(const uint8_t *data, int length, bool &up, bool &down, bool &left, bool &right) {
+  up = down = left = right = false;
+  for (size_t i = 0; i < JM_JOY_RULES_COUNT; i++) {
+    const JM_Rule &r = JM_JOY_RULES[i];
+#if (JM_HAS_DPAD_INDEX == 1)
+    if ((int)r.index != JM_DPAD_INDEX) continue;
+#endif
+    if (!JM_match(r, data, length)) continue;
+    JM_applyDirFunc(r.func, up, down, left, right);
+  }
+}
+
+static inline void JM_DecodeJoystickButtons(const uint8_t *data, int length, bool &fire, bool &fire2, bool &fire3, bool &autofireEnabled, bool &autoleftrightEnabled) {
+  fire = fire2 = fire3 = false;
+  bool html_auto_on = false; bool html_auto_off = false; bool html_auto_hold = false;
+  for (size_t i = 0; i < JM_JOY_RULES_COUNT; i++) {
+    const JM_Rule &r = JM_JOY_RULES[i];
+#if (JM_HAS_DPAD_INDEX == 1)
+    if ((int)r.index == JM_DPAD_INDEX) continue;
+#endif
+    if (!JM_match(r, data, length)) continue;
+    if (r.func == JM_AUTOFIRE_ON) { html_auto_on = true; continue; }
+    if (r.func == JM_AUTOFIRE_OFF) { html_auto_off = true; continue; }
+    if (r.func == JM_AUTOFIRE_HOLD) { html_auto_hold = true; continue; }
+    if (r.func == JM_AUTOLEFTRIGHT_ON) { JM_autoleftright = true; continue; }
+    if (r.func == JM_AUTOLEFTRIGHT_OFF) { JM_autoleftright = false; continue; }
+    if (r.func == JM_FIRE) fire = true;
+    if (r.func == JM_FIRE2) fire2 = true;
+    if (r.func == JM_FIRE3) fire3 = true;
+  }
+  static bool latch = false;
+  if (html_auto_on) latch = true;
+  if (html_auto_off) latch = false;
+  autofireEnabled = latch || html_auto_hold;
+  autoleftrightEnabled = JM_autoleftright;
+}
+
+static inline void JM_DecodeJoystickMode(const uint8_t *data, int length, bool &up, bool &down, bool &left, bool &right, bool &fire, bool &fire2, bool &fire3, bool &autofireEnabled, bool &autoleftrightEnabled) {
+  JM_DecodeDirections(data, length, up, down, left, right);
+  JM_DecodeJoystickButtons(data, length, fire, fire2, fire3, autofireEnabled, autoleftrightEnabled);
+}
+
+static inline void JM_DecodeMouseModeButtons_C64(const uint8_t *data, int length, bool &fire, bool &up, bool &autofireEnabled) {
+  fire = up = false;
+  bool html_auto_on = false; bool html_auto_off = false; bool html_auto_hold = false;
+  for (size_t i = 0; i < JM_MOUSE_BTN_RULES_COUNT; i++) {
+    const JM_Rule &r = JM_MOUSE_BTN_RULES[i];
+    if (!JM_match(r, data, length)) continue;
+    if (r.func == JM_AUTOFIRE_ON) { html_auto_on = true; continue; }
+    if (r.func == JM_AUTOFIRE_OFF) { html_auto_off = true; continue; }
+    if (r.func == JM_AUTOFIRE_HOLD) { html_auto_hold = true; continue; }
+    if (r.func == JM_FIRE) fire = true;
+    if (r.func == JM_UP) up = true;
+  }
+  static bool latch = false;
+  if (html_auto_on) latch = true;
+  if (html_auto_off) latch = false;
+  autofireEnabled = latch || html_auto_hold;
+}
+
+static inline void JM_DecodeMouseModeButtons_A(const uint8_t *data, int length, bool &fire, bool &button2, bool &button3, bool &autofireEnabled) {
+  fire = button2 = button3 = false;
+  bool html_auto_on = false; bool html_auto_off = false; bool html_auto_hold = false;
+  for (size_t i = 0; i < JM_MOUSE_BTN_RULES_COUNT; i++) {
+    const JM_Rule &r = JM_MOUSE_BTN_RULES[i];
+    if (!JM_match(r, data, length)) continue;
+    if (r.func == JM_AUTOFIRE_ON) { html_auto_on = true; continue; }
+    if (r.func == JM_AUTOFIRE_OFF) { html_auto_off = true; continue; }
+    if (r.func == JM_AUTOFIRE_HOLD) { html_auto_hold = true; continue; }
+    if (r.func == JM_FIRE) fire = true;
+    if (r.func == JM_FIRE2 || r.func == JM_UP) button2 = true;
+    if (r.func == JM_FIRE3) button3 = true;
+  }
+  static bool latch = false;
+  if (html_auto_on) latch = true;
+  if (html_auto_off) latch = false;
+  autofireEnabled = latch || html_auto_hold;
+}
+
+static inline void JM_AnalogToMouseDelta_C64(const uint8_t *data, int length, int &dX, int &dY) {
+  dX = dY = 0;
+#if (JM_USE_ANALOG_MOUSE == 1)
+  for (size_t i=0; i < (sizeof(JM_MOUSE_X_INDEXES)/sizeof(JM_MOUSE_X_INDEXES[0])); i++) {
+    uint8_t idx = JM_MOUSE_X_INDEXES[i];
+    if ((int)idx >= length) continue;
+    uint8_t v = data[idx];
+    if (v < JM_ANALOG_DEAD_LOW || v > JM_ANALOG_DEAD_HIGH) dX += ((int)v - JM_ANALOG_CENTER) / JM_C64_ANALOG_DIV;
+  }
+  for (size_t i=0; i < (sizeof(JM_MOUSE_Y_INDEXES)/sizeof(JM_MOUSE_Y_INDEXES[0])); i++) {
+    uint8_t idx = JM_MOUSE_Y_INDEXES[i];
+    if ((int)idx >= length) continue;
+    uint8_t v = data[idx];
+    if (v < JM_ANALOG_DEAD_LOW || v > JM_ANALOG_DEAD_HIGH) {
+#if (JM_C64_Y_INVERT == 1)
+      dY += (JM_ANALOG_CENTER - (int)v) / JM_C64_ANALOG_DIV;
+#else
+      dY += ((int)v - JM_ANALOG_CENTER) / JM_C64_ANALOG_DIV;
+#endif
+    }
+  }
+#endif
+}
+
+static inline void JM_AnalogToMouseSteps_A(const uint8_t *data, int length, int &xStepsSigned, int &yStepsSigned) {
+  xStepsSigned = yStepsSigned = 0;
+#if (JM_USE_ANALOG_MOUSE == 1)
+  for (size_t i=0; i < (sizeof(JM_MOUSE_X_INDEXES)/sizeof(JM_MOUSE_X_INDEXES[0])); i++) {
+    uint8_t idx = JM_MOUSE_X_INDEXES[i];
+    if ((int)idx >= length) continue;
+    uint8_t v = data[idx];
+    if (v < JM_ANALOG_DEAD_LOW || v > JM_ANALOG_DEAD_HIGH) xStepsSigned += ((int)v - JM_ANALOG_CENTER) / JM_A_STEP_DIV;
+  }
+  for (size_t i=0; i < (sizeof(JM_MOUSE_Y_INDEXES)/sizeof(JM_MOUSE_Y_INDEXES[0])); i++) {
+    uint8_t idx = JM_MOUSE_Y_INDEXES[i];
+    if ((int)idx >= length) continue;
+    uint8_t v = data[idx];
+    if (v < JM_ANALOG_DEAD_LOW || v > JM_ANALOG_DEAD_HIGH) {
+#if (JM_A_Y_INVERT == 1)
+      yStepsSigned += (JM_ANALOG_CENTER - (int)v) / JM_A_STEP_DIV;
+#else
+      yStepsSigned += ((int)v - JM_ANALOG_CENTER) / JM_A_STEP_DIV;
+#endif
+    }
+  }
+#endif
+}
+
+#else 
+static inline void JM_DecodeDirections(const uint8_t*, int, bool &up, bool &down, bool &left, bool &right) { up = down = left = right = false; }
+static inline void JM_DecodeJoystickButtons(const uint8_t*, int, bool &fire, bool &fire2, bool &fire3, bool &autofireEnabled, bool &autoleftrightEnabled) { fire = fire2 = fire3 = autofireEnabled = autoleftrightEnabled = false; }
+static inline void JM_DecodeJoystickMode(const uint8_t*, int, bool &up, bool &down, bool &left, bool &right, bool &fire, bool &fire2, bool &fire3, bool &autofireEnabled, bool &autoleftrightEnabled) { up = down = left = right = fire = fire2 = fire3 = autofireEnabled = autoleftrightEnabled = false; }
+static inline void JM_DecodeMouseModeButtons_C64(const uint8_t*, int, bool &fire, bool &up, bool &autofireEnabled) { fire = up = autofireEnabled = false; }
+static inline void JM_DecodeMouseModeButtons_A(const uint8_t*, int, bool &fire, bool &button2, bool &button3, bool &autofireEnabled) { fire = button2 = button3 = autofireEnabled = false; }
+static inline void JM_AnalogToMouseDelta_C64(const uint8_t*, int, int &dX, int &dY) { dX = 0; dY = 0; }
+static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigned, int &yStepsSigned) { xStepsSigned = 0; yStepsSigned = 0; }
+#define JM_ATARI_PULSE_SCALE 18.6f
+#endif
+`;
+        }
+
+        // --- EXPORT TO ESP32 (WEBSERIAL) ---
+        function hexToInt(hexStr) {
+            if (!hexStr || hexStr === "NONE") return 0;
+            return parseInt(hexStr.replace('#', ''), 16);
+        }
+
+        async function sendSerialData() {
+            if (!('serial' in navigator)) {
+                alert("WebSerial API is not supported in this browser. Please use Chrome or Edge Desktop, and ensure you are on an HTTPS connection.");
+                return;
+            }
+
+            let payload = {
+                cmd: "save",
+                vid: hidDevice ? hidDevice.vendorId : 0,
+                pid: hidDevice ? hidDevice.productId : 0,
+                dpad_type: 0, byte_x: 0, byte_y: 0,
+                val_up: 0, val_down: 0, val_left: 0, val_right: 0,
+                byte_f1: 0, val_f1: 0, c_cf1: 0,
+                byte_f2: 0, val_f2: 0, c_cf2: 0,
+                byte_f3: 0, val_f3: 0, c_cf3: 0,
+                byte_up_alt: 0, val_up_alt: 0, c_cua: 0,
+                byte_auto: 0, val_auto: 0, c_cauto: 0,
+                byte_auto_off: 0, val_auto_off: 0,
+                byte_auto_h: 0, val_auto_h: 0
+            };
+
+            let dpad_idx = 0;
+            let foundUp = 0; 
+
+            for (const zoneId in mappedZones) {
+                if (!mappedZones[zoneId]) continue;
+                let selInput = document.getElementById('sel_' + zoneId);
+                let hexInput = document.getElementById('hex_' + zoneId);
+
+                if (!selInput || !hexInput) continue;
+
+                let actionKey = selInput.value;
+                let hexStr = hexInput.value;
+                const sw = document.getElementById('col_' + zoneId);
+                let colorVal = sw ? rgbToHex(sw.style.backgroundColor) : "#000000";
+
+                if (actionKey === "NONE") continue;
+
+                let index = 0;
+                let value = 0;
+
+                if (hexStr.includes("[B:")) {
+                    let match = hexStr.match(/\[B:(\d+)\s*=\s*0x([0-9A-Fa-f]+)\]/);
+                    if (match) { index = parseInt(match[1]); value = parseInt(match[2], 16); }
+                } else if (hexStr.includes("[IDX:")) {
+                    let match = hexStr.match(/\[IDX:\s*(\d+)\]/);
+                    if (match) { index = parseInt(match[1]); value = 255; }
+                }
+
+                let cInt = hexToInt(colorVal);
+
+                switch(actionKey) {
+                    case "UP": 
+                        if (foundUp === 0) { dpad_idx = index; payload.val_up = value; foundUp++; } 
+                        else { payload.byte_up_alt = index; payload.val_up_alt = value; payload.c_cua = cInt; }
+                        break;
+                    case "DOWN": payload.val_down = value; break;
+                    case "LEFT": payload.val_left = value; break;
+                    case "RIGHT": payload.val_right = value; break;
+                    case "LS-X": case "RS-X": payload.byte_x = index; break;
+                    case "LS-Y": case "RS-Y": payload.byte_y = index; break;
+                    case "F1": payload.byte_f1 = index; payload.val_f1 = value; payload.c_cf1 = cInt; break;
+                    case "F2": payload.byte_f2 = index; payload.val_f2 = value; payload.c_cf2 = cInt; break;
+                    case "F3": payload.byte_f3 = index; payload.val_f3 = value; payload.c_cf3 = cInt; break;
+                    case "A-TOG": payload.byte_auto = index; payload.val_auto = value; payload.c_cauto = cInt; break;
+                    case "A-OFF": payload.byte_auto_off = index; payload.val_auto_off = value; break;
+                    case "A-HLD": payload.byte_auto_h = index; payload.val_auto_h = value; break;
+                }
+            }
+
+            if (!payload.byte_x) payload.byte_x = dpad_idx;
+            if (!payload.byte_y) payload.byte_y = dpad_idx;
+
+            if (payload.val_up === 0 || payload.val_up === 255 || payload.val_down === 0 || payload.val_down === 255) {
+                payload.dpad_type = 2; // Digital Buttons
+            } else if (payload.val_up <= 8 && payload.val_right <= 8) {
+                payload.dpad_type = 1; // HAT / POV
+            }
+
+            try {
+                const port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+
+                const writer = port.writable.getWriter();
+                document.getElementById('saveSerialBtn').innerText = "⏳ SENDING...";
+                try {
+                    await writer.write(new TextEncoder().encode(JSON.stringify(payload) + "\n"));
+                    await writer.close();
+                } finally {
+                    writer.releaseLock();
+                    await port.close();
+                }
+
+                document.body.innerHTML = `
+                    <div style="
+                        display:flex; flex-direction:column; align-items:center; justify-content:center;
+                        min-height:100vh; background:#000; font-family:'Oswald',sans-serif;
+                        text-transform:uppercase; text-align:center; padding:40px; box-sizing:border-box;">
+                        <div style="color:var(--lcars-green,#32CD32); font-size:2.2em; font-weight:700; letter-spacing:0.1em; margin-bottom:16px;">
+                            💾 CONFIGURATION SAVED
+                        </div>
+                        <div style="color:#aaa; font-size:1em; margin-bottom:12px; font-family:sans-serif; text-transform:none;">
+                            Gamepad mapping has been written to the ESP32.
+                        </div>
+                        <div style="color:var(--lcars-amber,#FFC107); font-size:0.95em; margin-bottom:40px; font-family:sans-serif; text-transform:none;">
+                            Refresh the page to verify or continue editing.
+                        </div>
+                        <button onclick="location.reload()" style="
+                            background:var(--lcars-green,#32CD32); color:#000; border:none;
+                            border-radius:25px; padding:14px 48px; font-family:'Oswald',sans-serif;
+                            font-size:1.2em; font-weight:700; cursor:pointer; letter-spacing:0.08em;
+                            text-transform:uppercase;">
+                            🔄 REFRESH PAGE
+                        </button>
+                    </div>`;
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('saveSerialBtn').innerText = "💾 SAVE";
+                if (error.name !== "NotFoundError") {
+                    alert("❌ Serial connection failed. Ensure no other program is using the COM port.");
+                }
+            }
+        }
+
+
+        // --- IMPORT LOGIC ---
+        document.getElementById('importBtnLabel').addEventListener('click', () => {
+            document.getElementById('importFileInput').click();
+        });
+
+        document.getElementById('importFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0]; 
+            if (!file) return;
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const metaMatch = content.match(/\/\/ WEB_META:\s*(.+)/);
+                
+                if (metaMatch) {
+                    document.getElementById('actionTbody').innerHTML = '';
+                    document.getElementById('actionTable').style.display = 'none';
+                    mappedZones = {};
+                    document.querySelectorAll('.btn-zone').forEach(zone => {
+                        zone.classList.remove('bound');
+                        const shape = zone.querySelector('.shape');
+                        if (shape) { shape.style.fill = ''; shape.style.stroke = ''; }
+                        const label = zone.querySelector('.dynamic-label');
+                        if (label) label.textContent = '';
+                    });
+
+                    const items = metaMatch[1].split('|');
+                    items.forEach(item => {
+                        const parts = item.split(':');
+                        if (parts.length >= 5) { 
+                            const oldId = parts[0];          
+                            const byteIndex = parseInt(parts[1]);
+                            const byteVal = parseInt(parts[2]);
+                            const oldAction = parts[3];     
+                            const oldColor = parts[4];       
+
+                            const newId = IMPORT_ID_TRANSLATOR[oldId];
+                            if (!newId) return; 
+
+                            let newAction = IMPORT_ACTION_TRANSLATOR[oldAction] || "NONE";
+                            
+                            if (oldAction === "X Axis" && oldId === "RSH") newAction = "RS-X";
+                            if (oldAction === "Y Axis" && oldId === "RSV") newAction = "RS-Y";
+
+                            let hexStr = "";
+                            if (oldAction.includes("Axis")) {
+                                hexStr = `[IDX: ${byteIndex}]`;
+                            } else {
+                                hexStr = `[B:${byteIndex} = 0x${byteVal.toString(16).toUpperCase().padStart(2, '0')}]`;
+                            }
+
+                            activeZoneId = newId;
+                            activeZoneName = "Imported " + newId;
+                            activeDefaultAction = newAction;
+                            processIntercept(hexStr);
+
+                            const selInput = document.getElementById('sel_' + newId);
+                            if (selInput) selInput.value = newAction;
+                            
+                            if (oldColor !== "NONE" && oldColor.startsWith("#")) { 
+                                const sw = document.getElementById('col_' + newId);
+                                if (sw) sw.style.backgroundColor = oldColor;
+                            }
+                            
+                            updateSVG(newId);
+                        }
+                    });
+                    alert("Profile loaded successfully!");
+                } else {
+                    alert("No valid WEB_META tag found in this file.");
+                }
+                e.target.value = ''; 
+            };
+            reader.readAsText(file);
+        });
+
+        // --- ICON GENERATION ---
+        function getIconSVG(type, activeIdx) {
+            const getFill = (i) => i === activeIdx ? 'currentColor' : '#333'; 
+            
+            if (type === 'diamond') {
+                return `<svg width="28" height="28" viewBox="0 0 28 28" style="vertical-align:middle; display:inline-block;">
+                    <circle cx="14" cy="5" r="4.5" fill="${getFill(0)}" stroke="#111" stroke-width="1"/>
+                    <circle cx="23" cy="14" r="4.5" fill="${getFill(1)}" stroke="#111" stroke-width="1"/>
+                    <circle cx="14" cy="23" r="4.5" fill="${getFill(2)}" stroke="#111" stroke-width="1"/>
+                    <circle cx="5" cy="14" r="4.5" fill="${getFill(3)}" stroke="#111" stroke-width="1"/>
+                </svg>`;
+            }
+            if (type === 'arcade') {
+                return `<svg width="40" height="28" viewBox="0 0 40 28" style="vertical-align:middle; display:inline-block;">
+                    <circle cx="8" cy="8" r="4.5" fill="${getFill(0)}" stroke="#111" stroke-width="1"/>
+                    <circle cx="20" cy="8" r="4.5" fill="${getFill(1)}" stroke="#111" stroke-width="1"/>
+                    <circle cx="32" cy="8" r="4.5" fill="${getFill(2)}" stroke="#111" stroke-width="1"/>
+                    <circle cx="8" cy="20" r="4.5" fill="${getFill(3)}" stroke="#111" stroke-width="1"/>
+                    <circle cx="20" cy="20" r="4.5" fill="${getFill(4)}" stroke="#111" stroke-width="1"/>
+                    <circle cx="32" cy="20" r="4.5" fill="${getFill(5)}" stroke="#111" stroke-width="1"/>
+                </svg>`;
+            }
+            if (type === 'shoulder') {
+                return `<svg width="36" height="20" viewBox="0 0 36 20" style="vertical-align:middle; display:inline-block;">
+                    <rect x="2" y="4" width="14" height="8" rx="2" fill="${getFill(0)}" stroke="#111" stroke-width="1"/>
+                    <rect x="20" y="4" width="14" height="8" rx="2" fill="${getFill(1)}" stroke="#111" stroke-width="1"/>
+                </svg>`;
+            }
+            if (type === 'center') {
+                return `<svg width="28" height="20" viewBox="0 0 28 20" style="vertical-align:middle; display:inline-block;">
+                    <rect x="2" y="8" width="10" height="4" rx="2" fill="${getFill(0)}" stroke="#111" stroke-width="1"/>
+                    <rect x="16" y="8" width="10" height="4" rx="2" fill="${getFill(1)}" stroke="#111" stroke-width="1"/>
+                </svg>`;
+            }
+            if (type === 'arcade_top') {
+                return `<svg width="40" height="16" viewBox="0 0 40 16" style="vertical-align:middle; display:inline-block;">
+                    <rect x="4" y="6" width="8" height="4" rx="1" fill="${getFill(0)}" stroke="#111" stroke-width="1"/>
+                    <rect x="16" y="6" width="8" height="4" rx="1" fill="${getFill(1)}" stroke="#111" stroke-width="1"/>
+                    <rect x="28" y="6" width="8" height="4" rx="1" fill="${getFill(2)}" stroke="#111" stroke-width="1"/>
+                </svg>`;
+            }
+            return '';
+        }
+
+        function getZoneLabel(zoneId) {
+            switch(zoneId) {
+                case 'pad_up': case 'arc_up': return '✚⬆️';
+                case 'pad_down': case 'arc_down': return '✚⬇️';
+                case 'pad_left': case 'arc_left': return '✚⬅️';
+                case 'pad_right': case 'arc_right': return '✚➡️';
+                
+                case 'pad_btn_n': return getIconSVG('diamond', 0);
+                case 'pad_btn_e': return getIconSVG('diamond', 1);
+                case 'pad_btn_s': return getIconSVG('diamond', 2);
+                case 'pad_btn_w': return getIconSVG('diamond', 3);
+                
+                case 'pad_l1': return getIconSVG('shoulder', 0);
+                case 'pad_r1': return getIconSVG('shoulder', 1);
+                
+                case 'pad_sel': return getIconSVG('center', 0);
+                case 'pad_sta': return getIconSVG('center', 1);
+                
+                case 'pad_ls_x': case 'arc_ls_x': return '🕹️ LS ➡️';
+                case 'pad_ls_y': case 'arc_ls_y': return '🕹️ LS ⬇️';
+                case 'pad_rs_x': return '🕹️ RS ➡️';
+                case 'pad_rs_y': return '🕹️ RS ⬇️';
+                
+                case 'arc_b1': return getIconSVG('arcade', 0);
+                case 'arc_b2': return getIconSVG('arcade', 1);
+                case 'arc_b3': return getIconSVG('arcade', 2);
+                case 'arc_b4': return getIconSVG('arcade', 3);
+                case 'arc_b5': return getIconSVG('arcade', 4);
+                case 'arc_b6': return getIconSVG('arcade', 5);
+                
+                case 'arc_t1': return getIconSVG('arcade_top', 0);
+                case 'arc_t2': return getIconSVG('arcade_top', 1);
+                case 'arc_t3': return getIconSVG('arcade_top', 2);
+                
+                default: return zoneId;
+            }
+        }
+
+        function switchLayout() {
+            const selected = document.getElementById('layoutSelect').value;
+            document.getElementById('svg-gamepad').classList.remove('active');
+            document.getElementById('svg-arcade').classList.remove('active');
+            document.getElementById(selected).classList.add('active');
+
+            document.getElementById('actionTbody').innerHTML = '';
+            document.getElementById('actionTable').style.display = 'none';
+            mappedZones = {};
+
+            document.querySelectorAll('.btn-zone').forEach(zone => {
+                zone.classList.remove('bound');
+                const shape = zone.querySelector('.shape');
+                if (shape) {
+                    shape.style.fill = '';
+                    shape.style.stroke = '';
+                }
+                const label = zone.querySelector('.dynamic-label');
+                if (label) {
+                    label.textContent = '';
+                }
+            });
+        }
+
+        async function connectHID() {
+            if (!navigator.hid) {
+                alert("WebHID is not supported. Use Chrome Desktop.");
+                return;
+            }
+            try {
+                const devices = await navigator.hid.requestDevice({ filters: [] });
+                if (devices.length > 0) {
+                    hidDevice = devices[0];
+                    await hidDevice.open();
+                    document.getElementById('connBanner').className = 'status-banner connected';
+                    document.getElementById('connBanner').innerText = `🟢 ONLINE: ${hidDevice.productName}`;
+                    document.getElementById('connectBtn').style.display = 'none';
+                    hidDevice.addEventListener('inputreport', handleInputReport);
+                }
+            } catch (error) { console.error(error); }
+        }
+
+        function startListening(zoneId, zoneName, defaultAction) {
+            if (!hidDevice) { alert("INITIALIZE WEBHID CONNECTION FIRST!"); return; }
+            
+            activeZoneId = zoneId;
+            activeZoneName = zoneName;
+            activeDefaultAction = defaultAction;
+
+            const titleElem = document.getElementById('modalTitle');
+            const zoneElem = document.getElementById('modalZoneName');
+            const instElem = document.getElementById('modalInstruction');
+            
+            if (zoneName.includes('STICK')) {
+                titleElem.innerText = "ANALOG CALIBRATION"; titleElem.style.color = "var(--lcars-red)"; 
+                zoneElem.innerText = zoneName; zoneElem.style.color = "var(--lcars-gold)"; 
+                instElem.innerText = "Push the stick all the way to the edge.";
+            } else {
+                titleElem.innerText = "LISTENING..."; titleElem.style.color = "var(--lcars-gold)"; 
+                zoneElem.innerText = zoneName; zoneElem.style.color = "#fff"; 
+                instElem.innerText = "Press the physical button on your pad.";
+            }
+            
+            document.getElementById('listenModal').style.display = 'flex';
+            document.getElementById(zoneId).classList.add('listening');
+            baselineData = null; 
+        }
+
+        function submitManualHex() {
+            let input = document.getElementById('manualHexInput').value.trim();
+            if (!input) return;
+            
+            let finalStr = input;
+            if (input.includes(':')) {
+                let parts = input.split(':');
+                if (parts[0].toUpperCase() === "IDX") {
+                    finalStr = `[IDX: ${parts[1].trim()}]`;
+                } else if (!input.includes('[')) {
+                    let b = parseInt(parts[0]);
+                    let v = parseInt(parts[1]);
+                    if (!isNaN(b) && !isNaN(v)) {
+                        finalStr = `[B:${b} = 0x${v.toString(16).toUpperCase().padStart(2, '0')}]`;
+                    }
+                }
+            }
+            processIntercept(finalStr);
+            document.getElementById('manualHexInput').value = '';
+        }
+
+        // --- SISTEMA ANTI-LAG (THROTTLING A 30 FPS) ---
+        function handleInputReport(event) {
+            const data = new Uint8Array(event.data.buffer);
+            if (!baselineData) { baselineData = new Uint8Array(data); return; }
+
+            // FAST BUFFER COPY
+            for(let i=0; i<data.length; i++) {
+                latestData[i] = data[i];
+            }
+
+            // BACKGROUND LOGIC
+            if (activeZoneId) {
+                let isAnalog = activeZoneName.includes('STICK');
+                for (let i = 0; i < data.length; i++) {
+                    if (cellState[i] === 1) continue; 
+
+                    let diff = Math.abs(data[i] - baselineData[i]);
+                    if (isAnalog) {
+                        if (diff > 80) { 
+                            processIntercept(`[IDX: ${i}]`); 
+                            baselineData = new Uint8Array(data); 
+                            return; 
+                        }
+                    } else {
+                        if (diff > 0 && diff < 255) {
+                            let hexVal = "0x" + data[i].toString(16).toUpperCase().padStart(2, '0');
+                            processIntercept(`[B:${i} = ${hexVal}]`); 
+                            baselineData = new Uint8Array(data); 
+                            return;
+                        }
+                    }
+                }
+            } else {
+                // Auto adjust baseline
+                for (let i = 0; i < data.length; i++) {
+                    if (cellState[i] !== 1 && Math.abs(data[i] - baselineData[i]) < 15) {
+                        baselineData[i] = data[i];
+                    }
+                }
+            }
+        }
+
+        // 2. Il Render Loop aggiorna l'HTML solo 30 volte al secondo
+        setInterval(() => {
+            if (!hidDevice) return;
+            
+            for(let i=0; i<64; i++) {
+                let v = latestData[i];
+                if(v !== lastReportUi[i]) {
+                    noiseCount[i]++; 
+                    lastReportUi[i] = v;
+                    
+                    if (cellState[i] === 0 && noiseCount[i] > 30) { 
+                        cellState[i] = 1; 
+                        updateCellUI(i); 
+                    }
+                    
+                    if (isDiagMode) {
+                        const cv = document.getElementById(`cv-${i}`);
+                        if(cv) { 
+                            cv.innerText = v; 
+                            if(noiseCount[i] > 30) cv.classList.add('spam'); 
+                        }
+                    }
+                }
+            }
+        }, 33); 
+
+        function processIntercept(interceptString) {
+            document.getElementById('listenModal').style.display = 'none';
+            let targetId = activeZoneId;
+            
+            if (targetId && document.getElementById(targetId)) {
+                document.getElementById(targetId).classList.remove('listening');
+            }
+            
+            document.getElementById('actionTable').style.display = 'table';
+            const tbody = document.getElementById('actionTbody');
+
+            if (!mappedZones[targetId]) {
+                const tr = document.createElement('tr');
+                tr.id = "row_" + targetId;
+                
+                let optionsHtml = "";
+                for(const [key, val] of Object.entries(ACTION_DICT)) {
+                    const selected = (key === activeDefaultAction) ? "selected" : "";
+                    optionsHtml += `<option value="${key}" ${selected}>${val.name}</option>`;
+                }
+
+                const zoneVisual = getZoneLabel(targetId);
+
+                tr.innerHTML = `
+                    <td class="col-zone" id="td_icon_${targetId}" style="font-weight:bold; font-size:20px; transition: color 0.2s;" title="${activeZoneName}">${zoneVisual}</td>
+                    <td class="col-act">
+                        <select id="sel_${targetId}" class="action-select" onchange="syncColorAndSVG('${targetId}')">
+                            ${optionsHtml}
+                        </select>
+                    </td>
+                    <td class="col-col">
+                        <div id="col_${targetId}" class="color-swatch-cell" onclick="openSwatchPicker('${targetId}')"></div>
+                    </td>
+                    <td class="col-hex">
+                        <input type="text" id="hex_${targetId}" class="val-manual" value="${interceptString}" readonly>
+                    </td> 
+                `;
+                
+                tr.onmouseenter = () => {
+                    let hexField = document.getElementById("hex_" + targetId);
+                    if(hexField) {
+                        let m = hexField.value.match(/\[(?:B|IDX):\s*(\d+)/);
+                        if(m) {
+                            let cell = document.getElementById("cell-" + m[1]);
+                            if(cell) {
+                                cell.dataset.oldBorder = cell.style.borderColor;
+                                cell.style.borderColor = "var(--lcars-cyan)";
+                                cell.style.boxShadow = "0 0 10px var(--lcars-cyan)";
+                                cell.style.transform = "scale(1.08)";
+                            }
+                        }
+                    }
+                };
+                
+                tr.onmouseleave = () => {
+                    let hexField = document.getElementById("hex_" + targetId);
+                    if(hexField) {
+                        let m = hexField.value.match(/\[(?:B|IDX):\s*(\d+)/);
+                        if(m) {
+                            let cell = document.getElementById("cell-" + m[1]);
+                            if(cell) {
+                                cell.style.borderColor = cell.dataset.oldBorder || "";
+                                cell.style.boxShadow = "";
+                                cell.style.transform = "";
+                            }
+                        }
+                    }
+                };
+                
+                tbody.appendChild(tr);
+                mappedZones[targetId] = true;
+                
+                document.getElementById(`hex_${targetId}`).readOnly = !isDiagMode;
+                syncColorAndSVG(targetId, true); 
+            } else {
+                const hexInput = document.getElementById("hex_" + targetId);
+                if (hexInput) hexInput.value = interceptString;
+            }
+
+            activeZoneId = null;
+        }
+
+        function syncColorAndSVG(zoneId, isInit = false) {
+            const actionKey = document.getElementById('sel_' + zoneId).value;
+            const defColor = ACTION_DICT[actionKey].color;
+            const sw = document.getElementById('col_' + zoneId);
+            if (sw) sw.style.backgroundColor = defColor;
+            updateSVG(zoneId);
+        }
+
+        function updateSVG(zoneId) {
+            const actionKey = document.getElementById('sel_' + zoneId).value;
+            const sw = document.getElementById('col_' + zoneId);
+            const color = sw ? rgbToHex(sw.style.backgroundColor) : ACTION_DICT[actionKey].color;
+            const targetEl = document.getElementById(zoneId);
+            
+            const iconTd = document.getElementById('td_icon_' + zoneId);
+            if (iconTd) iconTd.style.color = color;
+            
+            if (!targetEl) return;
+            
+            targetEl.classList.add('bound');
+            targetEl.classList.remove('mandatory');
+            
+            targetEl.querySelector('.shape').style.fill = color + "44";
+            targetEl.querySelector('.shape').style.stroke = color;
+            
+            const labelEl = targetEl.querySelector('.dynamic-label');
+            if (labelEl) {
+                if(actionKey === "NONE") {
+                    labelEl.textContent = ""; 
+                } else {
+                    labelEl.textContent = ACTION_DICT[actionKey].label; 
+                    labelEl.style.fill = "#ffffff";
+                }
+            }
+        }
+
+        function cancelListen() {
+            if (activeZoneId) document.getElementById(activeZoneId).classList.remove('listening');
+            document.getElementById('listenModal').style.display = 'none';
+            activeZoneId = null;
+        }
+    </script>
+</body>
+</html>
