@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MOUSE SYSTEMS - LCARS CONFIGURATION</title>
-    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        /* Base Theme - LCARS Okudagram Aesthetic */
         :root {
             --lcars-bg: #000;
             --lcars-purple: #9C27B0;
@@ -17,9 +16,22 @@
             --lcars-gold: #FF9800;
             --lcars-amber: #FFC107;
             --lcars-green: #32CD32;
-            --lcars-save: #4CAF50;
-            --lcars-danger: #dc3545;
+            --lcars-red: #dc3545;
             --lcars-text: #e0e0e0;
+            --lcars-fuchsia: #FF99CC;
+            --lcars-orange-pastel: #FFB366;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 2px,
+                rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+            );
+            pointer-events: none;
+            z-index: 999;
         }
 
         body { 
@@ -27,104 +39,40 @@
             color: var(--lcars-text); 
             font-family: 'Oswald', sans-serif; 
             text-transform: uppercase;
-            padding: 20px; 
-            margin: 0; 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center;
         }
 
-        /* --- LCARS Layout Elements --- */
-        .lcars-shell {
-            width: 95%;
-            max-width: 800px;
-            display: flex;
-            flex-direction: column;
-        }
+        .lcars-frame { display: flex; width: 100%; max-width: 900px; }
 
-        /* Top Bar with curve (Elbow) */
-        .lcars-title-bar {
-            display: flex;
-            height: 60px;
-            margin-bottom: 20px;
-        }
+        .lcars-spine { width: 130px; display: flex; flex-direction: column; margin-right: 20px; flex-shrink: 0; }
+        .spine-elbow { background-color: var(--lcars-teal); height: 70px; border-top-left-radius: 35px; border-bottom-left-radius: 35px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; color: #000; font-weight: bold; font-size: 1.1em; text-decoration: none; transition: 0.2s; }
+        .spine-elbow:hover { filter: brightness(1.2); }
+        .spine-bar-top { background-color: var(--lcars-mauve); flex-grow: 2; margin-bottom: 10px; }
+        .spine-bar-mid { background-color: var(--lcars-orange-pastel); margin-bottom: 10px; flex-grow: 3; }
+        .spine-block-1 { height: 60px; background-color: var(--lcars-amber); margin-bottom: 10px; }
+        .spine-block-2 { height: 100px; background-color: var(--lcars-teal); border-bottom-left-radius: 35px; }
 
-        .lcars-elbow {
-            width: 100px;
-            background-color: var(--lcars-mauve);
-            border-bottom-left-radius: 40px;
-            margin-right: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        .lcars-content { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; padding-bottom: 80px; }
 
-        .lcars-elbow-back {
-            background-color: #2a2a2a;
-            color: var(--lcars-cyan);
-            text-decoration: none;
-            font-weight: bold;
-            font-size: 1.2em;
-            width: 80px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 20px;
-            transition: 0.2s;
-        }
-        .lcars-elbow-back:hover { background-color: #444; color: #fff;}
+        .lcars-header { display: flex; align-items: stretch; height: 70px; margin-bottom: 20px; }
+        .header-cap { background-color: var(--lcars-amber); width: 30px; border-top-left-radius: 15px; border-bottom-left-radius: 15px; flex-shrink: 0; }
+        .header-title-band { background-color: var(--lcars-amber); flex-grow: 1; display: flex; align-items: center; padding: 0 20px; font-size: 1.5em; font-weight: bold; color: #000; gap: 15px; }
+        .header-status-pill { background: #000; color: var(--lcars-magenta); border-radius: 10px; padding: 5px 14px; font-size: 0.55em; font-weight: bold; cursor: pointer; transition: 0.2s; white-space: nowrap; letter-spacing: 1px; }
+        .header-status-pill.synced { color: var(--lcars-green); }
+        .header-status-pill.failed { color: var(--lcars-red); text-decoration: underline; }
+        .header-end-cap { background-color: var(--lcars-amber); width: 20px; border-top-right-radius: 15px; border-bottom-right-radius: 15px; flex-shrink: 0; }
 
-        .lcars-title {
-            flex-grow: 1;
-            background-color: var(--lcars-purple);
-            border-top-right-radius: 15px;
-            border-bottom-right-radius: 15px;
-            color: #000;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            font-size: 1.6em;
-            font-weight: bold;
-        }
-
-        /* Sync status - Subtle & Integreated */
-        #syncStatus {
-            background: #000;
-            color: var(--lcars-magenta);
-            border-radius: 10px;
-            padding: 5px 15px;
-            font-size: 0.6em;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        #syncStatus.synced { color: var(--lcars-green); }
-        #syncStatus.failed { color: var(--lcars-danger); text-decoration: underline;}
-        #syncStatus:hover { opacity: 0.8; }
-
-        /* --- Cards/Panels --- */
-        .lcars-panel {
-            background: #111;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: inset 0 0 10px rgba(200,200,200,0.1);
-            position: relative;
-        }
-
-        /* LCARS Functional Color Borders */
-        .panel-mouse { border-left: 10px solid var(--lcars-teal); }
+        .lcars-panel { background: #111; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: inset 0 0 10px rgba(200,200,200,0.08); }
+        .panel-mouse    { border-left: 10px solid var(--lcars-teal); }
         .panel-advanced { border-left: 10px solid var(--lcars-gold); }
 
-        .section-title { font-size: 1.1em; font-weight: bold; color: #aaa; margin-bottom: 20px; }
+        .section-title { font-size: 1.1em; font-weight: bold; color: #aaa; margin-bottom: 15px; border-bottom: 1px dashed #333; padding-bottom: 5px; }
         .setting-group { margin-bottom: 20px; }
         .setting-row { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
-        .setting-label { font-size: 1em; font-weight: bold; color: var(--lcars-mauve); width: 40%;}
+        .setting-label { font-size: 1em; font-weight: bold; color: var(--lcars-mauve); width: 40%; }
         .setting-desc { font-size: 0.8em; color: #aaaaaa; margin-top: 5px; line-height: 1.4; text-transform: none; font-family: sans-serif; }
-        
-        /* Styled Inputs (Select) */
+
         select { 
             padding: 10px; 
             background: #000; 
@@ -138,66 +86,50 @@
             flex-grow: 1;
         }
         select:focus { outline: none; border-color: var(--lcars-green); }
-        
-        /* Styled Range Sliders */
-        .slider-wrapper { display: flex; align-items: center; gap: 15px; flex-grow: 1; justify-content: flex-end; width: 60%;}
+
+        .slider-wrapper { display: flex; align-items: center; gap: 15px; flex-grow: 1; justify-content: flex-end; width: 60%; }
         
         input[type="range"] { 
-            flex-grow: 1; 
-            cursor: pointer; 
-            -webkit-appearance: none;
-            background: transparent;
+            flex-grow: 1; cursor: pointer; -webkit-appearance: none; background: transparent;
         }
         input[type="range"]:focus { outline: none; }
         input[type="range"]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 10px;
-            background: #222;
-            border-radius: 5px;
-            border: 1px solid #444;
+            width: 100%; height: 10px; background: #222; border-radius: 5px; border: 1px solid #444;
         }
         input[type="range"]::-webkit-slider-thumb {
-            height: 25px;
-            width: 15px;
-            border-radius: 5px;
-            background: var(--lcars-amber);
-            cursor: pointer;
-            -webkit-appearance: none;
-            margin-top: -8px; 
+            height: 25px; width: 15px; border-radius: 5px; background: var(--lcars-amber);
+            cursor: pointer; -webkit-appearance: none; margin-top: -8px; 
         }
-
         .slider-val { font-family: monospace; color: var(--lcars-amber); font-size: 1.2em; min-width: 25px; text-align: right; font-weight: bold; }
 
-        /* Buttons (LCARS Pills) */
-        .actions { margin-top: 10px; width: 100%; display: flex; justify-content: flex-end;}
-        
-        .btn-save { 
-            background: var(--lcars-save); 
-            color: #000; 
-            padding: 15px 40px; 
-            border: none; 
-            border-radius: 20px; 
-            font-family: 'Oswald', sans-serif;
-            font-weight: bold; 
-            cursor: pointer; 
-            font-size: 1.2em; 
-            width: auto; 
-            transition: 0.2s; 
-        }
-        .btn-save:hover:not(:disabled) { background: var(--lcars-green); color: #fff;}
-        .btn-save:disabled { opacity: 0.7; cursor: not-allowed; }
+        /* ── STICKY SAVE ── */
+        .sticky-save-bar { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, #000 35%); padding: 30px 20px 20px; display: flex; justify-content: center; pointer-events: none; z-index: 100; }
+        .btn-save { width: 100%; max-width: 900px; background: var(--lcars-green); color: #000; border: none; border-radius: 25px; padding: 15px; font-family: 'Oswald', sans-serif; font-size: 1.2em; font-weight: bold; cursor: pointer; transition: 0.3s; pointer-events: all; }
+        .btn-save:disabled { background: #222; color: #555; cursor: not-allowed; border: 1px solid #333; }
+        .btn-save:not(:disabled):hover { filter: brightness(1.2); box-shadow: 0 0 20px rgba(50,205,50,0.5); }
     </style>
 </head>
 <body>
-    <div class="lcars-shell">
-        <div class="lcars-title-bar">
-            <div class="lcars-elbow">
-                <a href="index.html" class="lcars-elbow-back">← BACK</a>
-            </div>
-            <div class="lcars-title">
+
+<div class="lcars-frame">
+
+    <div class="lcars-spine">
+        <a href="index.html" class="spine-elbow">← BACK</a>
+        <div class="spine-bar-top"></div>
+        <div class="spine-bar-mid"></div>
+        <div class="spine-block-1"></div>
+        <div class="spine-block-2"></div>
+    </div>
+
+    <div class="lcars-content">
+
+        <div class="lcars-header">
+            <div class="header-cap"></div>
+            <div class="header-title-band">
                 <span>MOUSE SYSTEMS v1.2</span>
-                <span id="syncStatus" title="Auto-Sync active. Click to retry manual read.">🔄 Refresh Stat.</span>
+                <span id="syncStatus" class="header-status-pill" title="Auto-Sync active. Click to retry manual read.">🔄 REFRESH STAT.</span>
             </div>
+            <div class="header-end-cap"></div>
         </div>
 
         <div class="lcars-panel panel-mouse">
@@ -229,7 +161,7 @@
         <div class="lcars-panel panel-advanced">
             <div class="section-title">Protocol Extensions</div>
             
-            <div class="setting-group" style="margin-bottom: 0;">
+            <div class="setting-group">
                 <div class="setting-label" style="margin-bottom: 8px;">Scroll Wheel Support (C64/Amiga)</div>
                 <select id="enableWheel">
                     <option value="0" selected>Disabled (Default)</option>
@@ -239,12 +171,25 @@
                     Warning: Enabling may break compatibility with older 3-byte BOOT protocol mice. Uses Middle Click emulation on Amiga and Micromys on C64.
                 </div>
             </div>
+
+            <div class="setting-group" style="margin-bottom: 0;">
+                <div class="setting-label" style="margin-bottom: 8px;">POT Timing Standard (C64 Mouse Only)</div>
+                <select id="palTiming">
+                    <option value="1" selected>PAL (Default)</option>
+                    <option value="0">NTSC</option>
+                </select>
+                <div class="setting-desc" style="margin-top: 10px;">
+                    Select the video standard of your Commodore 64. PAL and NTSC machines run at different clock rates, which affects the SID POT timing required for accurate mouse cursor movement. If the cursor drifts or feels sluggish, try switching this setting.
+                </div>
+            </div>
         </div>
 
-        <div class="actions">
+        <div class="sticky-save-bar">
             <button id="saveBtn" class="btn-save">💾 Commit to Memory</button>
         </div>
-    </div>
+
+    </div><!-- lcars-content -->
+</div><!-- lcars-frame -->
 
     <script>
         const aSpeed = document.getElementById('amigaSpeed');
@@ -376,6 +321,10 @@
                             document.getElementById('enableWheel').value = data.enable_wheel;
                         }
 
+                        if (data.pal_timing !== undefined) {
+                            document.getElementById('palTiming').value = data.pal_timing;
+                        }
+
                         // Successo silenzioso (Testo e colore cambiano senza invadenza)
                         indicator.innerText = "✅ Status OK";
                         indicator.className = "synced";
@@ -457,7 +406,8 @@
                 cmd: "mouse_save",
                 amiga_speed: parseInt(aSpeed.value),
                 c64_speed: parseInt(cSpeed.value),
-                enable_wheel: parseInt(document.getElementById('enableWheel').value)
+                enable_wheel: parseInt(document.getElementById('enableWheel').value),
+                pal_timing: parseInt(document.getElementById('palTiming').value)
             };
 
             btn.innerText = "⏳ Saving...";
