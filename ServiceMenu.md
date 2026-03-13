@@ -1,75 +1,198 @@
-# 🛠️ Advanced Service Menu Guide
+# 🛠️ Service Menu — Reference Guide
 
-The Advanced Service Menu is a powerful command-line interface built directly into the ESP32. It allows you to debug hardware, map new controllers, test input lag, and tweak system colors without needing to recompile the code.
+The Service Menu is an advanced serial console built into the firmware. It is intended for developers, power users, and troubleshooting. For everyday configuration, use the **Web UI** instead.
 
-### How to access the menu
-1. Connect the ESP32 to your PC using a USB-to-TTL Serial Adapter (See hardware setup in the main README).
-2. Open a Serial Terminal (Arduino IDE Serial Monitor) set to **115200 Baud**, `8N1`, with `Newline` enabled.
+## Accessing the Service Menu
+
+1. Connect a USB-to-TTL serial adapter to the ESP32:
+
+   | Serial Adapter | ESP32 |
+   |---|---|
+   | TX | GPIO 44 (RX) |
+   | RX | GPIO 43 (TX) |
+   | GND | GND |
+   | 5V | 5V *(only if not powered from DB9 or USB-C)* |
+
+2. Open a serial terminal at **115200 baud, 8N1, newline line ending**.
 3. Type `service` and press Enter.
+
+> The service menu is available in all modes: normal play, standalone (USB-C only), and dev mode. Some commands are restricted depending on context — see each command below.
 
 ---
 
 ## Command Reference
 
-### `new` Command
-**Maps a new unknown gamepad manually or auto-converts an HTML profile.**
-When you type `new`, the system checks if a generic HTML HID profile is currently active:
-* **Auto-Import Suggested method:** If an HTML profile is detected, it will ask if you want to convert it. It will instantly generate the clean C++ code for your `JoystickProfiles.h`.
-* **Manual Wizard (Sniffer):** If no HTML profile is active, it arms the Sniffer Wizard. Do not touch the pad for 1 second (to record the neutral state), then follow the on-screen prompts to press each button sequentially. It will generate a custom C++ profile at the end.
+---
 
-### `raw` Command
-**Displays the raw USB hex data stream.**
-Useful for low-level debugging. It prints the raw byte array coming from the USB Host shield in real-time. Only values that change from the previous state are printed to avoid flooding the terminal. Type `exit` to leave.
+### `new`
+*Available: normal + dev mode*
 
-### `test` Command
-**Tests logical button mappings.**
-This mode translates the raw USB data into logical console actions. Pressing a button on your gamepad will print `[UP]`, `[FIRE 1]`, `[AUTOFIRE]`, etc., to the screen. Perfect for verifying if your custom `PadConfig` is mapped correctly.
+Maps a new USB controller and generates a native C++ profile for `JoystickProfiles.h`.
 
-### `lag` Command
-**Measures USB Polling Rate and Input Lag....very experimental!.**
-Starts a highly accurate hardware latency benchmark.
-1. Type `lag`. The system enters a "Smart Trigger" waiting state.
-2. The timer will not start until you physically move the joystick or press a button.
-3. Once triggered, frantically move the sticks and press buttons for **3 seconds**.
-4. The system calculates the average milliseconds between packets and outputs a Hz rating:
-   * **EXCELLENT 🟢 (400+ Hz):** Under 2.5ms input lag. Perfect for hardcore retrogaming.
-   * **GOOD 🟡 (200+ Hz):** Under 5ms input lag. Great response.
-   * **ACCEPTABLE 🟠 (100+ Hz):** ~8ms input lag. Standard controller speed.
-   * **POOR 🔴 (<100 Hz):** Noticeable lag. Not recommended for fast action games.
+**Auto-Import flow (recommended):**
+1. First map your controller visually using `configurator.html` and save it.
+2. Type `new` in the service menu.
+3. The firmware detects the active HTML profile and asks: `HTML Profile detected! Do you want to Auto-Import it? (Y/N)`
+4. Type `Y`, enter a name for the profile, press Enter.
+5. Copy the generated C++ block into `JoystickProfiles.h` and recompile.
 
-### `gpio` Command
-**Real-time visual dashboard of DB9 hardware states.**
-This creates a live, auto-refreshing table showing the exact electrical state of the DB9 output pins.
-* Displays the physical ESP32 GPIO pin number.
-* Shows the electrical state (`HIGH` or `LOW`).
-* Shows the logical state (`[ IDLE ]` or `[ PRESSED ]` / `[ ACTIVE ]`).
+**Manual wizard:** If no HTML profile is active, the firmware walks you through mapping each button by pressing them one at a time.
 
-  You can type: "GP xxx (where xxx is GPIO pin number) to have its state printed in real time on serial monitor.
+---
 
-  
-* *Note:* The system automatically adjusts the logic display for Amiga (Pin 9 Active-Low) and C64 (POT Y / POT X logic) depending on your current boot mode.
+### `raw`
+*Available: normal + dev mode*
 
-### `color` Command
-**Live RGB Color Mixer.**
-A hardware calibration tool to tweak the WS2812B system LED.
-1. Type `color` to open the selection menu.
-2. Type the number of the state or button you want to tweak (e.g., `10` for Fire 2).
-3. **Use your connected gamepad to mix the color live:**
-   * **FIRE 1:** Cycle the active channel between RED 🔴, GREEN 🟢, and BLUE 🔵.
-   * **D-PAD LEFT / RIGHT:** Decrease or increase the value of the active color channel (0-255).
-   * **D-PAD UP / DOWN:** Adjust the global brightness of the LED.
-   * **FIRE 2:** Locks in the color and prints the exact `ws2812b.Color(r, g, b)` code to the terminal, ready to be copy-pasted into your `Globals.h` or `JoystickProfiles.h`.
-   * **FIRE 3:** Exits the mixer.
+Displays the raw USB HID data stream coming from the connected controller as a continuous hex dump. Useful for identifying button byte positions when writing a new native profile manually.
 
-### `c64` / `amiga` Commands
-**Forces the system logic.**
-By default, the adapter detects if it's plugged into an Amiga by checking if Pin 5 is pulled `HIGH` at boot. If you are testing the board on a desk without a console, you can manually force the C64 or Amiga logical routing by typing these commands.
+Press `Enter` to stop and return to the service menu.
 
-### `reboot` Command
-Performs a soft reset of the ESP32, re-initializing the USB Host and the LED state.
+---
 
-### `flash` Command
-Reboots the ESP32 directly into **DFU (Device Firmware Upgrade) / Programming Mode**. This is extremely useful if your ESP32 board is inside a 3D-printed case and you cannot easily reach the physical "BOOT" button to upload new firmware via Arduino IDE.
+### `test`
+*Available: normal + dev mode*
 
-### `exit` Command
-Closes the Service Menu, shuts down all serial printing overhead, and returns the device to the standard **normal gaming mode**. Always use this command before actually playing a game on real hardware!
+Prints logical button events to the terminal as you press buttons on the connected controller. Shows which actions (UP, DOWN, FIRE1, etc.) are being triggered by the current mapping.
+
+Useful to verify a new profile before flashing it permanently.
+
+Press `Enter` to stop.
+
+---
+
+### `lag`
+*Available: normal + dev mode*
+
+Runs a hardware latency benchmark. Measures the controller's USB polling interval and calculates the effective input lag in milliseconds.
+
+Output example:
+```
+Polling rate : 125 Hz
+Input lag    : ~8 ms
+```
+
+---
+
+### `mousetest`
+*Available: normal + dev mode*
+
+Displays live mouse USB packets including X/Y delta, buttons, and computed speed. Useful for diagnosing mouse behavior and tuning speed settings.
+
+Press `Enter` to stop.
+
+---
+
+### `gpio`
+*Available: normal + dev mode*
+
+Opens a real-time dashboard showing the electrical state of every DB9 output pin.
+
+> ⚠️ **Note:** When the DB9 connector is not physically connected to a C64 or Amiga, all pins will read LOW (appear as PRESSED) because the pull-up resistors on the console side are absent. This is expected behavior — it is not a fault.
+
+Press `exit` to return to the service menu.
+
+---
+
+### `coloradj`
+*Available: always (including standalone mode)*
+
+Interactive LED color calibration. Adjust the R/G/B values of each system color slot live — the LED updates in real time as you type.
+
+**Color slots:**
+
+| # | Slot | Default |
+|---|---|---|
+| 1 | Idle C64 | Orange |
+| 2 | Idle Amiga | White |
+| 3 | Directions glowing | Purple |
+| 4 | Fire 1 | Green |
+| 5 | Fire 2 | Red |
+| 6 | Fire 3 | Cyan |
+| 7 | Alt UP (Jump) | Blue |
+| 8 | Autofire | Yellow |
+
+**Commands inside coloradj:**
+
+```
+1–8         → select a color slot to edit
+r+  r-      → increase / decrease Red by current step
+g+  g-      → increase / decrease Green by current step
+b+  b-      → increase / decrease Blue by current step
+r++ r--     → increase / decrease Red by 5
+g++ g--     → increase / decrease Green by 5
+b++ b--     → increase / decrease Blue by 5
+step N      → set step size (1–50, default: 1)
+save        → write all colors to NVS
+back        → return to color slot selector without saving
+reset       → restore firmware defaults for all slots and save
+exit        → exit coloradj and return to service menu
+```
+
+> Settings saved here are shared with `led.html` — both write to the same NVS storage blob (`col_blob`).
+
+---
+
+### `ledtest`
+*Available: dev mode only*
+
+Cycles through all 10 palette colors on the LED sequentially (1.2 seconds each), then restores the idle color. Useful for verifying LED hardware and RGB/GRB format.
+
+---
+
+### `devmode on` / `devmode off`
+*Available: always*
+
+Enables or disables developer mode. Requires a reboot to take effect.
+
+In dev mode:
+- `ledtest` becomes available
+- Console mode (C64/Amiga) can be forced via `c64` / `amiga` commands, overriding the physical slide switch
+- Additional diagnostic output is printed at boot
+
+---
+
+### `c64` / `amiga`
+*Available: dev mode only (not in standalone)*
+
+Forces the adapter into C64 or Amiga logic mode for bench testing without the physical console connected. Overrides the physical slide switch position until the next reboot.
+
+> In normal mode, console selection is controlled exclusively by the physical slide switch on the board. Changing the switch position while powered triggers an automatic reboot.
+
+---
+
+### `info`
+*Available: standalone mode*
+
+Displays a summary of the current NVS memory state: which keys are stored, their sizes, and whether custom mappings or color settings are present.
+
+---
+
+### `factory`
+*Available: standalone mode*
+
+Erases all user settings from NVS (controller mapping, LED colors, LED format, mouse speed) and reboots. The adapter returns to factory defaults.
+
+> This is equivalent to using the factory reset button in `memory.html`.
+
+---
+
+### `reboot`
+*Available: always*
+
+Performs a soft reboot of the ESP32. All NVS settings are preserved.
+
+---
+
+### `flash`
+*Available: always*
+
+Reboots the ESP32 directly into DFU/programming mode, ready to receive a new firmware via esptool. No need to press the physical BOOT button on the board.
+
+---
+
+### `exit`
+*Available: always*
+
+Closes the service menu and returns the adapter to normal zero-lag play mode. Any active controller input is unblocked immediately.
+
+> ⚠️ If a controller is connected and was being used during service mode, `exit` will call `release_all_outputs()` to ensure no DB9 lines are left in a pressed state before returning to play mode.
