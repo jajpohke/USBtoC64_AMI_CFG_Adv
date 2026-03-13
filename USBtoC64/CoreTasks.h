@@ -1,7 +1,7 @@
 // ==========================================
-// USB to C64/Amiga Adapter - Advanced 1.1
+// USB to C64/Amiga Adapter - Advanced v1.2
 // File: CoreTasks.h
-// Description: Main Loop Helpers and Task Orchestrator (with Auto-Switch Watchdog)
+// Description: Main Loop Helpers and Task Orchestrator (Optimized for C64 Mouse)
 // ==========================================
 #pragma once
 
@@ -11,80 +11,65 @@
 #include "ServiceTools.h"
 #include "InputEngine.h"
 
-// Link to the RTC memory state from the main file
 extern int active_driver; 
-
-// Variable to track the last mouse movement/click time
 static unsigned long last_mouse_action_time = 0;
 
-// 1. Timer and Benchmark Control
 inline void check_polling_timer() {
     if (current_mode == MODE_POLLING && polling_active && polling_start_time > 0) {
         if (millis() - polling_start_time >= 3000) { 
             polling_active = false;
             float hz = (float)polling_packet_count / 3.0;
-            Serial2.printf("\n=== RESULT: ~%.0f Hz ===\n", hz);
+            dual_printf("\n=== RESULT: ~%.0f Hz ===\n", hz);
             current_mode = MODE_PLAY;
         }
     }
 }
 
-// 2. USB Packet Routing and Processing
 inline void process_usb_packet(pkt_t &p) {
-    if (active_driver == 1) {
-        // --- NATIVE HID MOUSE MODE (STRICT BOOT PROTOCOL) ---
+    if (active_driver == 1) { 
+        // 🐭 HID MOUSE PROCESSING ENGINE
         if (current_mode == MODE_DEBUG) {
-            Serial2.print("[HID BOOT] Len: "); 
-            Serial2.print(p.len); 
-            Serial2.print(" -> Data: ");
-            for(int i = 0; i < p.len; i++) {
-                Serial2.printf("%02X ", p.data[i]);
-            }
-            Serial2.println();
+            dual_print("[HID MOUSE] Len: " + String(p.len) + " -> ");
+            for(int i = 0; i < p.len; i++) { dual_printf("%02X ", p.data[i]); }
+            dual_println();
         }
 
-        if (p.len < 3) return;
+        uint8_t btns = 0;
+        int8_t dx = 0, dy = 0, wheel = 0;
 
-        uint8_t btns = p.data[0];
-        int8_t dx = (int8_t)p.data[1];
-        int8_t dy = (int8_t)p.data[2];
-
-        if (dx != 0 || dy != 0 || btns != 0) {
-            last_mouse_action_time = millis();
+        // PROTOCOL-AWARE PARSER:
+        // Protocol is known at connect time via mouse_wheel_enabled flag.
+        // BOOT protocol  (wheel off): [Buttons, X, Y]              — data[0] = buttons always
+        // REPORT protocol (wheel on): [Report ID, Buttons, X, Y, Wheel] — data[0] = Report ID
+        // Never guess from data[0]: left button press sets buttons=0x01, which the old
+        // data[0]==1 heuristic misidentified as a Report ID, shifting all fields by 1 byte.
+        if (mouse_wheel_enabled) {
+            if (p.len >= 5) { btns=p.data[1]; dx=(int8_t)p.data[2]; dy=(int8_t)p.data[3]; wheel=(int8_t)p.data[4]; }
+            else if (p.len >= 4) { btns=p.data[1]; dx=(int8_t)p.data[2]; dy=(int8_t)p.data[3]; }
+        } else {
+            if (p.len >= 3) { btns=p.data[0]; dx=(int8_t)p.data[1]; dy=(int8_t)p.data[2];
+                              if (p.len >= 4) wheel=(int8_t)p.data[3]; }
         }
+        
+        if (dx != 0 || dy != 0 || btns != 0 || wheel != 0) last_mouse_action_time = millis();
 
         if (current_mode == MODE_PLAY || current_mode == MODE_DEBUG || current_mode == MODE_GPIO) {
-            process_mouse(btns, dx, dy);
+            process_mouse(btns, dx, dy, wheel);
             
-            if (current_mode == MODE_DEBUG && (dx != 0 || dy != 0 || btns != 0)) {
-                Serial2.printf("MOUSE ACTION: X:%3d | Y:%3d | BTN:%02x\n", dx, dy, btns);
-                Serial2.println("--------------------------------------------------");
-            }
-
-            if (!ground_stabilized && !is_amiga) {
-                if (btns & 0x03) { 
-                    pinMode(GP_LEFT, OUTPUT); digitalWrite(GP_LEFT, LOW);
-                    pinMode(GP_RIGHT, OUTPUT); digitalWrite(GP_RIGHT, LOW);
-                    ground_stabilized = true;
-                }
+            if (current_mode == MODE_DEBUG && (dx != 0 || dy != 0 || btns != 0 || wheel != 0)) {
+                dual_printf("MOUSE ACTION: X:%3d | Y:%3d | BTN:%02x | WHL:%3d\n", dx, dy, btns, wheel);
+                dual_println("--------------------------------------------------");
             }
         }
-    } 
-    else {
-        // --- RAW JOYSTICK MODE ---
-        if (current_mode == MODE_SNIFFER) {
-            run_sniffer(connected_vid, connected_pid, p.data, p.len);
-        }
-        else if (current_mode == MODE_RAW) {
-            run_raw_sniffer(p.data, p.len); 
-        }
-        else { 
-            process_joystick(p.data, p.len); 
-        }
+        
+    } else {
+        // 🕹️ RAW JOYSTICK PROCESSING ENGINE
+        if (current_mode == MODE_SNIFFER) run_sniffer(connected_vid, connected_pid, p.data, p.len);
+        else if (current_mode == MODE_RAW) run_raw_sniffer(p.data, p.len); 
+        else process_joystick(p.data, p.len); 
     }
 }
 
-// 3. Hardware Diagnostics
 inline void run_gpio_diagnostics() {
     if (current_mode == MODE_GPIO) {
         uint16_t current_gpio_state = 0;
@@ -94,50 +79,81 @@ inline void run_gpio_diagnostics() {
         current_gpio_state |= (digitalRead(GP_RIGHT) << 3);
         current_gpio_state |= (digitalRead(GP_FIRE1) << 4);
         current_gpio_state |= (digitalRead(GP_FIRE2) << 5);
-        current_gpio_state |= (digitalRead(GP_POTY) << 6); 
-        if (!is_amiga) current_gpio_state |= (digitalRead(GP_C64_SIG_MODE_SW) << 7);
+        current_gpio_state |= (digitalRead(GP_FIRE3) << 6); 
+        if (!is_amiga) current_gpio_state |= (digitalRead(GP_POTX) << 7);
 
         if (current_gpio_state != last_gpio_state) {
             last_gpio_state = current_gpio_state;
             
-            Serial2.print("\x1b[2J\x1b[H");
-            Serial2.println("\n==========================================");
-            Serial2.println("    HARDWARE DIAGNOSTICS - GPIO STATES    ");
-            Serial2.println("==========================================");
-            Serial2.printf(" ENGINE : %s\n", use_html_configurator ? "HTML HID Configurator" : "Internal Profiler");
-            Serial2.printf(" MODE   : %s\n", is_amiga ? "AMIGA" : "COMMODORE 64");
-            Serial2.printf(" STATUS : %s\n", device_connected ? current_profile.name : "WAITING...");
-            Serial2.println("------------------------------------------");
-            Serial2.printf(" UP        |  %02d  |   %s    | %s\n", GP_UP, digitalRead(GP_UP) ? "HIGH" : "LOW ", get_pin_status(GP_UP, true).c_str());
-            Serial2.printf(" DOWN      |  %02d  |   %s    | %s\n", GP_DOWN, digitalRead(GP_DOWN) ? "HIGH" : "LOW ", get_pin_status(GP_DOWN, true).c_str());
-            Serial2.printf(" LEFT      |  %02d  |   %s    | %s\n", GP_LEFT, digitalRead(GP_LEFT) ? "HIGH" : "LOW ", get_pin_status(GP_LEFT, true).c_str());
-            Serial2.printf(" RIGHT     |  %02d  |   %s    | %s\n", GP_RIGHT, digitalRead(GP_RIGHT) ? "HIGH" : "LOW ", get_pin_status(GP_RIGHT, true).c_str());
-            Serial2.printf(" FIRE 1    |  %02d  |   %s    | %s\n", GP_FIRE1, digitalRead(GP_FIRE1) ? "HIGH" : "LOW ", get_pin_status(GP_FIRE1, true).c_str());
-            Serial2.printf(" FIRE 2    |  %02d  |   %s    | %s\n", GP_FIRE2, digitalRead(GP_FIRE2) ? "HIGH" : "LOW ", get_pin_status(GP_FIRE2, true).c_str());
-            Serial2.printf(" FIRE 3    |  %02d  |   %s    | %s\n", GP_POTY, digitalRead(GP_POTY) ? "HIGH" : "LOW ", get_pin_status(GP_POTY, is_amiga).c_str());
+            dual_print("\x1b[2J\x1b[H");
+            dual_println("\n==========================================");
+            dual_println("    HARDWARE DIAGNOSTICS - GPIO STATES    ");
+            dual_println("==========================================");
+            dual_println(" ENGINE : " + String(current_profile.name[0] ? current_profile.name : "Unknown"));
+            dual_println(" MODE   : " + String(is_amiga ? "AMIGA" : "COMMODORE 64"));
             
-            if (!is_amiga) {
-                Serial2.printf(" C64_SIG   |  %02d  |   %s    | %s\n", GP_C64_SIG_MODE_SW, digitalRead(GP_C64_SIG_MODE_SW) ? "HIGH" : "LOW ", get_pin_status(GP_C64_SIG_MODE_SW, false).c_str());
-            }
-            Serial2.println("------------------------------------------");
-            Serial2.println(">> Type 'exit' to return to normal operation <<\n");
+            if (device_connected) dual_println(" STATUS : " + String(current_profile.name));
+            else dual_println(" STATUS : WAITING...");
+            
+            dual_println("------------------------------------------");
+            
+            auto print_pin_line = [&](const char* name, int pin, bool is_amiga_opt) {
+                String status_str = get_pin_status(pin, is_amiga_opt);
+                String line = " "; line += name;
+                line += " |  "; if (pin < 10) line += "0"; line += pin;
+                line += "  |   "; line += (digitalRead(pin) ? "HIGH" : "LOW ");
+                line += "    | "; line += status_str;
+                dual_println(line);
+            };
+            
+            print_pin_line("UP       ", GP_UP, true);
+            print_pin_line("DOWN     ", GP_DOWN, true);
+            print_pin_line("LEFT     ", GP_LEFT, true);
+            print_pin_line("RIGHT    ", GP_RIGHT, true);
+            print_pin_line("FIRE 1   ", GP_FIRE1, true);
+            print_pin_line("FIRE 2   ", GP_FIRE2, true);
+            print_pin_line("FIRE 3   ", GP_FIRE3, is_amiga);
+            
+            if (!is_amiga) print_pin_line("C64_SIG  ", GP_POTX, false);
+            dual_println("------------------------------------------");
+            dual_println(">> Type 'exit' to return to normal operation <<\n");
         }
     }
 }
 
-// 4. Update Pin Output and LEDs
 inline void update_hardware_and_leds() {
-    static bool last_mouse_state = false;
-    static bool first_run_clock = true;
-    
-    if (is_mouse_connected != last_mouse_state || first_run_clock) {
-        if (is_mouse_connected) {
-            setCpuFrequencyMhz(240); 
+// --- HARDWARE LEARNING / SNIFFER VISUAL FEEDBACK ---
+    if (current_mode == MODE_LEARNING || current_mode == MODE_SNIFFER) {
+        uint32_t l_color = LED_OFF;
+        if (current_mode == MODE_LEARNING) {
+            l_color = (millis() % 1000 < 500) ? C_RED : LED_OFF; // 🔴
         } else {
-            setCpuFrequencyMhz(80); 
+            switch (sniff_step) {
+                case S_INIT:       l_color = (millis() % 200 < 100) ? C_PURPLE : LED_OFF; break; // 🟣
+                case S_START:      l_color = LED_OFF; break; 
+                case S_WAIT_UP:    l_color = C_BLUE; break; // 🔵
+                case S_WAIT_DOWN:  l_color = C_YELLOW; break; // 🟡
+                case S_WAIT_LEFT:  l_color = C_GREEN; break; // 🟢
+                case S_WAIT_RIGHT: l_color = C_RED; break; // 🔴
+                case S_WAIT_F1:    l_color = C_YELLOW; break; // 🟡
+                case S_WAIT_F2:    l_color = C_GREEN; break; // 🟢
+                case S_WAIT_F3:    l_color = C_CYAN; break; // 🩵
+                case S_WAIT_UPALT: l_color = C_BLUE; break; // 🔵
+                case S_WAIT_AUTO:  l_color = C_PURPLE; break; // 🟣
+                case S_WAIT_LS_X:
+                case S_WAIT_LS_Y:
+                case S_WAIT_RS_X:
+                case S_WAIT_RS_Y:  l_color = C_WHITE; break; // ⚪
+                case S_DONE:       l_color = (millis() % 400 < 200) ? C_GREEN : LED_OFF; break; // 🟢
+                default:           l_color = LED_OFF; break;
+            }
         }
-        last_mouse_state = is_mouse_connected;
-        first_run_clock = false;
+        static uint32_t last_l_color = 0xFFFFFFFF;
+        if (l_color != last_l_color) {
+            ws2812b.setPixelColor(0, l_color); ws2812b.show();
+            last_l_color = l_color;
+        }
+        return; 
     }
 
     if (device_connected && !is_mouse_connected) {
@@ -157,14 +173,14 @@ inline void update_hardware_and_leds() {
         if (final_up != last_up || joy_d != last_down || joy_l != last_left || joy_r != last_right || out_fire != last_fire || joy_f2 != last_f2 || joy_f3 != last_f3) {
             
             if (current_mode == MODE_DEBUG) {
-                Serial2.print("ACTION: ");
-                if (!final_up && !joy_d && !joy_l && !joy_r && !out_fire && !joy_f2 && !joy_f3 && !joy_up_alt && !joy_auto) Serial2.print("All released");
-                if(final_up) Serial2.print("[UP] "); if(joy_d) Serial2.print("[DOWN] "); 
-                if(joy_l) Serial2.print("[LEFT] "); if(joy_r) Serial2.print("[RIGHT] ");
-                if(out_fire) Serial2.print("[FIRE 1] "); if(joy_f2) Serial2.print("[FIRE 2] ");
-                if(joy_f3) Serial2.print("[FIRE 3] "); 
-                if(joy_up_alt) Serial2.print("[ALT UP] "); if(joy_auto) Serial2.print("[AUTOFIRE] ");
-                Serial2.println();
+                dual_print("ACTION: ");
+                if (!final_up && !joy_d && !joy_l && !joy_r && !out_fire && !joy_f2 && !joy_f3 && !joy_up_alt && !joy_auto) dual_print("All released");
+                if(final_up) dual_print("[UP] "); if(joy_d) dual_print("[DOWN] "); 
+                if(joy_l) dual_print("[LEFT] "); if(joy_r) dual_print("[RIGHT] ");
+                if(out_fire) dual_print("[FIRE 1] "); if(joy_f2) dual_print("[FIRE 2] ");
+                if(joy_f3) dual_print("[FIRE 3] "); 
+                if(joy_up_alt) dual_print("[ALT UP] "); if(joy_auto) dual_print("[AUTOFIRE] ");
+                dual_println();
             } 
             else if (current_mode == MODE_PLAY || current_mode == MODE_GPIO) {
                 set_joy_pin(GP_UP, final_up); set_joy_pin(GP_DOWN, joy_d);
@@ -174,19 +190,17 @@ inline void update_hardware_and_leds() {
             }
 
             uint32_t led_color = LED_OFF;
-            if (use_html_configurator) { led_color = LED_HTML_MODE; } 
-            else {
-                if (joy_f1) led_color = current_profile.color_fire1;
-                else if (joy_f2) led_color = current_profile.color_fire2;
-                else if (joy_f3) led_color = current_profile.color_fire3; 
-                else if (joy_up_alt) led_color = current_profile.color_up_alt;
-                else if (joy_auto) led_color = toggle ? current_profile.color_autofire : LED_OFF;
+            if (!sys_colors.multicolor_enabled) {
+                led_color = is_amiga ? sys_colors.idle_amiga : sys_colors.idle_c64;
+            } else {
+                if (joy_f1) led_color = sys_colors.btn_fire1;
+                else if (joy_f2) led_color = sys_colors.btn_fire2;
+                else if (joy_f3) led_color = sys_colors.btn_fire3; 
+                else if (joy_up_alt) led_color = sys_colors.btn_alt;
+                else if (joy_auto) led_color = toggle ? sys_colors.btn_auto : LED_OFF;
                 else {
-                    if (final_up) led_color = LED_DIR_UP;         
-                    else if (joy_r) led_color = LED_DIR_RIGHT;    
-                    else if (joy_l) led_color = LED_DIR_LEFT;     
-                    else if (joy_d) led_color = LED_DIR_DOWN;     
-                    else { led_color = is_amiga ? LED_IDLE_AMIGA : LED_IDLE_C64; }                
+                    if (final_up || joy_r || joy_l || joy_d) led_color = sys_colors.dir_glowing;         
+                    else { led_color = is_amiga ? sys_colors.idle_amiga : sys_colors.idle_c64; }                
                 }
             }
 
@@ -201,10 +215,9 @@ inline void update_hardware_and_leds() {
         }
     } 
     else { 
-        uint32_t idle_color = is_amiga ? LED_IDLE_AMIGA : LED_IDLE_C64;
-        if (is_mouse_connected && (millis() - last_mouse_action_time < 100)) {
-            idle_color = LED_JOY_MOUSE; 
-        }
+        // MOUSE MODE: LED stays idle to prevent C64 interrupt drops
+        uint32_t idle_color = is_amiga ? sys_colors.idle_amiga : sys_colors.idle_c64;
+        
         static uint32_t last_idle_color = 0xFFFFFFFF;
         if (idle_color != last_idle_color) {
             ws2812b.setPixelColor(0, idle_color); ws2812b.show();
@@ -212,62 +225,4 @@ inline void update_hardware_and_leds() {
         }
     }
 }
-
-// 5. Hardware Switch Safety Watchdog (WITH STABILITY SAMPLING & MOUSE PROTECTION)
-inline void check_switch_mismatch() {
-    if (!ENABLE_SWITCH_WATCHDOG) return;
-
-    // Run only if on C64, Fire 2 is NOT pressed, AND NO MOUSE is connected!
-    if (!is_amiga && !joy_f2 && !is_mouse_connected && current_mode == MODE_PLAY) { 
-        static unsigned long last_probe_time = 0;
-        
-        if (millis() - last_probe_time > 2000) { 
-            
-            // 1. Release the pin to listen (Float)
-            pinMode(GP_FIRE2, INPUT);
-            
-            // Give it 50us to let the Amiga pull-up snap into position
-            delayMicroseconds(50);  
-            
-            int stable_high_count = 0;
-            const int num_samples = 10;
-            
-            // 2. High-Speed Sampling Loop (1 millisecond total duration)
-            for (int i = 0; i < num_samples; i++) {
-                if (digitalRead(GP_FIRE2) == HIGH) {
-                    stable_high_count++;
-                }
-                delayMicroseconds(100); 
-            }
-            
-            // 3. Immediately restore C64 ground state (Output LOW) to kill the SID noise
-            pinMode(GP_FIRE2, OUTPUT); 
-            digitalWrite(GP_FIRE2, LOW);
-
-            // 4. Evaluate the stability
-            // If the signal is a rock-solid 10/10 HIGH, it's definitely an Amiga.
-            // If it fluctuates (antenna noise) or rises slowly (SID capacitor), it's a C64.
-            if (stable_high_count == num_samples) {
-                
-                // STABLE AMIGA DETECTED ON C64 SWITCH POSITION!
-                Serial2.println("\n[!] SMART CHECK: Rock-solid Amiga pull-up detected on GP5!");
-                Serial2.println("[!] AUTO-SWITCHING to Amiga Mode...");
-
-                // Visual Feedback: Triple Purple Flash
-                for(int i=0; i<3; i++) {
-                    ws2812b.setPixelColor(0, C_PURPLE); ws2812b.show(); delay(100);
-                    ws2812b.setPixelColor(0, LED_OFF); ws2812b.show(); delay(100);
-                }
-
-                // Force Amiga hardware configuration
-                configure_console_mode(true); 
-                
-                // Final State: Steady White (Amiga Idle)
-                ws2812b.setPixelColor(0, LED_IDLE_AMIGA); ws2812b.show();
-                return; 
-            }
-            
-            last_probe_time = millis();
-        }
-    }
-}
+// EOF

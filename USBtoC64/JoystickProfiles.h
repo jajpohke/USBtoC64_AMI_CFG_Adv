@@ -1,5 +1,5 @@
 // ==========================================
-// USB to C64/Amiga Adapter - Advanced v1.1
+// USB to C64/Amiga Adapter - Advanced v1.2
 // File: JoystickProfiles.h
 // Description: Controller profiles database and color palette
 // ==========================================
@@ -8,20 +8,19 @@
 
 #include <stdint.h>
 
-// 🎨 --- LED COLOR PALETTE (RGB Format from Live Mixer) --- 🎨
+// 🎨 --- LED COLOR MASTER PALETTE (Dimmed for safety & uniform look) --- 🎨
 #define RGB_COLOR(r, g, b) (((uint32_t)(r) << 16) | ((uint32_t)(g) << 8) | (b))
 
-#define C_RED    RGB_COLOR(85, 0, 0)      // 🔴 Red
-#define C_GREEN  RGB_COLOR(0, 85, 0)      // 🟢 Green
-#define C_BLUE   RGB_COLOR(0, 0, 85)      // 🔵 Blue
-#define C_YELLOW RGB_COLOR(85, 85, 0)     // 🟡 Yellow
-#define C_PURPLE RGB_COLOR(45, 0, 45)     // 🟣 Purple
-#define C_PINK   RGB_COLOR(85, 0, 85)     // 🩷 Pink
-#define C_CYAN   RGB_COLOR(0, 85, 85)     // 🩵 Cyan
-#define C_WHITE  RGB_COLOR(60, 60, 60)    // ⚪ White
-#define C_GRAY   RGB_COLOR(20, 20, 20)    // 🔘 Gray
-#define C_ORANGE RGB_COLOR(85, 8, 0)      // 🟠 Custom C64 Orange
-#define C_BLACK  RGB_COLOR(0, 0, 0)       // ⚫ Off
+#define C_BLACK       RGB_COLOR(0, 0, 0)       // ⚫ Spento
+#define C_WHITE       RGB_COLOR(25, 25, 25)    // ⚪ Amiga Idle
+#define C_RED         RGB_COLOR(30, 0, 0)      // 🔴 Red
+#define C_ORANGE      RGB_COLOR(30, 10, 0)     // 🟠 C64 Idle / Orange
+#define C_YELLOW      RGB_COLOR(25, 25, 0)     // 🟡 Yellow
+#define C_GREEN  RGB_COLOR(0, 15, 0)           // 🟢 Green
+#define C_BLUE        RGB_COLOR(0, 0, 30)      // 🔵 Blue
+#define C_CYAN        RGB_COLOR(0, 30, 30)     // 🩵 Cyan (Aux)
+#define C_PURPLE      RGB_COLOR(30, 0, 30)     // 🟣 Magenta / Purple
+#define C_PINK        RGB_COLOR(30, 10, 20)    // 🩷 Pink
 
 enum DpadType { BITMASK, HAT_SWITCH, AXIS, EXACT_VALUE, HYBRID_16BIT_BITMASK };
 
@@ -46,6 +45,7 @@ struct PadConfig {
     int byte_up_alt;
     int byte_autofire;
     int byte_autofire_off; 
+    int byte_autofire_hold; // NEW: Dedicated Hold Byte
 
     uint8_t val_up;
     uint8_t val_down;
@@ -58,6 +58,7 @@ struct PadConfig {
     uint8_t val_up_alt;
     uint8_t val_autofire;
     uint8_t val_autofire_off; 
+    uint8_t val_autofire_hold; // NEW: Dedicated Hold Value
 
     uint32_t color_fire1;
     uint32_t color_fire2;
@@ -90,7 +91,7 @@ const PadConfig PROFILES[] = {
     },
     {
         .name = "Sony PS3 Clone",
-        .vid = 2064, .pid = 1,
+        .vid = 0000, .pid = 0,
         .dpad_type = AXIS,
         .byte_x = 3, .byte_y = 4, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
         .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 6, .byte_up_alt = 5, .byte_autofire = 5, .byte_autofire_off = 0,
@@ -106,7 +107,7 @@ const PadConfig PROFILES[] = {
         .byte_fire1 = 3, .byte_fire2 = 3, .byte_fire3 = 3, .byte_up_alt = 3, .byte_autofire = 3, .byte_autofire_off = 0,
         .val_up = 1, .val_down = 2, .val_left = 4, .val_right = 8,
         .val_fire1 = 16, .val_fire2 = 32, .val_fire3 = 2, .val_up_alt = 128, .val_autofire = 64, .val_autofire_off = 0x00,
-        .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_GRAY, .color_autofire = C_ORANGE
+        .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_WHITE, .color_autofire = C_ORANGE
     },
     {
         .name = "HoriPad GameCube Peach",
@@ -174,17 +175,9 @@ const PadConfig PROFILES[] = {
         .use_report_id = true, .report_id_val = 1,
         .dpad_type = AXIS,
         .byte_x = 3, .byte_y = 4, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        
-        // Buttons bytes mapping
         .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 0, .byte_up_alt = 5, .byte_autofire = 6, .byte_autofire_off = 6,
-        
         .val_up = 0, .val_down = 255, .val_left = 0, .val_right = 255,
-        
-        // Values swapped based on your request
-        // Fire 1 = B (64), Fire 2 = Y (128), Alt Up = A (32)
-        // Autofire ON = L (4), Autofire OFF = R (8)
         .val_fire1 = 64, .val_fire2 = 128, .val_fire3 = 0, .val_up_alt = 32, .val_autofire = 4, .val_autofire_off = 8,
-        
         .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
     }
 };

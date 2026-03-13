@@ -1,5 +1,5 @@
 // ==========================================
-// USB to C64/Amiga Adapter - Advanced v1.1
+// USB to C64/Amiga Adapter - Advanced v1.2
 // File: InputEngine.h
 // Description: Unified Core Input Processing (Mouse & Joystick)
 // ==========================================
@@ -10,18 +10,19 @@
 #include "Hardware.h"
 #include "ServiceTools.h"
 
+extern QueueHandle_t wheel_queue;
+extern bool mouse_wheel_enabled;
+
 // ==========================================
 // 🖱️ PART 1: MOUSE PROCESSING ENGINE
 // ==========================================
 
-// --- MOUSE SPEED MULTIPLIER CALCULATOR ---
-// Converts simple 1-5 user scale into floating point multipliers
 inline float get_mouse_multiplier(int speed) {
-    if (speed <= 1) return 0.25f; // Very Slow
-    if (speed == 2) return 0.50f; // Slow
-    if (speed == 3) return 1.00f; // Normal
-    if (speed == 4) return 1.50f; // Fast
-    return 2.00f;                 // Very Fast
+    if (speed <= 1) return 0.25f; 
+    if (speed == 2) return 0.50f; 
+    if (speed == 3) return 1.00f; 
+    if (speed == 4) return 1.50f; 
+    return 2.00f;                 
 }
 
 // --- AMIGA QUADRATURE HELPERS (Push-Pull Mode) ---
@@ -45,10 +46,9 @@ inline void A_Up(int pulse)    { AVerticalMove(pulse); QY = (QY >= 3) ? 0 : ++QY
 
 // --- AMIGA MOUSE MODE (Quadrature) ---
 inline void process_amiga_mouse(int8_t dx, int8_t dy, bool b_left, bool b_right, bool b_mid) {
-    // Fraction accumulator for smooth scaling
     static float a_rem_x = 0;
     static float a_rem_y = 0;
-    float mult = get_mouse_multiplier(AMIGA_MOUSE_SPEED);
+    float mult = get_mouse_multiplier(mouse_amiga_speed);
 
     float real_dx = ((float)dx * mult) + a_rem_x;
     float real_dy = ((float)dy * mult) + a_rem_y;
@@ -87,57 +87,38 @@ inline void process_amiga_mouse(int8_t dx, int8_t dy, bool b_left, bool b_right,
 
 // --- COMMODORE 64 MOUSE MODE (1351 Analog) ---
 inline void process_c64_mouse(int8_t dx, int8_t dy, bool b_left, bool b_right, bool b_mid) {
-    
-    // FIX "CRAZY MOUSE" ON C64
-    // We must release the pins to high impedance (INPUT) to let the SID capacitors charge!
-    pinMode(GP_FIRE2, INPUT); 
-    pinMode(GP_POTY, INPUT);
-
-    // Fraction accumulator for smooth scaling
-    static float c64_rem_x = 0;
-    static float c64_rem_y = 0;
-    float mult = get_mouse_multiplier(C64_MOUSE_SPEED);
-
-    float real_dx = ((float)dx * mult) + c64_rem_x;
-    float real_dy = ((float)dy * mult) + c64_rem_y;
-
-    int final_dx = (int)real_dx;
-    int final_dy = (int)real_dy;
-
-    c64_rem_x = real_dx - final_dx;
-    c64_rem_y = real_dy - final_dy;
-
     set_joy_pin(GP_FIRE1, b_left);
     set_joy_pin(GP_UP, b_right);
     set_joy_pin(GP_DOWN, b_mid);
 
-    float new_x = (float)delayOnX + (STEPdelayOnX * (float)final_dx);
-    if (new_x > MAXdelayOnX) new_x = MINdelayOnX;
-    if (new_x < MINdelayOnX) new_x = MAXdelayOnX;
-    delayOnX = (uint64_t)new_x;
+    float mult = get_mouse_multiplier(mouse_c64_speed);
 
-    float new_y = (float)delayOnY - (STEPdelayOnY * (float)final_dy);
-    if (new_y > MAXdelayOnY) new_y = MINdelayOnY;
-    if (new_y < MINdelayOnY) new_y = MAXdelayOnY;
-    delayOnY = (uint64_t)new_y;
+    int64_t deltaX = (int64_t)(g_STEP_X * ((float)dx * mult));
+    delayOnX += deltaX;
+    if (delayOnX > g_MAX_X) delayOnX = g_MIN_X;
+    if (delayOnX < g_MIN_X) delayOnX = g_MAX_X;
+
+    int64_t deltaY = (int64_t)(g_STEP_Y * ((float)dy * mult));
+    delayOnY -= deltaY;
+    if (delayOnY > g_MAX_Y) delayOnY = g_MIN_Y;
+    if (delayOnY < g_MIN_Y) delayOnY = g_MAX_Y;
 }
 
 
 // --- MAIN MOUSE DISPATCHER ---
-// Accepts strict 3-byte BOOT Protocol packets
-inline void process_mouse(uint8_t buttons, int8_t dx, int8_t dy) {
+inline void process_mouse(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel) {
     bool b_left  = (buttons & 0x01) != 0;
     bool b_right = (buttons & 0x02) != 0;
     bool b_mid   = (buttons & 0x04) != 0;
 
-    // AUTO-DETECT: Hardware knows the target machine via the toggle switch
-    if (is_amiga) {
-        process_amiga_mouse(dx, dy, b_left, b_right, b_mid);
-    } else {
-        process_c64_mouse(dx, dy, b_left, b_right, b_mid);
+    if (is_amiga) process_amiga_mouse(dx, dy, b_left, b_right, b_mid);
+    else process_c64_mouse(dx, dy, b_left, b_right, b_mid);
+
+    // Asynchronous Wheel Injection (Micromys / Amiga)
+    if (mouse_wheel_enabled && wheel != 0 && wheel_queue != NULL) {
+        xQueueSend(wheel_queue, &wheel, 0);
     }
 }
-
 
 // ==========================================
 // 🕹️ PART 2: JOYSTICK PROCESSING ENGINE
@@ -171,7 +152,6 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
     if (current_mode == MODE_SERVICE) return; 
     if (!device_connected || len < 3) return;
 
-    // --- Variables declaration ---
     bool u = false, d = false, l = false, r = false;
     bool f1 = false, f2 = false, f3 = false, f_alt = false, auto_btn = false;
 
@@ -180,6 +160,7 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
         bool f3_html = false;
         bool html_auto_on = false;
         bool html_auto_off = false;
+        bool html_auto_hold = false;
 
         for (size_t i = 0; i < JM_JOY_RULES_COUNT; i++) {
             const JM_Rule &rule = JM_JOY_RULES[i];
@@ -212,20 +193,16 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
                 if (rule.func == JM_FIRE3) f3_html = true;
                 if (rule.func == JM_AUTOFIRE_ON) html_auto_on = true;
                 if (rule.func == JM_AUTOFIRE_OFF) html_auto_off = true;
+                if (rule.func == JM_AUTOFIRE_HOLD) html_auto_hold = true;
             }
         }
         f3 = f3_html; f_alt = false; 
         
-        // --- SMART HTML AUTOFIRE ---
         static bool html_autofire_latch = false;
         if (html_auto_on) html_autofire_latch = true;
         if (html_auto_off) html_autofire_latch = false;
         
-        bool has_html_off_btn = false;
-        for (size_t i = 0; i < JM_JOY_RULES_COUNT; i++) {
-            if (JM_JOY_RULES[i].func == JM_AUTOFIRE_OFF) { has_html_off_btn = true; break; }
-        }
-        auto_btn = has_html_off_btn ? html_autofire_latch : html_auto_on;
+        auto_btn = html_autofire_latch || html_auto_hold;
         
         #if JM_USE_ANALOG_MOUSE == 1
         for (size_t i = 0; i < (sizeof(JM_MOUSE_X_INDEXES)/sizeof(JM_MOUSE_X_INDEXES[0])); i++) {
@@ -248,9 +225,6 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
 
     } else {
 #endif
-        // --- NATIVE ENGINE ---
-        
-        // Step 1: Independently compute Analog values
         bool a_u = false, a_d = false, a_l = false, a_r = false;
 
         if (current_profile.byte_analog_x != 0 || current_profile.byte_analog_y != 0) {
@@ -274,7 +248,6 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
             }
         }
 
-        // Step 2: Independently compute Digital D-Pad values
         bool d_u = false, d_d = false, d_l = false, d_r = false;
 
         if (current_profile.dpad_type == HYBRID_16BIT_BITMASK) {
@@ -321,15 +294,14 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
             }
         }
 
-        // Step 3: MERGE Analog and Digital properly!
         u = a_u || d_u;
         d = a_d || d_d;
         l = a_l || d_l;
         r = a_r || d_r;
 
-        // --- Process Buttons (With ZERO-BYTE Protection) ---
         bool f_auto_on = false;
         bool f_auto_off = false;
+        bool f_auto_hold = false;
 
         if (current_profile.dpad_type == EXACT_VALUE || current_profile.dpad_type == HAT_SWITCH) {
             if (current_profile.byte_fire1 != 0 && len > current_profile.byte_fire1)   f1 = (raw_data[current_profile.byte_fire1] == current_profile.val_fire1);
@@ -338,6 +310,7 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
             if (current_profile.byte_up_alt != 0 && len > current_profile.byte_up_alt)  f_alt = (raw_data[current_profile.byte_up_alt] == current_profile.val_up_alt);
             if (current_profile.byte_autofire != 0 && len > current_profile.byte_autofire) f_auto_on = (raw_data[current_profile.byte_autofire] == current_profile.val_autofire);
             if (current_profile.byte_autofire_off != 0 && len > current_profile.byte_autofire_off) f_auto_off = (raw_data[current_profile.byte_autofire_off] == current_profile.val_autofire_off);
+            if (current_profile.byte_autofire_hold != 0 && len > current_profile.byte_autofire_hold) f_auto_hold = (raw_data[current_profile.byte_autofire_hold] == current_profile.val_autofire_hold);
         } else {
             if (current_profile.byte_fire1 != 0 && len > current_profile.byte_fire1)   f1 = (raw_data[current_profile.byte_fire1] & current_profile.val_fire1) != 0;
             if (current_profile.byte_fire2 != 0 && len > current_profile.byte_fire2)   f2 = (raw_data[current_profile.byte_fire2] & current_profile.val_fire2) != 0;
@@ -345,18 +318,18 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
             if (current_profile.byte_up_alt != 0 && len > current_profile.byte_up_alt)  f_alt = (raw_data[current_profile.byte_up_alt] & current_profile.val_up_alt) != 0;
             if (current_profile.byte_autofire != 0 && len > current_profile.byte_autofire) f_auto_on = (raw_data[current_profile.byte_autofire] & current_profile.val_autofire) != 0;
             if (current_profile.byte_autofire_off != 0 && len > current_profile.byte_autofire_off) f_auto_off = (raw_data[current_profile.byte_autofire_off] & current_profile.val_autofire_off) != 0;
+            if (current_profile.byte_autofire_hold != 0 && len > current_profile.byte_autofire_hold) f_auto_hold = (raw_data[current_profile.byte_autofire_hold] & current_profile.val_autofire_hold) != 0;
         }
 
-        // --- SMART NATIVE AUTOFIRE ---
         static bool native_autofire_latch = false;
         
-        if (current_profile.byte_autofire != 0 && current_profile.byte_autofire_off != 0) {
+        if (current_profile.byte_autofire_off != 0) {
             if (f_auto_on) native_autofire_latch = true;
             if (f_auto_off) native_autofire_latch = false;
-            auto_btn = native_autofire_latch;
+            auto_btn = native_autofire_latch || f_auto_hold;
         } 
-        else if (current_profile.byte_autofire != 0) {
-            auto_btn = f_auto_on; 
+        else {
+            auto_btn = f_auto_on || f_auto_hold; 
             native_autofire_latch = false;
         }
 
@@ -364,7 +337,6 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
     }
 #endif
 
-    // --- SMART MULTIPORT MERGE (CO-PILOT MODE) ---
     if (current_profile.use_report_id) {
         static bool p_u[3], p_d[3], p_l[3], p_r[3], p_f1[3], p_f2[3], p_f3[3], p_alt[3], p_auto[3];
         uint8_t id = raw_data[0]; 
@@ -390,3 +362,4 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
         joy_f1 = f1; joy_f2 = f2; joy_f3 = f3; joy_up_alt = f_alt; joy_auto = auto_btn;
     }
 }
+// EOF
