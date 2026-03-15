@@ -162,25 +162,18 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
         bool html_auto_off = false;
         bool html_auto_hold = false;
 
-        for (size_t i = 0; i < JM_JOY_RULES_COUNT; i++) {
-            const JM_Rule &rule = JM_JOY_RULES[i];
+        const JM_Rule* rules = jm_rules_dyn;
+        size_t rules_count   = jm_rules_dyn_count;
+
+        for (size_t i = 0; i < rules_count; i++) {
+            const JM_Rule &rule = rules[i];
             if (rule.index >= len) continue;
             uint8_t raw_val = raw_data[rule.index];
             bool matched = false;
 
-            if (rule.op == JM_BITANY) { matched = ((raw_val & rule.value) != 0); } 
-            else if (rule.op == JM_EQ) {
-                if (raw_val == rule.value) { matched = true; } 
-                else if (rule.index == JM_DPAD_INDEX) {
-                    uint8_t hat_val = raw_val & 0x0F; 
-                    uint8_t btn_val = raw_val & 0xF0; 
-                    if (rule.value <= 15) { if (hat_val == rule.value) matched = true; } 
-                    else {
-                        uint8_t rule_btn_bits = rule.value & 0xF0;
-                        if (rule_btn_bits != 0 && (btn_val & rule_btn_bits) == rule_btn_bits) matched = true;
-                    }
-                }
-            }
+            if (rule.op == JM_BITANY) { matched = ((raw_val & rule.value) != 0); }
+            else if (rule.op == JM_HAT) { matched = ((raw_val & 0x0F) == rule.value); }
+            else { matched = (raw_val == rule.value); } // JM_EQ — always strict match for dynamic rules
 
             if (matched) {
                 if (rule.func == JM_UP || rule.func == JM_UP_RIGHT || rule.func == JM_LEFT_UP) u = true;
@@ -204,30 +197,31 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
         
         auto_btn = html_autofire_latch || html_auto_hold;
         
-        #if JM_USE_ANALOG_MOUSE == 1
-        for (size_t i = 0; i < (sizeof(JM_MOUSE_X_INDEXES)/sizeof(JM_MOUSE_X_INDEXES[0])); i++) {
-            uint8_t idx = JM_MOUSE_X_INDEXES[i];
-            if (idx < len) {
-                uint8_t val = raw_data[idx];
-                if (val < JM_ANALOG_DEAD_LOW) l = true;
-                if (val > JM_ANALOG_DEAD_HIGH) r = true;
+        if (jm_use_analog_dyn) {
+            for (uint8_t i = 0; i < jm_analog_x_count_dyn; i++) {
+                uint8_t idx = jm_analog_x_dyn[i];
+                if (idx < len) {
+                    uint8_t val = raw_data[idx];
+                    if (val < JM_ANALOG_DEAD_LOW) l = true;
+                    if (val > JM_ANALOG_DEAD_HIGH) r = true;
+                }
+            }
+            for (uint8_t i = 0; i < jm_analog_y_count_dyn; i++) {
+                uint8_t idx = jm_analog_y_dyn[i];
+                if (idx < len) {
+                    uint8_t val = raw_data[idx];
+                    if (val < JM_ANALOG_DEAD_LOW) u = true;
+                    if (val > JM_ANALOG_DEAD_HIGH) d = true;
+                }
             }
         }
-        for (size_t i = 0; i < (sizeof(JM_MOUSE_Y_INDEXES)/sizeof(JM_MOUSE_Y_INDEXES[0])); i++) {
-            uint8_t idx = JM_MOUSE_Y_INDEXES[i];
-            if (idx < len) {
-                uint8_t val = raw_data[idx];
-                if (val < JM_ANALOG_DEAD_LOW) u = true;
-                if (val > JM_ANALOG_DEAD_HIGH) d = true;
-            }
-        }
-        #endif
 
     } else {
 #endif
         bool a_u = false, a_d = false, a_l = false, a_r = false;
 
-        if (current_profile.byte_analog_x != 0 || current_profile.byte_analog_y != 0) {
+        if (current_profile.dpad_type != HYBRID_16BIT_BITMASK &&
+            (current_profile.byte_analog_x != 0 || current_profile.byte_analog_y != 0)) {
             if (len > current_profile.byte_analog_x) {
                 uint8_t ax = raw_data[current_profile.byte_analog_x]; 
                 if (ax < 64) a_l = true; if (ax > 192) a_r = true;
@@ -303,27 +297,41 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
         bool f_auto_off = false;
         bool f_auto_hold = false;
 
-        if (current_profile.dpad_type == EXACT_VALUE || current_profile.dpad_type == HAT_SWITCH) {
-            if (current_profile.byte_fire1 != 0 && len > current_profile.byte_fire1)   f1 = (raw_data[current_profile.byte_fire1] == current_profile.val_fire1);
-            if (current_profile.byte_fire2 != 0 && len > current_profile.byte_fire2)   f2 = (raw_data[current_profile.byte_fire2] == current_profile.val_fire2);
-            if (current_profile.byte_fire3 != 0 && len > current_profile.byte_fire3)   f3 = (raw_data[current_profile.byte_fire3] == current_profile.val_fire3);
-            if (current_profile.byte_up_alt != 0 && len > current_profile.byte_up_alt)  f_alt = (raw_data[current_profile.byte_up_alt] == current_profile.val_up_alt);
-            if (current_profile.byte_autofire != 0 && len > current_profile.byte_autofire) f_auto_on = (raw_data[current_profile.byte_autofire] == current_profile.val_autofire);
-            if (current_profile.byte_autofire_off != 0 && len > current_profile.byte_autofire_off) f_auto_off = (raw_data[current_profile.byte_autofire_off] == current_profile.val_autofire_off);
-            if (current_profile.byte_autofire_hold != 0 && len > current_profile.byte_autofire_hold) f_auto_hold = (raw_data[current_profile.byte_autofire_hold] == current_profile.val_autofire_hold);
+        // Buttons always use bitmask regardless of dpad_type.
+        // Exception: HAT_SWITCH where buttons share the dpad byte use exact match
+        // (handled by storing the combined byte+hat value as-is in val_fire*).
+        // For all other cases bitmask is always correct and supports simultaneous presses.
+        if (current_profile.dpad_type == HAT_SWITCH) {
+            // HAT_SWITCH: for buttons on the SAME byte as the hat, mask the high nibble (0xF0)
+            // to avoid hat nibble contaminating button bitmask checks.
+            // For buttons on a DIFFERENT byte, use standard bitmask.
+            auto hat_btn = [&](int byte_idx, uint8_t val) -> bool {
+                if (byte_idx < 0 || len <= byte_idx) return false;
+                if (byte_idx == current_profile.byte_x)
+                    return (raw_data[byte_idx] & 0xF0 & val) != 0;
+                return (raw_data[byte_idx] & val) != 0;
+            };
+            f1        = hat_btn(current_profile.byte_fire1,         current_profile.val_fire1);
+            f2        = hat_btn(current_profile.byte_fire2,         current_profile.val_fire2);
+            f3        = hat_btn(current_profile.byte_fire3,         current_profile.val_fire3);
+            f_alt     = hat_btn(current_profile.byte_up_alt,        current_profile.val_up_alt);
+            f_auto_on = hat_btn(current_profile.byte_autofire,      current_profile.val_autofire);
+            f_auto_off= hat_btn(current_profile.byte_autofire_off,  current_profile.val_autofire_off);
+            f_auto_hold=hat_btn(current_profile.byte_autofire_hold, current_profile.val_autofire_hold);
         } else {
-            if (current_profile.byte_fire1 != 0 && len > current_profile.byte_fire1)   f1 = (raw_data[current_profile.byte_fire1] & current_profile.val_fire1) != 0;
-            if (current_profile.byte_fire2 != 0 && len > current_profile.byte_fire2)   f2 = (raw_data[current_profile.byte_fire2] & current_profile.val_fire2) != 0;
-            if (current_profile.byte_fire3 != 0 && len > current_profile.byte_fire3)   f3 = (raw_data[current_profile.byte_fire3] & current_profile.val_fire3) != 0;
-            if (current_profile.byte_up_alt != 0 && len > current_profile.byte_up_alt)  f_alt = (raw_data[current_profile.byte_up_alt] & current_profile.val_up_alt) != 0;
-            if (current_profile.byte_autofire != 0 && len > current_profile.byte_autofire) f_auto_on = (raw_data[current_profile.byte_autofire] & current_profile.val_autofire) != 0;
-            if (current_profile.byte_autofire_off != 0 && len > current_profile.byte_autofire_off) f_auto_off = (raw_data[current_profile.byte_autofire_off] & current_profile.val_autofire_off) != 0;
-            if (current_profile.byte_autofire_hold != 0 && len > current_profile.byte_autofire_hold) f_auto_hold = (raw_data[current_profile.byte_autofire_hold] & current_profile.val_autofire_hold) != 0;
+            // All other dpad types: buttons always use bitmask
+            if (current_profile.byte_fire1 >= 0 && len > current_profile.byte_fire1)   f1 = (raw_data[current_profile.byte_fire1] & current_profile.val_fire1) != 0;
+            if (current_profile.byte_fire2 >= 0 && len > current_profile.byte_fire2)   f2 = (raw_data[current_profile.byte_fire2] & current_profile.val_fire2) != 0;
+            if (current_profile.byte_fire3 >= 0 && len > current_profile.byte_fire3)   f3 = (raw_data[current_profile.byte_fire3] & current_profile.val_fire3) != 0;
+            if (current_profile.byte_up_alt >= 0 && len > current_profile.byte_up_alt)  f_alt = (raw_data[current_profile.byte_up_alt] & current_profile.val_up_alt) != 0;
+            if (current_profile.byte_autofire >= 0 && len > current_profile.byte_autofire) f_auto_on = (raw_data[current_profile.byte_autofire] & current_profile.val_autofire) != 0;
+            if (current_profile.byte_autofire_off >= 0 && len > current_profile.byte_autofire_off) f_auto_off = (raw_data[current_profile.byte_autofire_off] & current_profile.val_autofire_off) != 0;
+            if (current_profile.byte_autofire_hold >= 0 && len > current_profile.byte_autofire_hold) f_auto_hold = (raw_data[current_profile.byte_autofire_hold] & current_profile.val_autofire_hold) != 0;
         }
 
         static bool native_autofire_latch = false;
         
-        if (current_profile.byte_autofire_off != 0) {
+        if (current_profile.byte_autofire_off >= 0) {
             if (f_auto_on) native_autofire_latch = true;
             if (f_auto_off) native_autofire_latch = false;
             auto_btn = native_autofire_latch || f_auto_hold;

@@ -74,7 +74,7 @@ const PadConfig PROFILES[] = {
         .vid = 0x0f0d, .pid = 0x00ed,
         .dpad_type = BITMASK,
         .byte_x = 2, .byte_y = 0, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 3, .byte_fire2 = 3, .byte_fire3 = 5, .byte_up_alt = 3, .byte_autofire = 3, .byte_autofire_off = 0,
+        .byte_fire1 = 3, .byte_fire2 = 3, .byte_fire3 = 5, .byte_up_alt = 3, .byte_autofire = 3, .byte_autofire_off = -1,
         .val_up = 0x01, .val_down = 0x02, .val_left = 0x04, .val_right = 0x08,
         .val_fire1 = 0x10, .val_fire2 = 0x40, .val_fire3 = 0xFF, .val_up_alt = 0x20, .val_autofire = 0x80, .val_autofire_off = 0x00,
         .color_fire1 = C_BLUE, .color_fire2 = C_PINK, .color_fire3 = C_CYAN, .color_up_alt = C_RED, .color_autofire = C_GREEN
@@ -84,17 +84,17 @@ const PadConfig PROFILES[] = {
         .vid = 0x0583, .pid = 0x2060,
         .dpad_type = AXIS,
         .byte_x = 0, .byte_y = 1, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 2, .byte_fire2 = 2, .byte_fire3 = 2, .byte_up_alt = 2, .byte_autofire = 2, .byte_autofire_off = 0,
-        .val_up = 0, .val_down = 0, .val_left = 0, .val_right = 0,
+        .byte_fire1 = 2, .byte_fire2 = 2, .byte_fire3 = 2, .byte_up_alt = 2, .byte_autofire = 2, .byte_autofire_off = -1,
         .val_fire1 = 0x02, .val_fire2 = 0x08, .val_fire3 = 0x20, .val_up_alt = 0x01, .val_autofire = 0x04, .val_autofire_off = 0x00,
         .color_fire1 = C_YELLOW, .color_fire2 = C_GREEN, .color_fire3 = C_CYAN, .color_up_alt = C_RED, .color_autofire = C_BLUE
     },
     {
         .name = "Sony PS3 Clone",
-        .vid = 0000, .pid = 0,
+        //.vid = 0000, .pid = 0,
+        .vid = 2064, .pid = 1,
         .dpad_type = AXIS,
         .byte_x = 3, .byte_y = 4, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 6, .byte_up_alt = 5, .byte_autofire = 5, .byte_autofire_off = 0,
+        .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 6, .byte_up_alt = 5, .byte_autofire = 5, .byte_autofire_off = -1,
         .val_up = 0, .val_down = 255, .val_left = 0, .val_right = 255,
         .val_fire1 = 64, .val_fire2 = 128, .val_fire3 = 2, .val_up_alt = 32, .val_autofire = 16, .val_autofire_off = 0x00,
         .color_fire1 = C_BLUE, .color_fire2 = C_PINK, .color_fire3 = C_CYAN, .color_up_alt = C_RED, .color_autofire = C_GREEN
@@ -104,7 +104,7 @@ const PadConfig PROFILES[] = {
         .vid = 3853, .pid = 220,
         .dpad_type = HYBRID_16BIT_BITMASK, 
         .byte_x = 2, .byte_y = 0, .byte_analog_x = 6, .byte_analog_y = 8, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 3, .byte_fire2 = 3, .byte_fire3 = 3, .byte_up_alt = 3, .byte_autofire = 3, .byte_autofire_off = 0,
+        .byte_fire1 = 3, .byte_fire2 = 3, .byte_fire3 = 3, .byte_up_alt = 3, .byte_autofire = 3, .byte_autofire_off = -1,
         .val_up = 1, .val_down = 2, .val_left = 4, .val_right = 8,
         .val_fire1 = 16, .val_fire2 = 32, .val_fire3 = 2, .val_up_alt = 128, .val_autofire = 64, .val_autofire_off = 0x00,
         .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_WHITE, .color_autofire = C_ORANGE
@@ -113,10 +113,10 @@ const PadConfig PROFILES[] = {
         .name = "HoriPad GameCube Peach",
         .vid = 3695, .pid = 389,
         .dpad_type = EXACT_VALUE,
-        .byte_x = 2, .byte_y = 2, .byte_analog_x = 3, .byte_analog_y = 4, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 0, .byte_fire2 = 0, .byte_fire3 = 0, .byte_up_alt = 0, .byte_autofire = 0, .byte_autofire_off = 0,
+        .byte_x = 2, .byte_y = 2, .byte_analog_x = 3, .byte_analog_y = 4, .byte_analog_right_x = 5, .byte_analog_right_y = 6,
+        .byte_fire1 = 0, .byte_fire2 = 0, .byte_fire3 = 0, .byte_up_alt = 0, .byte_autofire = 0, .byte_autofire_off = -1,
         .val_up = 0, .val_down = 4, .val_left = 6, .val_right = 2,
-        .val_fire1 = 2, .val_fire2 = 4, .val_fire3 = 32, .val_up_alt = 8, .val_autofire = 1, .val_autofire_off = 0x00,
+        .val_fire1 = 4, .val_fire2 = 2, .val_fire3 = 1, .val_up_alt = 8, .val_autofire = 32, .val_autofire_off = 0x00,
         .color_fire1 = C_PINK, .color_fire2 = C_PURPLE, .color_fire3 = C_CYAN, .color_up_alt = C_PINK, .color_autofire = C_ORANGE
     },
     {
@@ -124,7 +124,7 @@ const PadConfig PROFILES[] = {
         .vid = 10093, .pid = 291,
         .dpad_type = AXIS,
         .byte_x = 0, .byte_y = 1, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 2, .byte_fire2 = 2, .byte_fire3 = 2, .byte_up_alt = 2, .byte_autofire = 2, .byte_autofire_off = 0,
+        .byte_fire1 = 2, .byte_fire2 = 2, .byte_fire3 = 2, .byte_up_alt = 2, .byte_autofire = 2, .byte_autofire_off = -1,
         .val_up = 1, .val_down = 255, .val_left = 1, .val_right = 255,
         .val_fire1 = 1, .val_fire2 = 4, .val_fire3 = 32, .val_up_alt = 2, .val_autofire = 8, .val_autofire_off = 0x00,
         .color_fire1 = C_ORANGE, .color_fire2 = C_GREEN, .color_fire3 = C_CYAN, .color_up_alt = C_RED, .color_autofire = C_BLUE
@@ -136,7 +136,7 @@ const PadConfig PROFILES[] = {
         .byte_x = 5, .byte_y = 5, .byte_analog_x = 1, .byte_analog_y = 2, .byte_analog_right_x = 3, .byte_analog_right_y = 4,
         .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 5, .byte_up_alt = 5, .byte_autofire = 6, .byte_autofire_off = 6,
         .val_up = 0, .val_down = 4, .val_left = 6, .val_right = 2,
-        .val_fire1 = 40, .val_fire2 = 24, .val_fire3 = 136, .val_up_alt = 72, .val_autofire = 1, .val_autofire_off = 2,
+        .val_fire1 = 32, .val_fire2 = 16, .val_fire3 = 128, .val_up_alt = 64, .val_autofire = 1, .val_autofire_off = 2,
         .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
     },
     {
@@ -144,7 +144,7 @@ const PadConfig PROFILES[] = {
         .vid = 2064, .pid = 3,
         .dpad_type = AXIS,
         .byte_x = 3, .byte_y = 4, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 5, .byte_up_alt = 5, .byte_autofire = 6, .byte_autofire_off = 0,
+        .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 5, .byte_up_alt = 5, .byte_autofire = 6, .byte_autofire_off = -1,
         .val_up = 0, .val_down = 255, .val_left = 0, .val_right = 255,
         .val_fire1 = 64, .val_fire2 = 128, .val_fire3 = 16, .val_up_alt = 32, .val_autofire = 4, .val_autofire_off = 0x00,
         .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
@@ -154,7 +154,7 @@ const PadConfig PROFILES[] = {
         .vid = 121, .pid = 6,
         .dpad_type = AXIS,
         .byte_x = 0, .byte_y = 1, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 5, .byte_up_alt = 5, .byte_autofire = 5, .byte_autofire_off = 0,
+        .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 5, .byte_up_alt = 5, .byte_autofire = 5, .byte_autofire_off = -1,
         .val_up = 0, .val_down = 255, .val_left = 0, .val_right = 255,
         .val_fire1 = 16, .val_fire2 = 32, .val_fire3 = 48, .val_up_alt = 64, .val_autofire = 128, .val_autofire_off = 0x00,
         .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
@@ -164,7 +164,7 @@ const PadConfig PROFILES[] = {
         .vid = 4754, .pid = 17987,
         .dpad_type = BITMASK,
         .byte_x = 0, .byte_y = 0, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 1, .byte_fire2 = 1, .byte_fire3 = 1, .byte_up_alt = 1, .byte_autofire = 1, .byte_autofire_off = 0,
+        .byte_fire1 = 1, .byte_fire2 = 1, .byte_fire3 = -1, .byte_up_alt = 1, .byte_autofire = 1, .byte_autofire_off = -1,
         .val_up = 8, .val_down = 4, .val_left = 2, .val_right = 1,
         .val_fire1 = 2, .val_fire2 = 8, .val_fire3 = 4, .val_up_alt = 1, .val_autofire = 4, .val_autofire_off = 0x00,
         .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW
@@ -175,7 +175,7 @@ const PadConfig PROFILES[] = {
         .use_report_id = true, .report_id_val = 1,
         .dpad_type = AXIS,
         .byte_x = 3, .byte_y = 4, .byte_analog_x = 0, .byte_analog_y = 0, .byte_analog_right_x = 0, .byte_analog_right_y = 0,
-        .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = 0, .byte_up_alt = 5, .byte_autofire = 6, .byte_autofire_off = 6,
+        .byte_fire1 = 5, .byte_fire2 = 5, .byte_fire3 = -1, .byte_up_alt = 5, .byte_autofire = 6, .byte_autofire_off = 6,
         .val_up = 0, .val_down = 255, .val_left = 0, .val_right = 255,
         .val_fire1 = 64, .val_fire2 = 128, .val_fire3 = 0, .val_up_alt = 32, .val_autofire = 4, .val_autofire_off = 8,
         .color_fire1 = C_GREEN, .color_fire2 = C_RED, .color_fire3 = C_CYAN, .color_up_alt = C_BLUE, .color_autofire = C_YELLOW

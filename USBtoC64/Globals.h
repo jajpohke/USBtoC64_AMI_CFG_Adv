@@ -9,9 +9,61 @@
 #include <stdint.h>
 #include <Preferences.h>
 #include "Adafruit_NeoPixel.h"
-#include "JoystickProfiles.h" 
+#include "JoystickProfiles.h"
+#include "JoystickMapping.h"
 
-extern Preferences prefs;
+// 🎮 --- HTML CONFIGURATOR ENGINE ---
+#define HAS_HTML_CONFIGURATOR 1
+extern bool use_html_configurator;
+
+// Dynamic JM rules loaded from NVS (HTML configurator save path)
+#define JM_DYN_MAX_RULES 32
+#define JM_DYN_MAX_ANALOG 4
+extern JM_Rule  jm_rules_dyn[JM_DYN_MAX_RULES];
+extern uint8_t  jm_rules_dyn_count;
+extern int8_t   jm_dpad_index_dyn;
+extern bool     jm_use_analog_dyn;
+extern uint8_t  jm_analog_x_dyn[JM_DYN_MAX_ANALOG];
+extern uint8_t  jm_analog_y_dyn[JM_DYN_MAX_ANALOG];
+extern uint8_t  jm_analog_x_count_dyn;
+extern uint8_t  jm_analog_y_count_dyn;
+
+// NVS blob for HTML rules (key: "jm_blob")
+typedef struct {
+    uint16_t vid;
+    uint16_t pid;
+    int8_t   dpad_index;
+    uint8_t  rule_count;
+    uint8_t  use_analog;
+    uint8_t  analog_x_count;
+    uint8_t  analog_y_count;
+    uint8_t  analog_x[JM_DYN_MAX_ANALOG];
+    uint8_t  analog_y[JM_DYN_MAX_ANALOG];
+    JM_Rule  rules[JM_DYN_MAX_RULES];
+} NVS_JM_Blob;
+
+extern Preferences prefs; // <--- SPOSTATA QUI, PRIMA DELL'USO
+
+inline void load_jm_rules_from_nvs() {
+    use_html_configurator = false;
+    jm_use_analog_dyn = false;
+    jm_analog_x_count_dyn = 0;
+    jm_analog_y_count_dyn = 0;
+    if (!prefs.isKey("jm_blob")) return;
+    NVS_JM_Blob blob;
+    size_t len = prefs.getBytes("jm_blob", &blob, sizeof(NVS_JM_Blob));
+    if (len < sizeof(uint16_t)*2 + 2) return;
+    jm_dpad_index_dyn  = blob.dpad_index;
+    jm_rules_dyn_count = (blob.rule_count <= JM_DYN_MAX_RULES) ? blob.rule_count : JM_DYN_MAX_RULES;
+    memcpy(jm_rules_dyn, blob.rules, jm_rules_dyn_count * sizeof(JM_Rule));
+    jm_use_analog_dyn      = blob.use_analog;
+    jm_analog_x_count_dyn  = (blob.analog_x_count <= JM_DYN_MAX_ANALOG) ? blob.analog_x_count : JM_DYN_MAX_ANALOG;
+    jm_analog_y_count_dyn  = (blob.analog_y_count <= JM_DYN_MAX_ANALOG) ? blob.analog_y_count : JM_DYN_MAX_ANALOG;
+    memcpy(jm_analog_x_dyn, blob.analog_x, jm_analog_x_count_dyn);
+    memcpy(jm_analog_y_dyn, blob.analog_y, jm_analog_y_count_dyn);
+}
+
+//extern Preferences prefs;
 // --- MOUSE GLOBAL SETTINGS ---
 extern int mouse_amiga_speed;
 extern int mouse_c64_speed;
@@ -241,26 +293,23 @@ inline void load_custom_profile_from_nvs() {
         size_t len = prefs.getBytes("cust_blob", &nvs_data, sizeof(NVS_PadProfile));
         
         if (len == sizeof(NVS_PadProfile)) {
+            // Path 1: blob written by 'new' service menu command
             custom_profile.name = "WEB_CUSTOM_PAD";
             custom_profile.vid = nvs_data.vid;
             custom_profile.pid = nvs_data.pid;
-            
             custom_profile.use_report_id = false; 
             custom_profile.report_id_val = 0;
             custom_profile.dpad_type = (DpadType)nvs_data.dpad_type;
-            
             custom_profile.byte_x = nvs_data.byte_x;
             custom_profile.byte_y = nvs_data.byte_y;
             custom_profile.byte_analog_x = 0; 
             custom_profile.byte_analog_y = 0;
             custom_profile.byte_analog_right_x = 0;
             custom_profile.byte_analog_right_y = 0;
-            
             custom_profile.val_up = nvs_data.val_up;
             custom_profile.val_down = nvs_data.val_down;
             custom_profile.val_left = nvs_data.val_left;
             custom_profile.val_right = nvs_data.val_right;
-            
             custom_profile.byte_fire1 = nvs_data.byte_fire1;
             custom_profile.val_fire1 = nvs_data.val_fire1;
             custom_profile.byte_fire2 = nvs_data.byte_fire2;
@@ -269,19 +318,54 @@ inline void load_custom_profile_from_nvs() {
             custom_profile.val_fire3 = nvs_data.val_fire3;
             custom_profile.byte_up_alt = nvs_data.byte_up_alt;
             custom_profile.val_up_alt = nvs_data.val_up_alt;
-            
             custom_profile.byte_autofire = nvs_data.byte_autofire;
             custom_profile.val_autofire = nvs_data.val_autofire;
             custom_profile.byte_autofire_off = nvs_data.byte_autofire_off;
             custom_profile.val_autofire_off = nvs_data.val_autofire_off;
             custom_profile.byte_autofire_hold = nvs_data.byte_autofire_hold;
             custom_profile.val_autofire_hold = nvs_data.val_autofire_hold;
-
             custom_profile.color_fire1 = nvs_data.color_fire1;
             custom_profile.color_fire2 = nvs_data.color_fire2;
             custom_profile.color_fire3 = nvs_data.color_fire3;
             custom_profile.color_up_alt = nvs_data.color_up_alt;
             custom_profile.color_autofire = nvs_data.color_autofire;
+        } else if (prefs.isKey("vid")) {
+            // Path 2: individual keys written by HTML configurator save
+            custom_profile.name = "WEB_CUSTOM_PAD";
+            custom_profile.vid = prefs.getUInt("vid", 0);
+            custom_profile.pid = prefs.getUInt("pid", 0);
+            custom_profile.use_report_id = false;
+            custom_profile.report_id_val = 0;
+            custom_profile.dpad_type = (DpadType)prefs.getInt("dpad_type", 0);
+            custom_profile.byte_x = prefs.getInt("byte_dpad_x", prefs.getInt("byte_x", 0));
+            custom_profile.byte_y = prefs.getInt("byte_dpad_y", prefs.getInt("byte_y", 0));
+            custom_profile.byte_analog_x = 0;
+            custom_profile.byte_analog_y = 0;
+            custom_profile.byte_analog_right_x = 0;
+            custom_profile.byte_analog_right_y = 0;
+            custom_profile.val_up = prefs.getInt("val_up", 0);
+            custom_profile.val_down = prefs.getInt("val_down", 0);
+            custom_profile.val_left = prefs.getInt("val_left", 0);
+            custom_profile.val_right = prefs.getInt("val_right", 0);
+            custom_profile.byte_fire1 = prefs.getInt("byte_f1", -1);
+            custom_profile.val_fire1 = prefs.getInt("val_f1", 0);
+            custom_profile.byte_fire2 = prefs.getInt("byte_f2", -1);
+            custom_profile.val_fire2 = prefs.getInt("val_f2", 0);
+            custom_profile.byte_fire3 = prefs.getInt("byte_f3", -1);
+            custom_profile.val_fire3 = prefs.getInt("val_f3", 0);
+            custom_profile.byte_up_alt = prefs.getInt("byte_up_alt", -1);
+            custom_profile.val_up_alt = prefs.getInt("val_up_alt", 0);
+            custom_profile.byte_autofire = prefs.getInt("byte_auto", -1);
+            custom_profile.val_autofire = prefs.getInt("val_auto", 0);
+            custom_profile.byte_autofire_off = prefs.getInt("byte_auto_off", -1);
+            custom_profile.val_autofire_off = prefs.getInt("val_auto_off", 0);
+            custom_profile.byte_autofire_hold = prefs.getInt("byte_auto_h", -1);
+            custom_profile.val_autofire_hold = prefs.getInt("val_auto_h", 0);
+            custom_profile.color_fire1 = prefs.getUInt("c_cf1", C_GREEN);
+            custom_profile.color_fire2 = prefs.getUInt("c_cf2", C_RED);
+            custom_profile.color_fire3 = prefs.getUInt("c_cf3", C_CYAN);
+            custom_profile.color_up_alt = prefs.getUInt("c_cua", C_BLUE);
+            custom_profile.color_autofire = prefs.getUInt("c_cauto", C_YELLOW);
         } else {
             Serial2.println(">>> NVS BLOB size mismatch! Custom profile corrupted or empty.");
             has_custom_profile = false;

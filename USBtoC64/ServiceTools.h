@@ -629,11 +629,69 @@ inline void handleServiceMenu() {
             dual_println("Switch Invert Logic: " + String(prefs.getBool("inv_switch", false) ? "ACTIVE" : "INACTIVE"));
             dual_println("----------------------------");
         }
-        else if (!C64_Amiga_Connected && command == "factory") {
-            dual_println("\n>>> ⚠️ FACTORY RESET... Clearing NVS ⚠️ <<<");
-            prefs.clear();
-            delay(1000);
-            ESP.restart();
+else if (command == "dumppad") {
+            dual_println("\n--- 🔍 NVS PAD DUMP ---");
+            dual_printf("has_custom   : %s\n", prefs.getBool("has_custom", false) ? "TRUE" : "FALSE");
+            
+            size_t jm_size = prefs.getBytesLength("jm_blob");
+            size_t cust_size = prefs.getBytesLength("cust_blob");
+            
+            if (jm_size > 0) {
+                dual_println("\n[ TIER 0: HTML DYNAMIC RULES ]");
+                NVS_JM_Blob jm_data;
+                prefs.getBytes("jm_blob", &jm_data, sizeof(NVS_JM_Blob));
+                dual_printf("vid          : 0x%04X\n", jm_data.vid);
+                dual_printf("pid          : 0x%04X\n", jm_data.pid);
+                dual_printf("dpad_index   : %d\n", jm_data.dpad_index);
+                dual_printf("rule_count   : %d\n", jm_data.rule_count);
+                
+                const char* op_names[] = { "==", "BIT", "HAT" };
+                const char* func_names[] = { "UP", "UP_RIGHT", "RIGHT", "RIGHT_DOWN", "DOWN", "DOWN_LEFT", "LEFT", "LEFT_UP", "FIRE 1", "FIRE 2", "FIRE 3", "AUTO ON", "AUTO OFF", "AUTO HOLD", "AUTO L/R ON", "AUTO L/R OFF" };
+                
+                for (int i = 0; i < jm_data.rule_count && i < JM_DYN_MAX_RULES; i++) {
+                    JM_Rule r = jm_data.rules[i];
+                    const char* op_str = (r.op <= 2) ? op_names[r.op] : "???";
+                    const char* func_str = (r.func <= 15) ? func_names[r.func] : "???";
+                    dual_printf("  Rule %02d    : Byte[%d] %-3s %3d  ->  Action: %s\n", i+1, r.index, op_str, r.value, func_str);
+                }
+                
+                dual_printf("jm_blob size : %d bytes\n", (int)jm_size);
+
+                // Analog axes
+                dual_printf("use_analog   : %s\n", jm_data.use_analog ? "YES" : "NO");
+                if (jm_data.use_analog) {
+                    dual_print("analog_x     : [");
+                    for (int i = 0; i < jm_data.analog_x_count && i < JM_DYN_MAX_ANALOG; i++) {
+                        if (i > 0) dual_print(", ");
+                        dual_printf("%d", jm_data.analog_x[i]);
+                    }
+                    dual_println("]");
+                    dual_print("analog_y     : [");
+                    for (int i = 0; i < jm_data.analog_y_count && i < JM_DYN_MAX_ANALOG; i++) {
+                        if (i > 0) dual_print(", ");
+                        dual_printf("%d", jm_data.analog_y[i]);
+                    }
+                    dual_println("]");
+                }
+            }
+            
+            if (cust_size > 0 || prefs.isKey("vid")) {
+                dual_println("\n[ TIER 1: LEGACY / SNIFFER ]");
+                dual_printf("vid          : 0x%04X\n", prefs.getUInt("vid", 0));
+                dual_printf("pid          : 0x%04X\n", prefs.getUInt("pid", 0));
+                dual_printf("dpad_type    : %d\n",    prefs.getInt("dpad_type", -1));
+                dual_printf("byte_dpad_x  : %d\n",    prefs.getInt("byte_dpad_x", -1));
+                dual_printf("byte_dpad_y  : %d\n",    prefs.getInt("byte_dpad_y", -1));
+                dual_printf("val_up       : %d  val_down     : %d\n", prefs.getInt("val_up", -1), prefs.getInt("val_down", -1));
+                dual_printf("val_left     : %d  val_right    : %d\n", prefs.getInt("val_left", -1), prefs.getInt("val_right", -1));
+                dual_printf("byte_f1      : %d  val_f1       : %d\n", prefs.getInt("byte_f1", -1), prefs.getInt("val_f1", -1));
+                dual_printf("cust_blob    : %d bytes\n", (int)cust_size);
+            }
+            
+            if (jm_size == 0 && cust_size == 0 && !prefs.isKey("vid")) {
+                dual_println(">>> NO PROFILE SAVED IN MEMORY <<<");
+            }
+            dual_println("-----------------------");
         }
         else if (current_mode != MODE_PLAY || command == "exit") {
             bool req_bare_metal = (command == "test" || command == "raw" || command == "lag" || command == "mousetest" || command == "gpio" || command == "new");

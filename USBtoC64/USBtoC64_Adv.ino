@@ -85,6 +85,17 @@ bool has_custom_profile = false;
 PadConfig custom_profile;
 PadConfig current_profile;
 
+// HTML configurator dynamic rules
+bool    use_html_configurator = false;
+JM_Rule jm_rules_dyn[JM_DYN_MAX_RULES];
+uint8_t jm_rules_dyn_count = 0;
+int8_t  jm_dpad_index_dyn  = -1;
+bool    jm_use_analog_dyn   = false;
+uint8_t jm_analog_x_dyn[JM_DYN_MAX_ANALOG];
+uint8_t jm_analog_y_dyn[JM_DYN_MAX_ANALOG];
+uint8_t jm_analog_x_count_dyn = 0;
+uint8_t jm_analog_y_count_dyn = 0;
+
 // 3. INCLUDE OPERATIONAL MODULES
 #include "Hardware.h"
 #include "ServiceTools.h"
@@ -241,9 +252,21 @@ void start_sniff(uint8_t addr) {
     
     bool found_custom = false;
     bool found_internal = false;
+    use_html_configurator = false; 
 
-    // TIER 1 — NVS custom profile (explicit user configuration, highest priority)
-    if (has_custom_profile) {
+// TIER 0 — HTML configurator rules blob (highest priority when VID/PID match)
+    if (jm_rules_dyn_count > 0 && prefs.isKey("jm_blob")) {
+        NVS_JM_Blob jm_full;
+        size_t len = prefs.getBytes("jm_blob", &jm_full, sizeof(NVS_JM_Blob));
+        if (len > 0 && connected_vid == jm_full.vid && connected_pid == jm_full.pid) {
+            use_html_configurator = true;
+            found_custom = true;
+            dual_println(">>> TIER 0 MATCH: Loaded HTML Configurator Rules");
+        }
+    }
+
+    // TIER 1 — NVS custom profile (explicit user configuration)
+    if (!found_custom && has_custom_profile) {
         if (connected_vid == custom_profile.vid && connected_pid == custom_profile.pid) {
             current_profile = custom_profile;
             found_custom = true;
@@ -271,7 +294,9 @@ void start_sniff(uint8_t addr) {
     do_blink(active_driver == 1 ? C_BLUE : C_GREEN, 2);
 
     dual_printf("\n*** CONNECTED: VID:%04x PID:%04x ***\n", connected_vid, connected_pid);
-    if (found_custom) {
+    if (use_html_configurator) {
+        dual_println(">>> TIER 0 MATCH: HTML Configurator Rules Active");
+    } else if (found_custom) {
         dual_println(">>> TIER 1 MATCH: Loaded NVS Custom Profile");
     } else if (found_internal) {
         dual_printf(">>> TIER 2 MATCH: Loaded Internal Profile [%s]\n", current_profile.name);
@@ -435,6 +460,7 @@ void setup() {
     delayOnX = g_MIN_X;
     delayOnY = g_MIN_Y;
 
+    load_jm_rules_from_nvs();
     load_custom_profile_from_nvs();
     load_sys_colors_from_nvs();
     
@@ -628,6 +654,8 @@ void loop() {
                 prefs.putInt("dpad_type", doc["dpad_type"] | 0);
                 prefs.putInt("byte_x", doc["byte_x"] | 0);
                 prefs.putInt("byte_y", doc["byte_y"] | 0);
+                prefs.putInt("byte_dpad_x", doc.containsKey("byte_dpad_x") ? doc["byte_dpad_x"].as<int>() : (int)(doc["byte_x"] | 0));
+                prefs.putInt("byte_dpad_y", doc.containsKey("byte_dpad_y") ? doc["byte_dpad_y"].as<int>() : (int)(doc["byte_y"] | 0));
                 prefs.putInt("val_up", doc["val_up"] | 0);
                 prefs.putInt("val_down", doc["val_down"] | 0);
                 prefs.putInt("val_left", doc["val_left"] | 0);
@@ -658,6 +686,43 @@ void loop() {
                 prefs.putInt("byte_auto_h", doc["byte_auto_h"] | 0);
                 prefs.putInt("val_auto_h", doc["val_auto_h"] | 0);
 
+                prefs.putBool("has_custom", true);
+                activePort->print("{\"status\":\"ok\"}\n");
+                delay(200); esp_restart();
+            }
+        }
+        else if (incoming.startsWith("{\"cmd\":\"save_jm\"")) {
+            // Save HTML configurator rules as blob — TIER 0
+            StaticJsonDocument<3072> doc;
+            DeserializationError error = deserializeJson(doc, incoming);
+            if (!error && doc.containsKey("rules")) {
+                NVS_JM_Blob blob;
+                blob.vid = doc["vid"] | 0;
+                blob.pid = doc["pid"] | 0;
+                blob.dpad_index = doc.containsKey("dpad_idx") ? (int8_t)doc["dpad_idx"].as<int>() : -1;
+                // Analog fields
+                blob.use_analog = doc.containsKey("use_analog") ? (uint8_t)doc["use_analog"].as<int>() : 0;
+                blob.analog_x_count = 0;
+                blob.analog_y_count = 0;
+                if (blob.use_analog && doc.containsKey("analog_x")) {
+                    JsonArray ax = doc["analog_x"].as<JsonArray>();
+                    for (uint8_t v : ax) { if (blob.analog_x_count < JM_DYN_MAX_ANALOG) blob.analog_x[blob.analog_x_count++] = v; }
+                }
+                if (blob.use_analog && doc.containsKey("analog_y")) {
+                    JsonArray ay = doc["analog_y"].as<JsonArray>();
+                    for (uint8_t v : ay) { if (blob.analog_y_count < JM_DYN_MAX_ANALOG) blob.analog_y[blob.analog_y_count++] = v; }
+                }
+                JsonArray rules = doc["rules"].as<JsonArray>();
+                blob.rule_count = 0;
+                for (JsonObject r : rules) {
+                    if (blob.rule_count >= JM_DYN_MAX_RULES) break;
+                    blob.rules[blob.rule_count].index = r["i"] | 0;
+                    blob.rules[blob.rule_count].value = r["v"] | 0;
+                    blob.rules[blob.rule_count].op    = (JM_Op)(r["op"] | 0);
+                    blob.rules[blob.rule_count].func  = (JM_Func)(r["f"] | 0);
+                    blob.rule_count++;
+                }
+                prefs.putBytes("jm_blob", &blob, sizeof(NVS_JM_Blob));
                 prefs.putBool("has_custom", true);
                 activePort->print("{\"status\":\"ok\"}\n");
                 delay(200); esp_restart();
@@ -823,7 +888,20 @@ void loop() {
             if (!deserializeJson(doc, incoming) && doc.containsKey("target")) {
                 String t = doc["target"].as<String>();
                 if (t == "mouse") { prefs.remove("amiga_speed"); prefs.remove("c64_speed"); prefs.remove("en_wheel"); prefs.remove("pal_timing"); }
-                else if (t == "pad") { prefs.remove("has_custom"); prefs.remove("cust_blob"); }
+                else if (t == "pad") { 
+                    prefs.remove("has_custom"); prefs.remove("cust_blob"); prefs.remove("jm_blob");
+                    prefs.remove("vid"); prefs.remove("pid");
+                    prefs.remove("dpad_type"); prefs.remove("byte_x"); prefs.remove("byte_y");
+                    prefs.remove("byte_dpad_x"); prefs.remove("byte_dpad_y");
+                    prefs.remove("val_up"); prefs.remove("val_down"); prefs.remove("val_left"); prefs.remove("val_right");
+                    prefs.remove("byte_f1"); prefs.remove("val_f1"); prefs.remove("c_cf1");
+                    prefs.remove("byte_f2"); prefs.remove("val_f2"); prefs.remove("c_cf2");
+                    prefs.remove("byte_f3"); prefs.remove("val_f3"); prefs.remove("c_cf3");
+                    prefs.remove("byte_up_alt"); prefs.remove("val_up_alt"); prefs.remove("c_cua");
+                    prefs.remove("byte_auto"); prefs.remove("val_auto"); prefs.remove("c_cauto");
+                    prefs.remove("byte_auto_off"); prefs.remove("val_auto_off");
+                    prefs.remove("byte_auto_h"); prefs.remove("val_auto_h");
+                }
                 else if (t == "led") { prefs.remove("has_colors"); prefs.remove("col_blob"); prefs.remove("led_fmt"); }
                 else if (t == "dev") { prefs.remove("dev_mode"); prefs.remove("dev_amiga"); }
                 else if (t == "inv") { prefs.remove("inv_switch"); }
