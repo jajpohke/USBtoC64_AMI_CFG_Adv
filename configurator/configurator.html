@@ -319,6 +319,10 @@
                     <option value="svg-gamepad">Standard Gamepad (SNES-Style)</option>
                     <option value="svg-arcade">Arcade Stick (Hori-Style)</option>
                 </select>
+                <label style="color:var(--lcars-amber); font-weight:bold; margin-left:20px; cursor:pointer;">
+                    <input type="checkbox" id="chkDiagonals" onchange="toggleDiagonals()" style="margin-right:5px; cursor:pointer;">
+                    CONFIGURE DIAGONALS
+                </label>
             </div>
 
             <p style="font-size:0.9em; color:#aaa; text-align:center; margin-bottom: 20px; font-family: sans-serif; text-transform: none;">
@@ -352,6 +356,28 @@
                     <g class="btn-zone" id="pad_right" onclick="startListening('pad_right', 'Gamepad RIGHT', 'RIGHT')">
                         <rect x="130" y="95" width="30" height="30" class="shape" style="fill:transparent; stroke:transparent;" />
                         <text x="145" y="115" text-anchor="middle" class="base-arrow" fill="var(--lcars-cyan)">➡️</text> <text x="145" y="140" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <!-- DIAGONALS: hidden by default, shown by toggleDiagonals() -->
+                    <g class="btn-zone diag-zone" id="pad_up_r" onclick="startListening('pad_up_r', 'Gamepad UP-RIGHT', 'UP-R')" style="display:none;">
+                        <rect x="130" y="65" width="22" height="22" class="shape" style="fill:rgba(156,39,176,0.25); stroke:var(--lcars-cyan); stroke-dasharray:3,2;" />
+                        <text x="141" y="81" text-anchor="middle" class="base-arrow" fill="var(--lcars-cyan)" font-size="12px">↗️</text>
+                        <text x="141" y="60" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone diag-zone" id="pad_dn_r" onclick="startListening('pad_dn_r', 'Gamepad DN-RIGHT', 'DN-R')" style="display:none;">
+                        <rect x="130" y="125" width="22" height="22" class="shape" style="fill:rgba(156,39,176,0.25); stroke:var(--lcars-cyan); stroke-dasharray:3,2;" />
+                        <text x="141" y="141" text-anchor="middle" class="base-arrow" fill="var(--lcars-cyan)" font-size="12px">↘️</text>
+                        <text x="141" y="160" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone diag-zone" id="pad_dn_l" onclick="startListening('pad_dn_l', 'Gamepad DN-LEFT', 'DN-L')" style="display:none;">
+                        <rect x="70" y="125" width="22" height="22" class="shape" style="fill:rgba(156,39,176,0.25); stroke:var(--lcars-cyan); stroke-dasharray:3,2;" />
+                        <text x="81" y="141" text-anchor="middle" class="base-arrow" fill="var(--lcars-cyan)" font-size="12px">↙️</text>
+                        <text x="81" y="160" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone diag-zone" id="pad_up_l" onclick="startListening('pad_up_l', 'Gamepad UP-LEFT', 'UP-L')" style="display:none;">
+                        <rect x="70" y="65" width="22" height="22" class="shape" style="fill:rgba(156,39,176,0.25); stroke:var(--lcars-cyan); stroke-dasharray:3,2;" />
+                        <text x="81" y="81" text-anchor="middle" class="base-arrow" fill="var(--lcars-cyan)" font-size="12px">↖️</text>
+                        <text x="81" y="60" text-anchor="middle" class="dynamic-label"></text>
                     </g>
 
                     <g class="btn-zone" id="pad_btn_n" onclick="startListening('pad_btn_n', 'Top Action Button', 'A-HLD')">
@@ -432,6 +458,28 @@
                         <rect x="145" y="115" width="30" height="30" rx="4" class="shape" />
                         <text x="160" y="135" text-anchor="middle" class="base-arrow">➡️</text>
                         <text x="160" y="162" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+
+                    <!-- DIAGONALS: hidden by default, shown by toggleDiagonals() -->
+                    <g class="btn-zone diag-zone" id="arc_up_r" onclick="startListening('arc_up_r', 'Arcade UP-RIGHT', 'UP-R')" style="display:none;">
+                        <rect x="141" y="68" width="26" height="26" rx="4" class="shape" style="fill:rgba(156,39,176,0.25); stroke:#aaa; stroke-dasharray:3,2;" />
+                        <text x="154" y="86" text-anchor="middle" class="base-arrow" font-size="13px">↗️</text>
+                        <text x="154" y="58" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone diag-zone" id="arc_dn_r" onclick="startListening('arc_dn_r', 'Arcade DN-RIGHT', 'DN-R')" style="display:none;">
+                        <rect x="141" y="163" width="26" height="26" rx="4" class="shape" style="fill:rgba(156,39,176,0.25); stroke:#aaa; stroke-dasharray:3,2;" />
+                        <text x="154" y="181" text-anchor="middle" class="base-arrow" font-size="13px">↘️</text>
+                        <text x="154" y="205" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone diag-zone" id="arc_dn_l" onclick="startListening('arc_dn_l', 'Arcade DN-LEFT', 'DN-L')" style="display:none;">
+                        <rect x="43" y="163" width="26" height="26" rx="4" class="shape" style="fill:rgba(156,39,176,0.25); stroke:#aaa; stroke-dasharray:3,2;" />
+                        <text x="56" y="181" text-anchor="middle" class="base-arrow" font-size="13px">↙️</text>
+                        <text x="56" y="205" text-anchor="middle" class="dynamic-label"></text>
+                    </g>
+                    <g class="btn-zone diag-zone" id="arc_up_l" onclick="startListening('arc_up_l', 'Arcade UP-LEFT', 'UP-L')" style="display:none;">
+                        <rect x="43" y="68" width="26" height="26" rx="4" class="shape" style="fill:rgba(156,39,176,0.25); stroke:#aaa; stroke-dasharray:3,2;" />
+                        <text x="56" y="86" text-anchor="middle" class="base-arrow" font-size="13px">↖️</text>
+                        <text x="56" y="58" text-anchor="middle" class="dynamic-label"></text>
                     </g>
 
                     <g class="btn-zone" id="arc_b1" onclick="startListening('arc_b1', 'Arcade Button 1 (Top-Left)', 'F1')">
@@ -522,10 +570,14 @@
             "A-TOG": { name: "AUTO Fr1 TOG", label: "AutoFr1. On", color: "#005500" },
             "A-HLD": { name: "AUTO Fr1 HLD", label: "AutoFr1. Hold", color: "#ff9800" },
             "A-OFF": { name: "AUTO Fr1 OFF", label: "AutoFr1 Off", color: "#9C27B0" },
-            "UP":    { name: "UP", label: "⬆️", color: "#9C27B0" },
-            "DOWN":  { name: "DOWN", label: "⬇️", color: "#9C27B0" },
-            "LEFT":  { name: "LEFT", label: "⬅️", color: "#9C27B0" },
-            "RIGHT": { name: "RIGHT", label: "➡️", color: "#9C27B0" },
+            "UP":    { name: "⬆️ UP",    label: "⬆️", color: "#9C27B0" },
+            "DOWN":  { name: "⬇️ DOWN",  label: "⬇️", color: "#9C27B0" },
+            "LEFT":  { name: "⬅️ LEFT",  label: "⬅️", color: "#9C27B0" },
+            "RIGHT": { name: "➡️ RIGHT", label: "➡️", color: "#9C27B0" },
+            "UP-R":  { name: "↗️ UP-RIGHT", label: "↗️", color: "#9C27B0" },
+            "DN-R":  { name: "↘️ DN-RIGHT", label: "↘️", color: "#9C27B0" },
+            "DN-L":  { name: "↙️ DN-LEFT",  label: "↙️", color: "#9C27B0" },
+            "UP-L":  { name: "↖️ UP-LEFT",  label: "↖️", color: "#9C27B0" },
             "LS-X":  { name: "LS-X", label: "LS_Right ➡️", color: "#9C27B0" },
             "LS-Y":  { name: "LS-Y", label: "LS_Down ⬇️", color: "#9C27B0" },
             "RS-X":  { name: "RS-X", label: "RS_Right ➡️", color: "#9C27B0" },
@@ -622,23 +674,27 @@
         // --- DICTIONARIES FOR IMPORT/EXPORT TRANSLATION ---
         const IMPORT_ID_TRANSLATOR = {
             "DU": "pad_up", "DD": "pad_down", "DL": "pad_left", "DR": "pad_right",
+            "DUR": "pad_up_r", "DDR": "pad_dn_r", "DDL": "pad_dn_l", "DUL": "pad_up_l",
             "LSH": "pad_ls_x", "LSV": "pad_ls_y", "RSH": "pad_rs_x", "RSV": "pad_rs_y",
             "A": "pad_btn_s", "B": "pad_btn_e", "X": "pad_btn_w", "Y": "pad_btn_n",
             "LT": "pad_l1", "RT": "pad_r1", "SEL": "pad_sel", "STA": "pad_sta"
         };
 
         const EXPORT_ID_TRANSLATOR = {
-            "pad_up": "DU", "pad_down": "DD", "pad_left": "DL", "pad_right": "DR", 
+            "pad_up": "DU", "pad_down": "DD", "pad_left": "DL", "pad_right": "DR",
+            "pad_up_r": "DUR", "pad_dn_r": "DDR", "pad_dn_l": "DDL", "pad_up_l": "DUL",
             "pad_ls_x": "LSH", "pad_ls_y": "LSV", "pad_rs_x": "RSH", "pad_rs_y": "RSV",
             "pad_btn_s": "A", "pad_btn_e": "B", "pad_btn_w": "X", "pad_btn_n": "Y",
             "pad_l1": "LT", "pad_r1": "RT", "pad_sel": "SEL", "pad_sta": "STA",
             "arc_up": "DU", "arc_down": "DD", "arc_left": "DL", "arc_right": "DR",
+            "arc_up_r": "DUR", "arc_dn_r": "DDR", "arc_dn_l": "DDL", "arc_up_l": "DUL",
             "arc_b1": "A", "arc_b2": "X", "arc_b3": "LT", 
             "arc_b4": "B", "arc_b5": "Y", "arc_b6": "RT"
         };
 
         const IMPORT_ACTION_TRANSLATOR = {
             "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT",
+            "UP-RIGHT": "UP-R", "DN-RIGHT": "DN-R", "DN-LEFT": "DN-L", "UP-LEFT": "UP-L",
             "Fire1": "F1", "Fire2": "F2", "Fire3": "F3", "Alt UP": "UP",
             "Autofire Off": "A-OFF", "Autofire On": "A-TOG", "Autofire Hold": "A-HLD",
             "X Axis": "LS-X", 
@@ -647,6 +703,7 @@
 
         const EXPORT_ACTION_TRANSLATOR = {
             "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT",
+            "UP-R": "UP-RIGHT", "DN-R": "DN-RIGHT", "DN-L": "DN-LEFT", "UP-L": "UP-LEFT",
             "F1": "Fire1", "F2": "Fire2", "F3": "Fire3", 
             "A-TOG": "Autofire On", "A-OFF": "Autofire Off", "A-HLD": "Autofire Hold",
             "LS-X": "X Axis", "LS-Y": "Y Axis", "RS-X": "X Axis", "RS-Y": "Y Axis"
@@ -654,12 +711,17 @@
 
         const ENUM_ACTION_TRANSLATOR = {
             "UP": "JM_UP", "DOWN": "JM_DOWN", "LEFT": "JM_LEFT", "RIGHT": "JM_RIGHT",
+            "UP-R": "JM_UP_RIGHT", "DN-R": "JM_RIGHT_DOWN", "DN-L": "JM_DOWN_LEFT", "UP-L": "JM_LEFT_UP",
             "F1": "JM_FIRE", "F2": "JM_FIRE2", "F3": "JM_FIRE3",
             "A-TOG": "JM_AUTOFIRE_ON", "A-OFF": "JM_AUTOFIRE_OFF", "A-HLD": "JM_AUTOFIRE_HOLD"
         };
 
         let hidDevice = null;
+        let importedVid = 0;  // VID from imported .h file
+        let importedPid = 0;  // PID from imported .h file
+        let serialPort = null; // Persistent serial port — same pattern as memory.html
         let baselineData = null;
+        let zoneBaselines = {}; // Stores baseline per zone at intercept time for XOR bitmask calculation
         let activeZoneId = null;
         let activeDefaultAction = null;
         let activeZoneName = null;
@@ -773,10 +835,10 @@
                 let value = 0;
 
                 if (hexStr.includes("[B:")) {
-                    let match = hexStr.match(/\[B:(\d+)\s*=\s*0x([0-9A-Fa-f]+)\]/);
+                    let match = hexStr.match(/\[B:(\d+)\s*=\s*(\d+)\]/);
                     if (match) {
                         index = parseInt(match[1]);
-                        value = parseInt(match[2], 16);
+                        value = parseInt(match[2]);
                     }
                 } else if (hexStr.includes("[IDX:")) {
                     let match = hexStr.match(/\[IDX:\s*(\d+)\]/);
@@ -1056,92 +1118,111 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                 return;
             }
 
-            let payload = {
-                cmd: "save",
-                vid: hidDevice ? hidDevice.vendorId : 0,
-                pid: hidDevice ? hidDevice.productId : 0,
-                dpad_type: 0, byte_x: 0, byte_y: 0,
-                val_up: 0, val_down: 0, val_left: 0, val_right: 0,
-                byte_f1: 0, val_f1: 0, c_cf1: 0,
-                byte_f2: 0, val_f2: 0, c_cf2: 0,
-                byte_f3: 0, val_f3: 0, c_cf3: 0,
-                byte_up_alt: 0, val_up_alt: 0, c_cua: 0,
-                byte_auto: 0, val_auto: 0, c_cauto: 0,
-                byte_auto_off: 0, val_auto_off: 0,
-                byte_auto_h: 0, val_auto_h: 0
-            };
+            const vid = hidDevice ? hidDevice.vendorId : (importedVid || 0);
+            const pid = hidDevice ? hidDevice.productId : (importedPid || 0);
 
-            let dpad_idx = 0;
-            let foundUp = 0; 
+            let rules = [];
+            let dpadIndex = -1;
+            let analogX = [];
+            let analogY = [];
+
+            const FUNC_MAP = {
+                "JM_UP":0,"JM_UP_RIGHT":1,"JM_RIGHT":2,"JM_RIGHT_DOWN":3,
+                "JM_DOWN":4,"JM_DOWN_LEFT":5,"JM_LEFT":6,"JM_LEFT_UP":7,
+                "JM_FIRE":8,"JM_FIRE2":9,"JM_FIRE3":10,
+                "JM_AUTOFIRE_ON":11,"JM_AUTOFIRE_OFF":12,"JM_AUTOFIRE_HOLD":13,
+                "JM_AUTOLEFTRIGHT_ON":14,"JM_AUTOLEFTRIGHT_OFF":15
+            };
 
             for (const zoneId in mappedZones) {
                 if (!mappedZones[zoneId]) continue;
                 let selInput = document.getElementById('sel_' + zoneId);
                 let hexInput = document.getElementById('hex_' + zoneId);
-
                 if (!selInput || !hexInput) continue;
 
                 let actionKey = selInput.value;
                 let hexStr = hexInput.value;
-                const sw = document.getElementById('col_' + zoneId);
-                let colorVal = sw ? rgbToHex(sw.style.backgroundColor) : "#000000";
-
                 if (actionKey === "NONE") continue;
 
                 let index = 0;
                 let value = 0;
 
                 if (hexStr.includes("[B:")) {
-                    let match = hexStr.match(/\[B:(\d+)\s*=\s*0x([0-9A-Fa-f]+)\]/);
-                    if (match) { index = parseInt(match[1]); value = parseInt(match[2], 16); }
+                    let match = hexStr.match(/\[B:(\d+)\s*=\s*(\d+)\]/);
+                    if (!match) match = hexStr.match(/\[B:(\d+)\s*==\s*(\d+)\]/);
+                    if (match) { index = parseInt(match[1]); value = parseInt(match[2]); }
+                    else continue;
                 } else if (hexStr.includes("[IDX:")) {
                     let match = hexStr.match(/\[IDX:\s*(\d+)\]/);
                     if (match) { index = parseInt(match[1]); value = 255; }
+                    else continue;
+                } else continue;
+
+                // Analog axes — collect indexes separately, don't add to rules
+                if (actionKey === "LS-X" || actionKey === "RS-X") {
+                    if (!analogX.includes(index)) analogX.push(index);
+                    continue;
+                }
+                if (actionKey === "LS-Y" || actionKey === "RS-Y") {
+                    if (!analogY.includes(index)) analogY.push(index);
+                    continue;
                 }
 
-                let cInt = hexToInt(colorVal);
+                let funcEnum = ENUM_ACTION_TRANSLATOR[actionKey];
+                if (!funcEnum) continue;
+                let funcVal = FUNC_MAP[funcEnum];
+                if (funcVal === undefined) continue;
 
-                switch(actionKey) {
-                    case "UP": 
-                        if (foundUp === 0) { dpad_idx = index; payload.val_up = value; foundUp++; } 
-                        else { payload.byte_up_alt = index; payload.val_up_alt = value; payload.c_cua = cInt; }
-                        break;
-                    case "DOWN": payload.val_down = value; break;
-                    case "LEFT": payload.val_left = value; break;
-                    case "RIGHT": payload.val_right = value; break;
-                    case "LS-X": case "RS-X": payload.byte_x = index; break;
-                    case "LS-Y": case "RS-Y": payload.byte_y = index; break;
-                    case "F1": payload.byte_f1 = index; payload.val_f1 = value; payload.c_cf1 = cInt; break;
-                    case "F2": payload.byte_f2 = index; payload.val_f2 = value; payload.c_cf2 = cInt; break;
-                    case "F3": payload.byte_f3 = index; payload.val_f3 = value; payload.c_cf3 = cInt; break;
-                    case "A-TOG": payload.byte_auto = index; payload.val_auto = value; payload.c_cauto = cInt; break;
-                    case "A-OFF": payload.byte_auto_off = index; payload.val_auto_off = value; break;
-                    case "A-HLD": payload.byte_auto_h = index; payload.val_auto_h = value; break;
-                }
+                const isDirFunc = ["JM_UP","JM_DOWN","JM_LEFT","JM_RIGHT",
+                                   "JM_UP_RIGHT","JM_RIGHT_DOWN","JM_DOWN_LEFT","JM_LEFT_UP"].includes(funcEnum);
+                // HAT if it's a direction with value 0-7 (hat switch), EQ otherwise
+                const op = (isDirFunc && value <= 7) ? 2 : 0;
+                rules.push({ i: index, v: value, op: op, f: funcVal });
+                if (isDirFunc && dpadIndex < 0) dpadIndex = index;
             }
 
-            if (!payload.byte_x) payload.byte_x = dpad_idx;
-            if (!payload.byte_y) payload.byte_y = dpad_idx;
-
-            if (payload.val_up === 0 || payload.val_up === 255 || payload.val_down === 0 || payload.val_down === 255) {
-                payload.dpad_type = 2; // Digital Buttons
-            } else if (payload.val_up <= 8 && payload.val_right <= 8) {
-                payload.dpad_type = 1; // HAT / POV
+            if (rules.length === 0) {
+                alert("⚠️ No buttons mapped. Please map at least one action before saving.");
+                return;
             }
+
+            let payload = { cmd: "save_jm", vid, pid, dpad_idx: dpadIndex,
+                use_analog: (analogX.length > 0 || analogY.length > 0) ? 1 : 0,
+                analog_x: analogX, analog_y: analogY, rules };
 
             try {
-                const port = await navigator.serial.requestPort();
-                await port.open({ baudRate: 115200 });
+                if (!serialPort) {
+                    const ports = await navigator.serial.getPorts();
+                    if (ports.length > 0) serialPort = ports[0];
+                    else serialPort = await navigator.serial.requestPort();
+                }
+                let retries = 4;
+                while (retries > 0) {
+                    try { if (!serialPort.readable || !serialPort.writable) await serialPort.open({ baudRate: 115200 }); break; }
+                    catch (e) { retries--; if (retries === 0) throw e; await new Promise(res => setTimeout(res, 300)); }
+                }
 
-                const writer = port.writable.getWriter();
+                const writer = serialPort.writable.getWriter();
                 document.getElementById('saveSerialBtn').innerText = "⏳ SENDING...";
                 try {
                     await writer.write(new TextEncoder().encode(JSON.stringify(payload) + "\n"));
-                    await writer.close();
                 } finally {
                     writer.releaseLock();
-                    await port.close();
                 }
+
+                // Read response before ESP32 reboots
+                const reader = serialPort.readable.getReader();
+                const decoder = new TextDecoder();
+                let incoming = "";
+                const readPromise = (async () => {
+                    while (true) { const { value, done } = await reader.read(); if (done) break; incoming += decoder.decode(value, { stream: true }); if (incoming.includes('}')) break; }
+                })();
+                await Promise.race([readPromise, new Promise(r => setTimeout(r, 1500))]);
+                try { reader.cancel().catch(()=>{}); reader.releaseLock(); } catch(e) {}
+
+                try { await serialPort.close(); } catch(e) {}
+                serialPort = null;
+                await new Promise(r => setTimeout(r, 500));
 
                 document.body.innerHTML = `
                     <div style="
@@ -1174,13 +1255,7 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                 }
             }
         }
-
-
         // --- IMPORT LOGIC ---
-        document.getElementById('importBtnLabel').addEventListener('click', () => {
-            document.getElementById('importFileInput').click();
-        });
-
         document.getElementById('importFileInput').addEventListener('change', function(e) {
             const file = e.target.files[0]; 
             if (!file) return;
@@ -1191,9 +1266,16 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                 const metaMatch = content.match(/\/\/ WEB_META:\s*(.+)/);
                 
                 if (metaMatch) {
+                    // Extract VID/PID from comments in the imported file
+                    const vidMatch = content.match(/\/\/\s*Vendor ID:\s*(\d+)/);
+                    const pidMatch = content.match(/\/\/\s*Product ID:\s*(\d+)/);
+                    importedVid = vidMatch ? parseInt(vidMatch[1]) : 0;
+                    importedPid = pidMatch ? parseInt(pidMatch[1]) : 0;
+
                     document.getElementById('actionTbody').innerHTML = '';
                     document.getElementById('actionTable').style.display = 'none';
                     mappedZones = {};
+                    zoneBaselines = {};
                     document.querySelectorAll('.btn-zone').forEach(zone => {
                         zone.classList.remove('bound');
                         const shape = zone.querySelector('.shape');
@@ -1213,7 +1295,14 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                             const oldColor = parts[4];       
 
                             const newId = IMPORT_ID_TRANSLATOR[oldId];
-                            if (!newId) return; 
+                            if (!newId) return;
+
+                            // If this is a diagonal zone, enable the checkbox and show zones
+                            const diagIds = ['pad_up_r','pad_dn_r','pad_dn_l','pad_up_l','arc_up_r','arc_dn_r','arc_dn_l','arc_up_l'];
+                            if (diagIds.includes(newId)) {
+                                const chk = document.getElementById('chkDiagonals');
+                                if (chk && !chk.checked) { chk.checked = true; toggleDiagonals(); }
+                            } 
 
                             let newAction = IMPORT_ACTION_TRANSLATOR[oldAction] || "NONE";
                             
@@ -1224,7 +1313,7 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                             if (oldAction.includes("Axis")) {
                                 hexStr = `[IDX: ${byteIndex}]`;
                             } else {
-                                hexStr = `[B:${byteIndex} = 0x${byteVal.toString(16).toUpperCase().padStart(2, '0')}]`;
+                                hexStr = `[B:${byteIndex} = ${byteVal}]`;
                             }
 
                             activeZoneId = newId;
@@ -1302,6 +1391,10 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                 case 'pad_down': case 'arc_down': return '✚⬇️';
                 case 'pad_left': case 'arc_left': return '✚⬅️';
                 case 'pad_right': case 'arc_right': return '✚➡️';
+                case 'pad_up_r': case 'arc_up_r': return '✚↗️';
+                case 'pad_dn_r': case 'arc_dn_r': return '✚↘️';
+                case 'pad_dn_l': case 'arc_dn_l': return '✚↙️';
+                case 'pad_up_l': case 'arc_up_l': return '✚↖️';
                 
                 case 'pad_btn_n': return getIconSVG('diamond', 0);
                 case 'pad_btn_e': return getIconSVG('diamond', 1);
@@ -1334,6 +1427,13 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
             }
         }
 
+        function toggleDiagonals() {
+            const show = document.getElementById('chkDiagonals').checked;
+            document.querySelectorAll('.diag-zone').forEach(el => {
+                el.style.display = show ? '' : 'none';
+            });
+        }
+
         function switchLayout() {
             const selected = document.getElementById('layoutSelect').value;
             document.getElementById('svg-gamepad').classList.remove('active');
@@ -1343,6 +1443,7 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
             document.getElementById('actionTbody').innerHTML = '';
             document.getElementById('actionTable').style.display = 'none';
             mappedZones = {};
+            zoneBaselines = {};
 
             document.querySelectorAll('.btn-zone').forEach(zone => {
                 zone.classList.remove('bound');
@@ -1415,7 +1516,7 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                     let b = parseInt(parts[0]);
                     let v = parseInt(parts[1]);
                     if (!isNaN(b) && !isNaN(v)) {
-                        finalStr = `[B:${b} = 0x${v.toString(16).toUpperCase().padStart(2, '0')}]`;
+                        finalStr = `[B:${b} = ${v}]`;
                     }
                 }
             }
@@ -1425,7 +1526,16 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
 
         // --- SISTEMA ANTI-LAG (THROTTLING A 30 FPS) ---
         function handleInputReport(event) {
-            const data = new Uint8Array(event.data.buffer);
+            // Prepend reportId if non-zero — same as Laface, so byte indexes match ESP32 raw USB
+            const raw = new Uint8Array(event.data.buffer);
+            let data;
+            if (event.reportId && event.reportId !== 0) {
+                data = new Uint8Array(raw.length + 1);
+                data[0] = event.reportId;
+                data.set(raw, 1);
+            } else {
+                data = raw;
+            }
             if (!baselineData) { baselineData = new Uint8Array(data); return; }
 
             // FAST BUFFER COPY
@@ -1448,8 +1558,18 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                         }
                     } else {
                         if (diff > 0 && diff < 255) {
-                            let hexVal = "0x" + data[i].toString(16).toUpperCase().padStart(2, '0');
-                            processIntercept(`[B:${i} = ${hexVal}]`); 
+                            let xorVal = data[i] ^ baselineData[i];
+                            let hexVal;
+                            if (data[i] <= 7) {
+                                // Hat switch position — use pressed value directly
+                                hexVal = data[i];
+                            } else if (xorVal > 0 && xorVal < 255) {
+                                // Bitmask button — use XOR to isolate changed bits
+                                hexVal = xorVal;
+                            } else {
+                                hexVal = data[i];
+                            }
+                            processIntercept(`[B:${i} = ${hexVal.toString(10)}]`); 
                             baselineData = new Uint8Array(data); 
                             return;
                         }
@@ -1494,6 +1614,11 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
         function processIntercept(interceptString) {
             document.getElementById('listenModal').style.display = 'none';
             let targetId = activeZoneId;
+            
+            // Save baseline snapshot for this zone — used later in save to compute XOR bitmask
+            if (targetId && baselineData) {
+                zoneBaselines[targetId] = new Uint8Array(baselineData);
+            }
             
             if (targetId && document.getElementById(targetId)) {
                 document.getElementById(targetId).classList.remove('listening');
