@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -269,8 +270,40 @@
         
         .btn-cancel { background: #000; color: var(--lcars-text); border: 2px solid #555; padding: 10px 25px; border-radius: 20px; cursor: pointer; margin-top: 15px; font-family: 'Oswald', sans-serif; font-size: 1.1em; text-transform: uppercase;} 
         .btn-cancel:hover { border-color: var(--lcars-red); color: var(--lcars-red); }
+
+        /* v2 additions */
+        #connBanner.banner-waiting  { 
+            background: linear-gradient(90deg, #2a0000, #1a0800); 
+            color: #ff6633; border: 1px solid #aa3300;
+        }
+        #connBanner.banner-gp-ok    { 
+            background: linear-gradient(90deg, #2a1a00, #1a1000); 
+            color: #ffcc00; border: 1px solid #aa8800;
+            font-size: 1.1em; text-align: center; padding: 10px; font-weight: bold;
+        }
+        #connBanner.connected, #connBanner.banner-hid-ok { 
+            background: linear-gradient(90deg, #002a00, #001a00); 
+            color: #44ff44; border: 1px solid #008800;
+            font-size: 1.1em; text-align: center; padding: 10px; font-weight: bold;
+        }
+        #connBanner.banner-hid-fail { 
+            background: linear-gradient(90deg, #2a1a00, #1a1000); 
+            color: #ffcc00; border: 1px solid #aa8800;
+            font-size: 1.1em; text-align: center; padding: 10px; font-weight: bold;
+        }
+        .banner-dot { 
+            display: inline-block; width: 10px; height: 10px; 
+            border-radius: 50%; margin-right: 8px; vertical-align: middle;
+            box-shadow: 0 0 6px currentColor;
+        }
+        .gp-btn { width: 32px; height: 32px; border-radius: 4px; border: 1px solid #444; background: #222; font-size: 10px; color: #888; display: inline-flex; align-items: center; justify-content: center; }
+        .gp-btn.active { background: #242; border-color: #4c4; color: #4c4; font-weight: bold; }
+        .gp-axis-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; font-family: monospace; }
+        .gp-axis-bar-bg { width: 160px; height: 10px; background: #333; border-radius: 5px; position: relative; overflow: hidden; }
+        .gp-axis-bar { position: absolute; height: 100%; background: var(--lcars-cyan); border-radius: 5px; }
+        .cell.gp-active { border-color: #fc0 !important; background: #332 !important; box-shadow: 0 0 6px #fc0; }
+        #exportJsonBtn { display: none; }
     </style>
-</head>
 <body>
 
     <div class="lcars-frame">
@@ -298,17 +331,18 @@
 
         <div class="lcars-panel panel-nav">
             <div class="top-buttons">
-                <button id="connectBtn" onclick="connectHID()">🔌 Connect USB Gamepad</button>
+                <button id="connectBtn" onclick="connectHID()" style="display:none;">🔌 Connect HID</button>
                 
                 <label id="importBtnLabel" for="importFileInput" style="cursor: pointer;">📂 Import Profile</label>
                 <input type="file" id="importFileInput" accept=".h" style="display:none">
                 
                 <button id="exportBtn">⬇️ Export .H File</button>
                 <button id="saveSerialBtn" onclick="sendSerialData()">💾 SAVE</button>
+                <button id="exportJsonBtn" onclick="exportJSON()">📋 Export JSON</button>
                 <button id="diagToggle">🛠️ Diagnostics</button>
             </div>
             
-            <div class="status-banner" id="connBanner">🔴 NO DEVICE CONNECTED. CLICK 'CONNECT USB GAMEPAD' TO INITIALIZE WEBHID.</div>
+            <div class="status-banner banner-waiting" id="connBanner"><span class="banner-dot" style="background:#ff3300;"></span>Press any button on your pad to initialize...</div>
         </div>
 
         <div class="lcars-panel panel-visual">
@@ -322,6 +356,10 @@
                 <label style="color:var(--lcars-amber); font-weight:bold; margin-left:20px; cursor:pointer;">
                     <input type="checkbox" id="chkDiagonals" onchange="toggleDiagonals()" style="margin-right:5px; cursor:pointer;">
                     CONFIGURE DIAGONALS
+                </label>
+                <label style="color:var(--lcars-gold); font-weight:bold; margin-left:20px; cursor:pointer;" title="Force directional zones to analog axes regardless of Gamepad API">
+                    <input type="checkbox" id="chkForceAxis" style="margin-right:5px; cursor:pointer;" checked>
+                    FORCE AXIS
                 </label>
             </div>
 
@@ -509,6 +547,21 @@
                     </g>
                 </svg>
             </div>
+
+            <!-- GAMEPAD API STATE — horizontal bar below SVG, visible when pad connected -->
+            <div id="gpDiagSection" style="display:none; margin-top:10px; background:#050505; border:1px solid var(--lcars-cyan); border-radius:8px; padding:10px 14px; display:none;">
+                <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                    <div style="align-self:center; color:var(--lcars-cyan); font-size:0.85em; letter-spacing:2px; white-space:nowrap;">GAMEPAD API</div>
+                    <div>
+                        <div style="font-size:10px; color:#666; margin-bottom:5px; font-family:sans-serif;">BUTTONS</div>
+                        <div id="gpBtnPanel" style="display:flex; flex-wrap:wrap; gap:3px; max-width:500px;"></div>
+                    </div>
+                    <div style="flex:1; min-width:200px;">
+                        <div style="font-size:10px; color:#666; margin-bottom:5px; font-family:sans-serif;">AXES</div>
+                        <div id="gpAxesPanel" style="display:flex; flex-wrap:wrap; gap:6px 20px;"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="data-panel">
@@ -559,6 +612,7 @@
         <div class="pop-title">SELECT COLOR</div>
         <div class="pop-grid" id="popGrid"></div>
     </div>
+
 
     <script>
         // Custom dictionary provided by user
@@ -717,6 +771,14 @@
         };
 
         let hidDevice = null;
+        // --- GAMEPAD API ---
+        let gamepadIndex = null;       // index in navigator.getGamepads()
+        let gpPrevButtons = [];        // previous button states for edge detection
+        let gpPrevAxes = [];           // previous axes values
+        let gpLoopId = null;           // requestAnimationFrame id
+        let hidBaseline = new Uint8Array(64);   // HID baseline updated when pad at rest
+        let hidCurrent = new Uint8Array(64);    // latest HID report
+        let gpMappedHistory = new Set(); // avoid double-mapping same gamepad input
         let importedVid = 0;  // VID from imported .h file
         let importedPid = 0;  // PID from imported .h file
         let serialPort = null; // Persistent serial port — same pattern as memory.html
@@ -724,6 +786,24 @@
         let zoneBaselines = {}; // Stores baseline per zone at intercept time for XOR bitmask calculation
         let activeZoneId = null;
         let activeDefaultAction = null;
+
+        // Progressive default sequence for button zones — advances each time a button is mapped
+        const BTN_DEFAULT_SEQUENCE = ['F1', 'UP', 'F2', 'A-HLD', 'F3', 'A-OFF', 'A-TOG'];
+        let btnDefaultIndex = 0;
+
+        function nextBtnDefault() {
+            const action = BTN_DEFAULT_SEQUENCE[btnDefaultIndex % BTN_DEFAULT_SEQUENCE.length];
+            btnDefaultIndex++;
+            return action;
+        }
+
+        // Button zones — use progressive default
+        const BTN_ZONES = new Set([
+            'pad_btn_n','pad_btn_e','pad_btn_s','pad_btn_w',
+            'pad_l1','pad_r1','pad_sel','pad_sta',
+            'arc_b1','arc_b2','arc_b3','arc_b4','arc_b5','arc_b6',
+            'arc_t1','arc_t2','arc_t3'
+        ]);
         let activeZoneName = null;
         let mappedZones = {}; 
         let isDiagMode = false;
@@ -752,6 +832,8 @@
 
         // --- DIAGNOSTICS & GRID INIT ---
         let noiseCount = new Uint32Array(64);
+        let byteMinVal = new Uint8Array(64).fill(255); // track min value seen per byte
+        let byteMaxVal = new Uint8Array(64);           // track max value seen per byte
         let cellState = new Uint8Array(64); 
         
         let latestData = new Uint8Array(64);
@@ -787,7 +869,20 @@
             
             const sec = document.getElementById('diagSection');
             sec.style.display = isDiagMode ? 'block' : 'none';
-            
+
+            // Show Export JSON only in diag mode
+            document.getElementById('exportJsonBtn').style.display = isDiagMode ? 'inline-block' : 'none';
+
+            // Show Gamepad API panel if pad connected and diag open
+            const gpSec = document.getElementById('gpDiagSection');
+            if (isDiagMode && gamepadIndex !== null) {
+                const gp = navigator.getGamepads()[gamepadIndex];
+                if (gp) { initGpDiag(gp); }
+                gpSec.style.display = 'block';
+            } else {
+                gpSec.style.display = 'none';
+            }
+
             document.querySelectorAll('.val-manual').forEach(inp => {
                 inp.readOnly = !isDiagMode;
             });
@@ -1118,77 +1213,8 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                 return;
             }
 
-            const vid = hidDevice ? hidDevice.vendorId : (importedVid || 0);
-            const pid = hidDevice ? hidDevice.productId : (importedPid || 0);
-
-            let rules = [];
-            let dpadIndex = -1;
-            let analogX = [];
-            let analogY = [];
-
-            const FUNC_MAP = {
-                "JM_UP":0,"JM_UP_RIGHT":1,"JM_RIGHT":2,"JM_RIGHT_DOWN":3,
-                "JM_DOWN":4,"JM_DOWN_LEFT":5,"JM_LEFT":6,"JM_LEFT_UP":7,
-                "JM_FIRE":8,"JM_FIRE2":9,"JM_FIRE3":10,
-                "JM_AUTOFIRE_ON":11,"JM_AUTOFIRE_OFF":12,"JM_AUTOFIRE_HOLD":13,
-                "JM_AUTOLEFTRIGHT_ON":14,"JM_AUTOLEFTRIGHT_OFF":15
-            };
-
-            for (const zoneId in mappedZones) {
-                if (!mappedZones[zoneId]) continue;
-                let selInput = document.getElementById('sel_' + zoneId);
-                let hexInput = document.getElementById('hex_' + zoneId);
-                if (!selInput || !hexInput) continue;
-
-                let actionKey = selInput.value;
-                let hexStr = hexInput.value;
-                if (actionKey === "NONE") continue;
-
-                let index = 0;
-                let value = 0;
-
-                if (hexStr.includes("[B:")) {
-                    let match = hexStr.match(/\[B:(\d+)\s*=\s*(\d+)\]/);
-                    if (!match) match = hexStr.match(/\[B:(\d+)\s*==\s*(\d+)\]/);
-                    if (match) { index = parseInt(match[1]); value = parseInt(match[2]); }
-                    else continue;
-                } else if (hexStr.includes("[IDX:")) {
-                    let match = hexStr.match(/\[IDX:\s*(\d+)\]/);
-                    if (match) { index = parseInt(match[1]); value = 255; }
-                    else continue;
-                } else continue;
-
-                // Analog axes — collect indexes separately, don't add to rules
-                if (actionKey === "LS-X" || actionKey === "RS-X") {
-                    if (!analogX.includes(index)) analogX.push(index);
-                    continue;
-                }
-                if (actionKey === "LS-Y" || actionKey === "RS-Y") {
-                    if (!analogY.includes(index)) analogY.push(index);
-                    continue;
-                }
-
-                let funcEnum = ENUM_ACTION_TRANSLATOR[actionKey];
-                if (!funcEnum) continue;
-                let funcVal = FUNC_MAP[funcEnum];
-                if (funcVal === undefined) continue;
-
-                const isDirFunc = ["JM_UP","JM_DOWN","JM_LEFT","JM_RIGHT",
-                                   "JM_UP_RIGHT","JM_RIGHT_DOWN","JM_DOWN_LEFT","JM_LEFT_UP"].includes(funcEnum);
-                // HAT if it's a direction with value 0-7 (hat switch), EQ otherwise
-                const op = (isDirFunc && value <= 7) ? 2 : 0;
-                rules.push({ i: index, v: value, op: op, f: funcVal });
-                if (isDirFunc && dpadIndex < 0) dpadIndex = index;
-            }
-
-            if (rules.length === 0) {
-                alert("⚠️ No buttons mapped. Please map at least one action before saving.");
-                return;
-            }
-
-            let payload = { cmd: "save_jm", vid, pid, dpad_idx: dpadIndex,
-                use_analog: (analogX.length > 0 || analogY.length > 0) ? 1 : 0,
-                analog_x: analogX, analog_y: analogY, rules };
+            let payload = buildPayload();
+            if (!payload) return;
 
             try {
                 if (!serialPort) {
@@ -1255,6 +1281,96 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                 }
             }
         }
+
+        function buildPayload() {
+            const vid = hidDevice ? hidDevice.vendorId : (importedVid || 0);
+            const pid = hidDevice ? hidDevice.productId : (importedPid || 0);
+            let rules = [];
+            let dpadIndex = -1;
+            let analogX = [];
+            let analogY = [];
+
+            const FUNC_MAP = {
+                "JM_UP":0,"JM_UP_RIGHT":1,"JM_RIGHT":2,"JM_RIGHT_DOWN":3,
+                "JM_DOWN":4,"JM_DOWN_LEFT":5,"JM_LEFT":6,"JM_LEFT_UP":7,
+                "JM_FIRE":8,"JM_FIRE2":9,"JM_FIRE3":10,
+                "JM_AUTOFIRE_ON":11,"JM_AUTOFIRE_OFF":12,"JM_AUTOFIRE_HOLD":13,
+                "JM_AUTOLEFTRIGHT_ON":14,"JM_AUTOLEFTRIGHT_OFF":15
+            };
+
+            for (const zoneId in mappedZones) {
+                if (!mappedZones[zoneId]) continue;
+                let selInput = document.getElementById('sel_' + zoneId);
+                let hexInput = document.getElementById('hex_' + zoneId);
+                if (!selInput || !hexInput) continue;
+                let actionKey = selInput.value;
+                let hexStr = hexInput.value;
+                if (actionKey === "NONE") continue;
+
+                let index = 0, value = 0;
+                if (hexStr.includes("[B:")) {
+                    let match = hexStr.match(/\[B:(\d+)\s*=\s*(\d+)\]/);
+                    if (!match) match = hexStr.match(/\[B:(\d+)\s*==\s*(\d+)\]/);
+                    if (match) { index = parseInt(match[1]); value = parseInt(match[2]); }
+                    else continue;
+                } else if (hexStr.includes("[IDX:")) {
+                    let match = hexStr.match(/\[IDX:\s*(\d+)\]/);
+                    if (match) { index = parseInt(match[1]); value = 255; }
+                    else continue;
+                } else continue;
+
+                if (actionKey === "LS-X" || actionKey === "RS-X") { if (!analogX.includes(index)) analogX.push(index); continue; }
+                if (actionKey === "LS-Y" || actionKey === "RS-Y") { if (!analogY.includes(index)) analogY.push(index); continue; }
+
+                // Direction zones captured as IDX (axis) → route to analog
+                if (hexStr.includes("[IDX:")) {
+                    const isXDir = ["LEFT","RIGHT","UP-R","DN-R","DN-L","UP-L"].includes(actionKey);
+                    const isYDir = ["UP","DOWN"].includes(actionKey);
+                    if (isXDir && !analogX.includes(index)) { analogX.push(index); continue; }
+                    if (isYDir && !analogY.includes(index)) { analogY.push(index); continue; }
+                    continue; // IDX on direction — skip rule
+                }
+
+                let funcEnum = ENUM_ACTION_TRANSLATOR[actionKey];
+                if (!funcEnum) continue;
+                let funcVal = FUNC_MAP[funcEnum];
+                if (funcVal === undefined) continue;
+
+                const isDirFunc = ["JM_UP","JM_DOWN","JM_LEFT","JM_RIGHT",
+                                   "JM_UP_RIGHT","JM_RIGHT_DOWN","JM_DOWN_LEFT","JM_LEFT_UP"].includes(funcEnum);
+                // HAT op only for actual dpad zones — not face buttons mapped to directions
+                const isDpadZone = DIR_ZONES.has(zoneId) && !zoneId.includes('ls') && !zoneId.includes('rs');
+                const op = (isDirFunc && isDpadZone && value <= 7) ? 2 : 0;
+                rules.push({ i: index, v: value, op: op, f: funcVal });
+                if (isDirFunc && isDpadZone && dpadIndex < 0) dpadIndex = index;
+            }
+
+            if (rules.length === 0 && analogX.length === 0 && analogY.length === 0) {
+                alert("⚠️ No buttons mapped.");
+                return null;
+            }
+
+            return { cmd: "save_jm", vid, pid, dpad_idx: dpadIndex,
+                use_analog: (analogX.length > 0 || analogY.length > 0) ? 1 : 0,
+                analog_x: analogX, analog_y: analogY, rules };
+        }
+
+        function exportJSON() {
+            const payload = buildPayload();
+            if (!payload) return;
+            const json = JSON.stringify(payload, null, 2);
+            const blob = new Blob([json], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            const deviceName = hidDevice ? hidDevice.productName.replace(/[^a-z0-9]/gi, '_') : "pad";
+            a.download = `${deviceName}_${payload.vid}_${payload.pid}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
         // --- IMPORT LOGIC ---
         document.getElementById('importFileInput').addEventListener('change', function(e) {
             const file = e.target.files[0]; 
@@ -1274,10 +1390,12 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
 
                     document.getElementById('actionTbody').innerHTML = '';
                     document.getElementById('actionTable').style.display = 'none';
-                    mappedZones = {};
+                    mappedZones = {}; gpAxisToHidByte.clear(); btnDefaultIndex = 0;
                     zoneBaselines = {};
-                    document.querySelectorAll('.btn-zone').forEach(zone => {
+                    document.querySelectorAll('.btn-zone, .zone-btn').forEach(zone => {
                         zone.classList.remove('bound');
+                        zone.style.borderColor = '';
+                        zone.style.backgroundColor = '';
                         const shape = zone.querySelector('.shape');
                         if (shape) { shape.style.fill = ''; shape.style.stroke = ''; }
                         const label = zone.querySelector('.dynamic-label');
@@ -1442,20 +1560,17 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
 
             document.getElementById('actionTbody').innerHTML = '';
             document.getElementById('actionTable').style.display = 'none';
-            mappedZones = {};
+            mappedZones = {}; gpAxisToHidByte.clear(); btnDefaultIndex = 0;
             zoneBaselines = {};
 
-            document.querySelectorAll('.btn-zone').forEach(zone => {
+            document.querySelectorAll('.btn-zone, .zone-btn').forEach(zone => {
                 zone.classList.remove('bound');
+                zone.style.borderColor = '';
+                zone.style.backgroundColor = '';
                 const shape = zone.querySelector('.shape');
-                if (shape) {
-                    shape.style.fill = '';
-                    shape.style.stroke = '';
-                }
+                if (shape) { shape.style.fill = ''; shape.style.stroke = ''; }
                 const label = zone.querySelector('.dynamic-label');
-                if (label) {
-                    label.textContent = '';
-                }
+                if (label) label.textContent = '';
             });
         }
 
@@ -1469,12 +1584,232 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                 if (devices.length > 0) {
                     hidDevice = devices[0];
                     await hidDevice.open();
-                    document.getElementById('connBanner').className = 'status-banner connected';
-                    document.getElementById('connBanner').innerText = `🟢 ONLINE: ${hidDevice.productName}`;
+                    const banner = document.getElementById('connBanner');
+                    banner.className = 'connected';
+                    banner.innerHTML = `<span class="banner-dot" style="background:#44ff44;"></span>ONLINE: ${hidDevice.productName}`;
                     document.getElementById('connectBtn').style.display = 'none';
                     hidDevice.addEventListener('inputreport', handleInputReport);
+                    startGamepadLoop();
+                } else {
+                    hidCancelled();
                 }
-            } catch (error) { console.error(error); }
+            } catch (error) {
+                // User cancelled or error
+                hidCancelled();
+            }
+        }
+
+        function hidCancelled() {
+            const banner = document.getElementById('connBanner');
+            banner.className = 'banner-hid-fail';
+            banner.innerHTML = `<span class="banner-dot" style="background:#ffcc00;"></span>HID not connected — 
+                <button onclick="connectHID()" style="background:var(--lcars-cyan); color:#000; border:none; border-radius:4px; padding:4px 12px; cursor:pointer; font-weight:bold; font-family:'Oswald',sans-serif;">🔌 Retry HID</button> &nbsp;
+                <button onclick="location.reload()" style="background:#333; color:#eee; border:1px solid #666; border-radius:4px; padding:4px 10px; cursor:pointer; font-family:'Oswald',sans-serif;">🔄 Reload</button>`;
+        }
+
+        // --- GAMEPAD API LOOP ---
+        window.addEventListener('gamepadconnected', (e) => {
+            gamepadIndex = e.gamepad.index;
+            gpPrevButtons = Array.from(e.gamepad.buttons).map(b => b.pressed);
+            gpPrevAxes = Array.from(e.gamepad.axes);
+            console.log('🎮 Gamepad connected:', e.gamepad.id);
+            initGpDiag(e.gamepad);
+            // gpDiagSection visibility controlled by diagToggle — only show if already open
+            if (isDiagMode) document.getElementById('gpDiagSection').style.display = 'block';
+
+            const banner = document.getElementById('connBanner');
+            banner.className = 'banner-gp-ok';
+            banner.innerHTML = `<span class="banner-dot" style="background:#ffcc00;"></span>Pad detected: <strong>${e.gamepad.id.split('(')[0].trim()}</strong> &nbsp;&mdash;&nbsp; Click here to start &rarr; &nbsp;
+                <button onclick="connectHID()" style="background:var(--lcars-cyan); color:#000; border:none; border-radius:4px; padding:4px 12px; cursor:pointer; font-weight:bold; font-family:'Oswald',sans-serif;">🔌 Connect HID</button>`;
+
+            startGamepadLoop();
+        });
+
+        window.addEventListener('gamepaddisconnected', (e) => {
+            if (e.gamepad.index === gamepadIndex) {
+                gamepadIndex = null;
+                gpPrevButtons = [];
+                gpPrevAxes = [];
+                document.getElementById('gpDiagSection').style.display = 'none';
+            }
+        });
+
+        function initGpDiag(gp) {
+            const btnPanel = document.getElementById('gpBtnPanel');
+            btnPanel.innerHTML = '';
+            for (let i = 0; i < gp.buttons.length; i++) {
+                const d = document.createElement('div');
+                d.className = 'gp-btn';
+                d.id = `gp-btn-${i}`;
+                d.title = `Button ${i}`;
+                d.textContent = i;
+                btnPanel.appendChild(d);
+            }
+            // Build axis bars
+            const axesPanel = document.getElementById('gpAxesPanel');
+            axesPanel.innerHTML = '';
+            for (let i = 0; i < gp.axes.length; i++) {
+                axesPanel.innerHTML += `
+                    <div class="gp-axis-row">
+                        <span style="color:#888; width:20px;">A${i}</span>
+                        <div class="gp-axis-bar-bg">
+                            <div class="gp-axis-bar" id="gp-axis-bar-${i}" style="left:50%;width:0;"></div>
+                        </div>
+                        <span id="gp-axis-val-${i}" style="color:#4af; width:40px;">0.00</span>
+                    </div>`;
+            }
+        }
+
+        function updateGpDiag(gp) {
+            for (let i = 0; i < gp.buttons.length; i++) {
+                const el = document.getElementById(`gp-btn-${i}`);
+                if (el) el.classList.toggle('active', gp.buttons[i].pressed);
+            }
+            for (let i = 0; i < gp.axes.length; i++) {
+                const val = gp.axes[i]; // -1.0 to +1.0
+                const bar = document.getElementById(`gp-axis-bar-${i}`);
+                const valEl = document.getElementById(`gp-axis-val-${i}`);
+                if (bar) {
+                    // Center at 50%, extend left or right
+                    const pct = val * 50;
+                    if (pct >= 0) { bar.style.left = '50%'; bar.style.width = pct + '%'; }
+                    else { bar.style.left = (50 + pct) + '%'; bar.style.width = (-pct) + '%'; }
+                    bar.style.background = Math.abs(val) > 0.5 ? '#fc0' : '#4af';
+                }
+                if (valEl) valEl.textContent = val.toFixed(2);
+            }
+        }
+
+        function startGamepadLoop() {
+            if (gpLoopId) return;
+            function loop() {
+                gpLoopId = requestAnimationFrame(loop);
+                if (gamepadIndex === null) return;
+                const gp = navigator.getGamepads()[gamepadIndex];
+                if (!gp) return;
+
+                // Update diagnostic panel
+                updateGpDiag(gp);
+
+                let isInteracting = false;
+
+                // Check buttons
+                for (let i = 0; i < gp.buttons.length; i++) {
+                    const pressed = gp.buttons[i].pressed;
+                    if (pressed) isInteracting = true;
+                    // Rising edge: was not pressed, now pressed
+                    if (pressed && !(gpPrevButtons[i])) {
+                        console.log(`🔘 Button ${i} pressed, activeZoneId=${activeZoneId}, hidDevice=${!!hidDevice}`);
+                        if (activeZoneId) gpCorrelate('button', i);
+                        else gpHighlightCell(findBestHidByte());
+                    }
+                    gpPrevButtons[i] = pressed;
+                }
+
+                // Check axes
+                for (let i = 0; i < gp.axes.length; i++) {
+                    const val = gp.axes[i];
+                    if (Math.abs(val) > 0.3) isInteracting = true;
+                    // Threshold crossed
+                    const prevVal = gpPrevAxes[i] !== undefined ? gpPrevAxes[i] : 0;
+                    if (Math.abs(val) > 0.3 && Math.abs(prevVal) <= 0.3) {
+                        console.log(`🕹️ Axis ${i} crossed threshold: ${val.toFixed(2)}, activeZoneId=${activeZoneId}`);
+                        if (!hidDevice) { break; }
+                        if (activeZoneId) gpCorrelate('axis', i);
+                        else gpHighlightCell(findBestHidByte());
+                    }
+                    gpPrevAxes[i] = val;
+                }
+
+                // Update HID baseline when pad at rest
+                if (!isInteracting && !activeZoneId) {
+                    hidBaseline.set(hidCurrent);
+                }
+            }
+            loop();
+        }
+
+        // Direction zones — use Gamepad API + HID correlator
+        const DIR_ZONES = new Set([
+            'pad_up','pad_down','pad_left','pad_right',
+            'pad_up_r','pad_dn_r','pad_dn_l','pad_up_l',
+            'arc_up','arc_down','arc_left','arc_right',
+            'arc_up_r','arc_dn_r','arc_dn_l','arc_up_l',
+            'pad_ls_x','pad_ls_y','pad_rs_x','pad_rs_y',
+            'arc_ls_x','arc_ls_y'
+        ]);
+
+        // Axis memory: gpAxisIndex → hidByte — so opposite directions reuse same IDX
+        const gpAxisToHidByte = new Map();
+        let gpLastEventWasAxis = false; // tracks if last gpCorrelate event was axis or button
+
+        function findBestHidByte() {
+            let bestByte = -1, bestDiff = 0;
+            for (let i = 0; i < hidCurrent.length; i++) {
+                if (cellState[i] === 1) continue;
+                const d = Math.abs(hidCurrent[i] - hidBaseline[i]);
+                if (d > bestDiff) { bestDiff = d; bestByte = i; }
+            }
+            console.log(`findBestHidByte: bestByte=${bestByte} bestDiff=${bestDiff} current=${Array.from(hidCurrent).slice(0,6)} baseline=${Array.from(hidBaseline).slice(0,6)}`);
+            return bestByte >= 0 && bestDiff >= 1 ? bestByte : -1;
+        }
+
+        let gpHighlightTimer = null;
+        function gpHighlightCell(byteIdx) {
+            if (byteIdx < 0) return;
+            // Only highlight if diagnostics is already open
+            if (!isDiagMode) return;
+            document.querySelectorAll('.cell.gp-active').forEach(c => c.classList.remove('gp-active'));
+            const cell = document.getElementById(`cell-${byteIdx}`);
+            if (cell) {
+                cell.classList.add('gp-active');
+                clearTimeout(gpHighlightTimer);
+                gpHighlightTimer = setTimeout(() => cell.classList.remove('gp-active'), 1500);
+            }
+        }
+
+        function gpCorrelate(type, gpIndex) {
+            if (!activeZoneId || !DIR_ZONES.has(activeZoneId)) return;
+
+            const forceAxis = document.getElementById('chkForceAxis').checked;
+            const effectiveType = forceAxis ? 'axis' : type;
+
+            if (effectiveType === 'axis') {
+                // Axis → IDX format → will go to analog_x/y
+                if (gpAxisToHidByte.has(gpIndex)) {
+                    const knownByte = gpAxisToHidByte.get(gpIndex);
+                    gpHighlightCell(knownByte);
+                    processIntercept(`[IDX: ${knownByte}]`);
+                    return;
+                }
+                let bestByte = -1, bestDiff = 0;
+                for (let i = 0; i < hidCurrent.length; i++) {
+                    if (cellState[i] === 1) continue;
+                    const d = Math.abs(hidCurrent[i] - hidBaseline[i]);
+                    if (d > bestDiff) { bestDiff = d; bestByte = i; }
+                }
+                console.log(`gpCorrelate: axis ${gpIndex} bestByte=${bestByte} bestDiff=${bestDiff} baseline=${Array.from(hidBaseline).slice(0,4)} current=${Array.from(hidCurrent).slice(0,4)}`);
+                if (bestByte < 0 || bestDiff < 5) return;
+                gpHighlightCell(bestByte);
+                gpAxisToHidByte.set(gpIndex, bestByte);
+                processIntercept(`[IDX: ${bestByte}]`);
+            } else {
+                // Button → use WebHID XOR directly
+                if (!baselineData) return;
+                let bestByte = -1, bestDiff = 0;
+                for (let i = 0; i < hidCurrent.length; i++) {
+                    if (cellState[i] === 1) continue;
+                    const d = Math.abs(hidCurrent[i] - baselineData[i]);
+                    if (d > 0 && d < 255 && d > bestDiff) { bestDiff = d; bestByte = i; }
+                }
+                if (bestByte < 0) return;
+                gpHighlightCell(bestByte);
+                const bsl = baselineData[bestByte];
+                const val = hidCurrent[bestByte];
+                const xorVal = val ^ bsl;
+                const hexVal = (xorVal > 0 && xorVal < 255) ? xorVal : val;
+                processIntercept(`[B:${bestByte} = ${hexVal}]`);
+            }
         }
 
         function startListening(zoneId, zoneName, defaultAction) {
@@ -1482,7 +1817,9 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
             
             activeZoneId = zoneId;
             activeZoneName = zoneName;
-            activeDefaultAction = defaultAction;
+            // Button zones get progressive default, others use their fixed default
+            activeDefaultAction = BTN_ZONES.has(zoneId) ? nextBtnDefault() : defaultAction;
+            gpLastEventWasAxis = false;
 
             const titleElem = document.getElementById('modalTitle');
             const zoneElem = document.getElementById('modalZoneName');
@@ -1541,35 +1878,39 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
             // FAST BUFFER COPY
             for(let i=0; i<data.length; i++) {
                 latestData[i] = data[i];
+                hidCurrent[i] = data[i];  // keep hidCurrent in sync for Gamepad API correlator
             }
 
             // BACKGROUND LOGIC
             if (activeZoneId) {
-                let isAnalog = activeZoneName.includes('STICK');
+                // Fire/action zones: always use WebHID XOR — skip Gamepad API
+                // Direction zones: use WebHID only if Gamepad API not present or said "button"
+                const isDirZone = DIR_ZONES.has(activeZoneId);
+                const isStick = activeZoneName.includes('STICK');
+
                 for (let i = 0; i < data.length; i++) {
                     if (cellState[i] === 1) continue; 
 
                     let diff = Math.abs(data[i] - baselineData[i]);
-                    if (isAnalog) {
+                    if (isStick) {
                         if (diff > 80) { 
                             processIntercept(`[IDX: ${i}]`); 
                             baselineData = new Uint8Array(data); 
                             return; 
                         }
+                    } else if (isDirZone && gamepadIndex !== null) {
+                        // Fully handled by gpCorrelate — axis→IDX, button→XOR
+                        // Nothing to do here
                     } else {
                         if (diff > 0 && diff < 255) {
-                            let xorVal = data[i] ^ baselineData[i];
-                            let hexVal;
-                            if (data[i] <= 7) {
-                                // Hat switch position — use pressed value directly
-                                hexVal = data[i];
-                            } else if (xorVal > 0 && xorVal < 255) {
-                                // Bitmask button — use XOR to isolate changed bits
-                                hexVal = xorVal;
+                            const forceAxis = document.getElementById('chkForceAxis').checked;
+                            if (isDirZone && forceAxis) {
+                                processIntercept(`[IDX: ${i}]`);
                             } else {
-                                hexVal = data[i];
+                                let xorVal = data[i] ^ baselineData[i];
+                                let hexVal = (xorVal > 0 && xorVal < 255) ? xorVal : data[i];
+                                processIntercept(`[B:${i} = ${hexVal.toString(10)}]`);
                             }
-                            processIntercept(`[B:${i} = ${hexVal.toString(10)}]`); 
                             baselineData = new Uint8Array(data); 
                             return;
                         }
@@ -1594,8 +1935,10 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                 if(v !== lastReportUi[i]) {
                     noiseCount[i]++; 
                     lastReportUi[i] = v;
-                    
-                    if (cellState[i] === 0 && noiseCount[i] > 30) { 
+                    // Track min/max for smart blacklist
+                    if (v < byteMinVal[i]) byteMinVal[i] = v;
+                    if (v > byteMaxVal[i]) byteMaxVal[i] = v;
+                    if (cellState[i] === 0 && noiseCount[i] > 150) { 
                         cellState[i] = 1; 
                         updateCellUI(i); 
                     }
@@ -1717,21 +2060,21 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
             
             if (!targetEl) return;
             
-            targetEl.classList.add('bound');
-            targetEl.classList.remove('mandatory');
-            
-            targetEl.querySelector('.shape').style.fill = color + "44";
-            targetEl.querySelector('.shape').style.stroke = color;
-            
-            const labelEl = targetEl.querySelector('.dynamic-label');
-            if (labelEl) {
-                if(actionKey === "NONE") {
-                    labelEl.textContent = ""; 
-                } else {
-                    labelEl.textContent = ACTION_DICT[actionKey].label; 
-                    labelEl.style.fill = "#ffffff";
-                }
+            if (actionKey === "NONE") {
+                targetEl.classList.remove('bound');
+                targetEl.style.borderColor = '';
+                targetEl.style.backgroundColor = '';
+            } else {
+                targetEl.classList.add('bound');
+                targetEl.style.borderColor = color;
+                targetEl.style.backgroundColor = color + "33";
             }
+
+            // legacy SVG support (no-op if elements don't exist)
+            const shapeEl = targetEl.querySelector('.shape');
+            if (shapeEl) { shapeEl.style.fill = color + "44"; shapeEl.style.stroke = color; }
+            const labelEl = targetEl.querySelector('.dynamic-label');
+            if (labelEl) labelEl.textContent = (actionKey === "NONE") ? "" : ACTION_DICT[actionKey].label;
         }
 
         function cancelListen() {
@@ -1740,5 +2083,6 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
             activeZoneId = null;
         }
     </script>
+
 </body>
 </html>
