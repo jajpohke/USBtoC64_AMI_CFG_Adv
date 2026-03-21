@@ -8,7 +8,7 @@ For advanced diagnostics and developer tools, see [DEVELOPER.md](DEVELOPER.md).
 
 ## 1. Flashing the Firmware
 
-> Skip this section if your board already has the firmware installed.
+> Skip this section if your board already has this fork firmware installed.
 
 ### What you need
 
