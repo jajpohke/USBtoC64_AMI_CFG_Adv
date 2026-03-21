@@ -4,11 +4,39 @@ An ESP32-S3 firmware to connect modern USB controllers and mice to classic **Com
 
 This is a fork of the [original USBtoC64 project](https://github.com/emanuelelaface/USBtoC64) by Emanuele Laface.
 
+This fork was born with a few specific goals: improving compatibility with stubborn controllers that don't work out of the box, adding Fire 2 and Fire 3 support on both C64 and Amiga, and offering a more user-friendly experience — without needing the Arduino IDE or reflashing the board every time something needs to change. Most configuration is handled directly from the browser via the [built-in web configurator](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html).
+
+For a full setup walkthrough, see the [Getting Started guide](GETSTARTED.md).
+
+### ⚠️ Features not implemented in this fork
+
+The following features from the original project are **not** available in this fork:
+
+- Joystick-to-mouse emulation
+- Mouse-to-joystick emulation
+- Live reconfiguration via the BOOT button
+- Atari Mouse support
+
+**On mouse support:** C64 SID 1351 proportional mouse support is particularly complex. We have tried to replicate the behaviour from Emanuele's original firmware as closely as possible, adding only the ability to adjust pointer speed via the web configurator. No issues have been found during testing, but we do not have the equipment to guarantee full correctness across all hardware revisions.
+
+If you need any of the above features, or run into mouse-related issues, we recommend flashing the original firmware — it only takes a few seconds using the [esptool web flasher](https://espressif.github.io/esptool-js/).
+
 ---
 
 > ⚠️ **THIS PROJECT IS EXPERIMENTAL AND NOT COMMERCIAL. USE AT YOUR OWN RISK.**
 
 > 🆘 **Something not working?** See the [Troubleshooting & FAQ](TROUBLESHOOTING.md) page.
+
+---
+
+## 📖 Documentation
+
+- [🚀 Getting Started](GETSTARTED.md) — flash the firmware, verify the connection, configure your first controller
+- [🎮 Controller Support](JOYSTICKGUIDE.md) — supported pads, plug & play profiles, mapping guide
+- [🚥 LED Guide](LEDGUIDE.md) — status colors, behaviour, customisation
+- [🛠️ Service Menu](SERVICEMENUGUIDE.md) — serial console, advanced commands, coloradj
+- [✨ What's New](#whats-new-in-v12) — v1.2 changelog
+- [🤝 Credits](#credits)
 
 ---
 
@@ -52,152 +80,6 @@ This is a fork of the [original USBtoC64 project](https://github.com/emanuelelaf
 
 [![Schematic](https://github.com/emanuelelaface/USBtoC64/raw/main/images/schematic.jpeg)](https://github.com/emanuelelaface/USBtoC64/blob/main/images/schematic.jpeg)
 
-### GPIO Pin Mapping
-
-| GPIO | Name | Circuit | Function |
-|---|---|---|---|
-| GP3 | `GP_FIRE3` | Direct → DB9 | Fire 3 / POT Y signal in joystick mode |
-| GP4 | `GP_POTX` | 150Ω + BAT43 → DB9 | POT X driver for SID mouse |
-| GP5 | `GP_FIRE2` | Direct → DB9 | Fire 2 |
-| GP6 | `GP_POTY` | 150Ω + BAT43 → DB9 | POT Y driver for SID mouse |
-
----
-
-## 🚀 Installation
-
-### Option A — Flash the precompiled binary (recommended)
-
-1. Disconnect the adapter from the C64/Amiga.
-2. Hold the **BOOT** button, connect the board via USB-C, wait one second, then release.
-3. Open [esptool web flasher](https://espressif.github.io/esptool-js/) in Chrome, click **Connect**, set Flash Address to `0x0000`, and upload the `.bin` file.
-
-Or via Python:
-```bash
-pip install esptool
-esptool.py -b 921600 -c esp32s3 -p <PORT> write_flash --flash_freq 80m 0x00000 USBtoC64_Adv.bin
-```
-
-### Option B — Compile from source (Arduino IDE)
-
-1. Install the **ESP32S3 Dev Module** board in Arduino IDE.
-2. Install the [ESP32_USB_Host_HID](https://github.com/esp32beans/ESP32_USB_Host_HID) library (`Sketch → Include Library → Add .ZIP Library`).
-3. Open `USBtoC64_Adv.ino` and upload.
-
----
-
-## 💻 Web UI — Browser Configuration (v1.2)
-
-Once the firmware is running, connect the adapter via USB-C to your PC. Open any of the web pages in the [`configurator/` folder](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html) in Chrome (WebSerial and WebHID are required — Firefox is not supported).
-
-| Page | Purpose |
-|---|---|
-| [`index.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html) | Main hub — access all pages |
-| [`configurator.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/configurator.html) | Map USB controller buttons visually, save mapping to ESP32 |
-| [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) | Customize all LED colors, select GRB/RGB format |
-| [`memory.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/memory.html) | System settings, NVS memory status, factory reset |
-| [`mouse.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/mouse.html) | Mouse speed and mode settings |
-
-All settings are saved to NVS and survive reboots. When you change the **LED format (GRB/RGB)**, the page will prompt you to refresh after saving — this is expected.
-
----
-
-## 🚥 LED Status
-
-### Boot / Idle
-
-| Color | Meaning |
-|---|---|
-| 🟠 Orange | C64 mode — waiting for controller |
-| ⚪ White | Amiga mode — waiting for controller |
-
-### Controller Active
-
-| Color | Meaning |
-|---|---|
-| 🟣 Purple | Direction pressed |
-| 🟢 Green | Fire 1 |
-| 🔴 Red | Fire 2 |
-| 🩵 Cyan | Fire 3 |
-| 🔵 Blue | Alt UP (Jump) |
-| 🟡 Yellow (blinking) | Autofire active |
-
-> All colors are customizable via [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) or via `coloradj` in the service menu.
-
-> **Wrong colors?** Your board may have RGB/GRB swapped. Fix it in [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) → LED Format selector, or via `service → coloradj`.
-
----
-
-## 🛠️ Service Menu (Serial Console)
-
-For advanced diagnostics. Connect a USB-to-TTL serial adapter to **GPIO 44 (RX)** and **GPIO 43 (TX)** at **115200 baud, 8N1, newline line ending**. Then open a serial terminal and type `service`.
-
-| Command | Available | Description |
-|---|---|---|
-| `new` | Normal + Dev | Map a new controller via wizard (hardware learning or serial sniffer) |
-| `raw` | Normal + Dev | Show live raw USB hex stream |
-| `test` | Normal + Dev | Print logical button outputs |
-| `lag` | Normal + Dev | Measure USB polling rate and input lag |
-| `mousetest` | Normal + Dev | Mouse packet analysis and speed benchmark |
-| `gpio` | Normal + Dev | Real-time DB9 pin state dashboard |
-| `coloradj` | **Always** | Interactive LED color calibration — adjust R/G/B live, save to NVS |
-| `ledtest` | Dev only | Cycle all 10 palette colors on the LED (1.2s each) |
-| `devmode on/off` | Always | Enable/disable developer mode (requires reboot) |
-| `info` | Standalone | Show NVS memory status |
-| `factory` | Standalone | Erase all saved settings and reboot |
-| `amiga` / `c64` | Normal + Dev | Force console mode for bench testing |
-| `reboot` | Always | Soft reboot |
-| `flash` | Always | Reboot into DFU/programming mode (no BOOT button needed) |
-| `exit` | Always | Return to zero-lag play mode |
-
-### `coloradj` — Color Calibration
-
-Type `coloradj` to enter the interactive menu. Select a color slot (1–8), then use:
-
-```
-r+  r-  g+  g-  b+  b-     → adjust by current step (default: 1)
-r++ r-- g++ g-- b++ b--     → adjust by 5
-step N                       → change step size (1–50)
-save                         → write to NVS
-back                         → return without saving
-reset                        → restore all firmware defaults
-```
-
-The LED updates in real time as you type. Changes are shared with [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) — both write to the same NVS blob.
-
----
-
-## 🎮 Controller Support
-
-### Plug & Play (pre-configured native profiles)
-
-| Controller | Notes |
-|---|---|
-| PlayStation 4 (original) | Full support |
-| HORI Mini 4 | Full support |
-| Buffalo Classic USB | Full support |
-| HoriPad GameCube (Pokémon / Peach) | Full support |
-| SNES Wi-Fi clone (D-input) | Full support |
-| NES2USB RetroBit | Full support |
-| USB2SNES Mayflash | Full support |
-| China Arcade PS3/PC | Full support |
-| Zero Lag China clone | Full support |
-| Xbox One | ❌ Not supported |
-
-> For a complete and updated list, see [SUPPORTED_PADS.md](SUPPORTED_PADS.md).
-
-### Mapping a New Controller
-
-**Quick way — Web UI (no recompile):**
-1. Connect the controller and open [`configurator.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/configurator.html).
-2. Map all buttons visually and click **💾 SAVE**.
-3. Done — the mapping is saved to NVS and active immediately on every boot.
-
-**Permanent way — native C++ profile (zero latency, built-in):**
-1. Map the controller via [`configurator.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/configurator.html) first to understand the button layout.
-2. Open a serial terminal, type `service` → `new` → choose option **2 (Serial Sniffer)**.
-3. Press each button when prompted. The adapter outputs a ready-to-paste C++ block.
-4. Copy it into `JoystickProfiles.h` and recompile.
-
 ---
 
 ## ⚠️ Known Hardware Quirks
@@ -205,6 +87,8 @@ The LED updates in real time as you type. Changes are shared with [`led.html`](h
 **HORI Mini Fighting Stick (PS3/PS4):** May not be recognized on cold boot. Fix: press RESET on the ESP32 after the controller is connected, or unplug/replug the USB cable.
 
 **SNES wireless dongle clones:** Plug the dongle only *after* the adapter has fully booted (LED shows orange or white). Plugging it in during boot may hang the USB host.
+
+**Nintendo Switch licensed controllers (e.g. Cuphead edition):** Some Switch-branded controllers are protocol-compatible and are recognized by the adapter, but several units tested caused a continuous reboot loop on the ESP32. If your Switch controller triggers this behaviour, it is currently unsupported.
 
 **C64/Amiga slide switch:** The physical slide switch on the board selects the console mode. Changing its position while the adapter is powered triggers an automatic reboot, after which the new mode is applied. There is no software override for normal use — always set the switch before connecting the adapter.
 
