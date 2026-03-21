@@ -116,11 +116,45 @@ Once all zones are mapped as desired, click **💾 SAVE**. The mapping is writte
 
 ### Pre-configured profiles
 
-If your controller is in the [supported list](SUPPORTED_PADS.md), it will be recognised automatically without any manual mapping needed. The saved NVS mapping (if present) always takes priority over the built-in profile.
+If your controller is in the [supported list](JOYSTICKGUIDE.md), it will be recognised automatically without any manual mapping needed. The saved NVS mapping (if present) always takes priority over the built-in profile.
 
 ---
 
-## 5. What's Next
+## 5. Using the Diagnostics Panel
+
+The **DIAGNOSTICS** button becomes available once the controller is connected and the status banner is green. Click it to reveal the **Live Data Stream** panel alongside the mapping table.
+
+### Live Data Stream grid
+
+The grid displays up to 64 bytes of raw HID data from your controller, updated in real time. Each cell shows its byte index and current value. When a byte changes value frequently on its own — without you pressing anything — it is flagged in orange and automatically blacklisted after a threshold. This prevents gyroscopes, rotary encoders, or noisy analogue axes from polluting the mapping.
+
+You can also manage individual bytes manually by clicking directly on a cell:
+- **Red border** — byte is blocked: the configurator will ignore it completely
+- **Green border** — byte is forced/allowed: the configurator will always consider it, even if it would normally be auto-blacklisted
+
+### Manual value entry
+
+When the configurator's automatic detection fails — for example, if the listening window closes before intercepting a clean signal — you can enter the mapping manually. Read the byte index and value directly from the Diagnostics grid, then type them into the manual input field in the listening modal using the format `byte:value` (e.g. `5:128`). For analogue axes, use the format `IDX:3`.
+
+The value field in the **Assignment Registry** table is also editable when Diagnostics mode is active, so you can correct an already-mapped zone without re-triggering the listening process.
+
+---
+
+## 6. Diagonal Mapping
+
+Most controllers generate diagonal directions by activating two cardinal signals simultaneously (e.g. UP + RIGHT = UP-RIGHT). These are handled automatically and require no extra configuration.
+
+However, some digital D-pads — particularly older or budget controllers — assign a unique byte value to each diagonal direction rather than combining two signals. On these pads, after mapping the four cardinal directions you may find that the diagonals simply do not work.
+
+If that happens, map the diagonal zones explicitly: click each diagonal zone on the SVG layout (↗ ↘ ↙ ↖) and press the corresponding diagonal on your controller, exactly as you would for any other button. The configurator will intercept the unique value for that diagonal.
+
+If automatic detection is unreliable — for example, because the D-pad is small and pressing a diagonal also briefly triggers a cardinal value — use the Diagnostics panel instead: observe the correct stable value in the Live Data Stream grid and enter it manually using the `byte:value` format described above.
+
+> Diagonal zones are only needed for controllers that produce unique HID values for diagonals. If your pad works correctly after mapping just the four cardinal directions, you can leave the diagonal zones unmapped.
+
+---
+
+## 7. What's Next
 
 - Customise LED colors → [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html)
 - Adjust mouse speed and mode → [`mouse.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/mouse.html)
