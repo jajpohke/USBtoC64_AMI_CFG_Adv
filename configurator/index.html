@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USB2C64_ADV — LCARS CORE INTERFACE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:      #000000;
+            --purp:    #CC66FF;
+            --mauve:   #CC99CC;
+            --fuchsia: #FF99CC;
+            --peach:   #FFCC99;
+            --amber:   #FFCC00;
+            --orange:  #FF9900;
+            --teal:    #009688;
+            --cyan:    #99CCFF;
+            --blue:    #6699CC;
+            --green:   #33CC66;
+            --red:     #CC3333;
+            --text:    #E8E8E8;
+            --dim:     #888888;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* ═══════════════════════════════════════
+           SCAN-LINE OVERLAY
+        ═══════════════════════════════════════ */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.08) 2px,
+                rgba(0,0,0,0.08) 4px
+            );
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* ═══════════════════════════════════════
+           TOP HEADER BAR
+        ═══════════════════════════════════════ */
+        .lcars-top {
+            display: flex;
+            height: 80px;
+            flex-shrink: 0;
+            animation: fadeIn 0.4s ease both;
+        }
+
+        /* Left rounded cap */
+        .top-elbow {
+            width: 200px;
+            background: var(--purp);
+            border-bottom-left-radius: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .top-elbow::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+        }
+        .top-elbow-label {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #000;
+            letter-spacing: 2px;
+            z-index: 1;
+        }
+
+        /* Separator gap */
+        .top-gap { width: 12px; background: var(--bg); flex-shrink: 0; }
+
+        /* Title band */
+        .top-title-band {
+            flex-grow: 1;
+            background: var(--fuchsia);
+            display: flex;
+            align-items: center;
+            padding: 0 30px;
+            gap: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        .top-title-band::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, transparent 40%);
+        }
+        .top-title-text {
+            font-size: 1.9em;
+            font-weight: 700;
+            color: #000;
+            letter-spacing: 3px;
+            z-index: 1;
+            flex-grow: 1;
+        }
+
+        /* Right indicator pills in header */
+        .top-indicators {
+            display: flex;
+            gap: 8px;
+            z-index: 1;
+        }
+        .top-pill {
+            background: rgba(0,0,0,0.35);
+            color: #000;
+            border-radius: 20px;
+            padding: 4px 14px;
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+        .pill-blink { animation: blinkPulse 2.5s ease-in-out infinite; }
+        .pill-blink2 { animation: blinkPulse 2.5s ease-in-out infinite 1.2s; }
+        @keyframes blinkPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Right end cap */
+        .top-end {
+            width: 80px;
+            background: var(--orange);
+            border-top-left-radius: 20px;
+            border-bottom-left-radius: 20px;
+            flex-shrink: 0;
+        }
+
+        /* ═══════════════════════════════════════
+           HORIZONTAL DIVIDER BARS  (sub-header)
+        ═══════════════════════════════════════ */
+        .lcars-subbar {
+            display: flex;
+            height: 18px;
+            gap: 8px;
+            margin-top: 8px;
+            animation: fadeIn 0.5s 0.1s ease both;
+        }
+        .subbar-seg { border-radius: 4px; }
+        .ss1 { width: 200px; background: var(--mauve); flex-shrink: 0; }
+        .ss2 { width: 12px; background: var(--bg); flex-shrink: 0; }
+        .ss3 { width: 60px; background: var(--amber); flex-shrink: 0; }
+        .ss4 { width: 120px; background: var(--teal); flex-shrink: 0; }
+        .ss5 { flex-grow: 1; background: var(--blue); }
+        .ss6 { width: 80px; background: var(--peach); flex-shrink: 0; }
+
+        /* ═══════════════════════════════════════
+           MAIN BODY — three-column layout
+        ═══════════════════════════════════════ */
+        .lcars-body {
+            display: flex;
+            flex-grow: 1;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 0;
+            animation: fadeIn 0.5s 0.15s ease both;
+        }
+
+        /* ─── LEFT SPINE ─── */
+        .lcars-spine {
+            width: 200px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .spine-block {
+            border-radius: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .spine-block::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+        }
+        .sb-label {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            font-size: 0.75em;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: rgba(0,0,0,0.6);
+            z-index: 1;
+        }
+
+        .sb1 { background: var(--purp);    height: 60px;  border-top-left-radius: 40px; }
+        .sb2 { background: var(--mauve);   flex-grow: 1; min-height: 50px; }
+        .sb3 { background: var(--fuchsia); height: 40px; }
+        .sb4 { background: var(--amber);   height: 80px; }
+        .sb5 { background: var(--peach);   height: 40px; }
+        .sb6 { background: var(--teal);    flex-grow: 2; min-height: 50px; }
+        .sb7 { background: var(--orange);  height: 60px; border-bottom-left-radius: 40px; }
+
+        /* ─── CENTER CONTENT ─── */
+        .lcars-center {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 0 4px;
+        }
+
+        /* System status row */
+        .status-row {
+            display: flex;
+            gap: 10px;
+            animation: fadeIn 0.5s 0.2s ease both;
+        }
+        .status-card {
+            background: #0d0d0d;
+            border-radius: 10px;
+            padding: 10px 18px;
+            flex: 1;
+            border-top: 3px solid;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .status-card-label { font-size: 0.7em; color: var(--dim); letter-spacing: 2px; }
+        .status-card-val   { font-size: 1.1em; font-weight: 700; letter-spacing: 1px; }
+        .sc-purp  { border-color: var(--purp);    }  .sc-purp  .status-card-val { color: var(--purp); }
+        .sc-amber { border-color: var(--amber);   }  .sc-amber .status-card-val { color: var(--amber); }
+        .sc-green { border-color: var(--green);   }  .sc-green .status-card-val { color: var(--green); animation: blinkPulse 3s infinite; }
+        .sc-cyan  { border-color: var(--cyan);    }  .sc-cyan  .status-card-val { color: var(--cyan); }
+
+        /* Main navigation panel */
+        .nav-panel {
+            background: #0d0d0d;
+            border-radius: 15px;
+            padding: 22px 25px;
+            border-left: 12px solid var(--teal);
+            flex-grow: 1;
+            animation: fadeIn 0.5s 0.25s ease both;
+        }
+
+        .nav-section-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 28px;
+        }
+        .nav-section-title {
+            font-size: 0.85em;
+            font-weight: 700;
+            color: var(--dim);
+            letter-spacing: 4px;
+        }
+        .nav-section-line {
+            flex-grow: 1;
+            height: 1px;
+            background: #333;
+        }
+        .nav-section-code {
+            font-size: 0.75em;
+            color: #444;
+            letter-spacing: 2px;
+        }
+
+        /* Staircase nav buttons */
+        .nav-container {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .lcars-btn {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: #000;
+            font-weight: 700;
+            font-size: 1.25em;
+            height: 58px;
+            border-radius: 29px;
+            transition: filter 0.2s, transform 0.15s, box-shadow 0.2s;
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+            max-width: 520px;
+        }
+
+        .lcars-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 50%);
+            border-radius: inherit;
+        }
+
+        .lcars-btn-icon {
+            width: 58px;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.2);
+            border-radius: 29px 0 0 29px;
+            font-size: 1.3em;
+            flex-shrink: 0;
+        }
+
+        .lcars-btn-text {
+            padding: 0 20px;
+            flex-grow: 1;
+        }
+
+        .lcars-btn-arrow {
+            width: 40px;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.15);
+            border-radius: 0 29px 29px 0;
+            font-size: 1.1em;
+            flex-shrink: 0;
+        }
+
+        .lcars-btn:hover {
+            filter: brightness(1.15);
+            transform: translateX(6px);
+            box-shadow: -6px 0 20px rgba(255,255,255,0.1);
+        }
+        .lcars-btn:active { transform: translateX(3px); filter: brightness(0.95); }
+
+        /* Staircase offsets + colors */
+        .btn-pad   { background: var(--cyan);    margin-left: 0px; }
+        .btn-mouse { background: var(--teal);    margin-left: 50px; }
+        .btn-led   { background: var(--mauve);   margin-left: 100px; }
+        .btn-mem   { background: var(--amber);   margin-left: 150px; }
+
+        /* Entry animations staggered */
+        .btn-pad   { animation: slideIn 0.5s 0.3s ease both; }
+        .btn-mouse { animation: slideIn 0.5s 0.4s ease both; }
+        .btn-led   { animation: slideIn 0.5s 0.5s ease both; }
+        .btn-mem   { animation: slideIn 0.5s 0.6s ease both; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-30px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ─── RIGHT SPINE ─── */
+        .lcars-spine-right {
+            width: 80px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sbr1 { background: var(--orange);  height: 60px;  border-top-right-radius: 40px; }
+        .sbr2 { background: var(--peach);   height: 50px; }
+        .sbr3 { background: var(--amber);   flex-grow: 1; min-height: 40px; }
+        .sbr4 { background: var(--cyan);    height: 60px; }
+        .sbr5 { background: var(--blue);    flex-grow: 2; min-height: 40px; }
+        .sbr6 { background: var(--teal);    height: 50px; }
+        .sbr7 { background: var(--purp);    height: 60px; border-bottom-right-radius: 40px; }
+
+        /* ═══════════════════════════════════════
+           BOTTOM BAR
+        ═══════════════════════════════════════ */
+        .lcars-bottom {
+            display: flex;
+            height: 50px;
+            gap: 8px;
+            margin-top: 8px;
+            flex-shrink: 0;
+            animation: fadeIn 0.5s 0.2s ease both;
+        }
+
+        .bot-left {
+            width: 200px;
+            background: var(--purp);
+            border-top-left-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .bot-left-label { font-size: 0.8em; font-weight: 700; color: #000; letter-spacing: 2px; }
+
+        .bot-gap { width: 12px; background: var(--bg); flex-shrink: 0; }
+
+        .bot-segments {
+            flex-grow: 1;
+            display: flex;
+            gap: 8px;
+        }
+        .bot-seg { border-radius: 4px; }
+        .bseg1 { background: var(--fuchsia); flex: 2; }
+        .bseg2 { background: var(--amber);   flex: 1; }
+        .bseg3 { background: var(--cyan);    flex: 3; border-top-left-radius: 20px; border-top-right-radius: 0; }
+
+        .bot-right {
+            width: 80px;
+            background: var(--orange);
+            border-top-right-radius: 30px;
+            flex-shrink: 0;
+        }
+
+        /* ═══════════════════════════════════════
+           TICKER / STATUS LINE
+        ═══════════════════════════════════════ */
+        .lcars-ticker {
+            height: 28px;
+            background: #0a0a0a;
+            border-top: 1px solid #1a1a1a;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .ticker-label {
+            background: var(--purp);
+            color: #000;
+            font-size: 0.75em;
+            font-weight: 700;
+            padding: 0 14px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            letter-spacing: 2px;
+            flex-shrink: 0;
+        }
+        .ticker-track {
+            flex-grow: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        .ticker-text {
+            display: inline-block;
+            white-space: nowrap;
+            font-size: 0.75em;
+            color: var(--dim);
+            letter-spacing: 2px;
+            animation: ticker 28s linear infinite;
+            padding-left: 100%;
+        }
+        @keyframes ticker {
+            from { transform: translateX(0); }
+            to   { transform: translateX(-100%); }
+        }
+        .ticker-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--green);
+            flex-shrink: 0;
+            margin: 0 12px;
+            animation: blinkPulse 1.5s infinite;
+        }
+
+        /* ═══════════════════════════════════════
+           GLOBAL ANIMATIONS
+        ═══════════════════════════════════════ */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <div class="lcars-top">
+        <div class="top-elbow">
+            <span class="top-elbow-label">SYS-01.2</span>
+        </div>
+        <div class="top-gap"></div>
+        <div class="top-title-band">
+            <span class="top-title-text">USB2C64_ADV — CORE INTERFACE V.1.2</span>
+
+        </div>
+        <div class="top-end"></div>
+    </div>
+
+    <!-- SUB-HEADER BARS -->
+    <div class="lcars-subbar">
+        <div class="subbar-seg ss1"></div>
+        <div class="subbar-seg ss2"></div>
+        <div class="subbar-seg ss3"></div>
+        <div class="subbar-seg ss4"></div>
+        <div class="subbar-seg ss5"></div>
+        <div class="subbar-seg ss6"></div>
+    </div>
+
+    <!-- MAIN BODY -->
+    <div class="lcars-body">
+
+        <!-- LEFT SPINE -->
+        <div class="lcars-spine">
+            <div class="spine-block sb1"><span class="sb-label">ADAPTER</span></div>
+            <div class="spine-block sb2"><span class="sb-label">USB2C64</span></div>
+            <div class="spine-block sb3"></div>
+            <div class="spine-block sb4"><span class="sb-label">V 1.2</span></div>
+            <div class="spine-block sb5"></div>
+            <div class="spine-block sb6"><span class="sb-label">SUBSYSTEMS</span></div>
+            <div class="spine-block sb7"></div>
+        </div>
+
+        <!-- CENTER CONTENT -->
+        <div class="lcars-center">
+
+            <!-- Status indicators row -->
+            <div class="status-row">
+                <div class="status-card sc-purp">
+                    <span class="status-card-label">FIRMWARE</span>
+                    <span class="status-card-val">V 1.2 STABLE</span>
+                </div>
+                <div class="status-card sc-green">
+                    <span class="status-card-label">HID PROTOCOL</span>
+                    <span class="status-card-val">● USB READY</span>
+                </div>
+            </div>
+
+            <!-- Nav panel -->
+            <div class="nav-panel">
+                <div class="nav-section-header">
+                    <span class="nav-section-title">SUBSYSTEM ACCESS</span>
+                    <div class="nav-section-line"></div>
+                    <span class="nav-section-code">NODE-04 // USS-LCARS</span>
+                </div>
+
+                <div class="nav-container">
+                    <a href="configurator.html" class="lcars-btn btn-pad">
+                        <div class="lcars-btn-icon">🕹️</div>
+                        <div class="lcars-btn-text">GAMEPAD / JOYSTICK CONFIG</div>
+                        <div class="lcars-btn-arrow">▶</div>
+                    </a>
+                    <a href="mouse.html" class="lcars-btn btn-mouse">
+                        <div class="lcars-btn-icon">🖱️</div>
+                        <div class="lcars-btn-text">MOUSE SYSTEMS</div>
+                        <div class="lcars-btn-arrow">▶</div>
+                    </a>
+                    <a href="led.html" class="lcars-btn btn-led">
+                        <div class="lcars-btn-icon">💡</div>
+                        <div class="lcars-btn-text">LIGHTS COLOR STUDIO</div>
+                        <div class="lcars-btn-arrow">▶</div>
+                    </a>
+                    <a href="memory.html" class="lcars-btn btn-mem">
+                        <div class="lcars-btn-icon">💾</div>
+                        <div class="lcars-btn-text">SYSTEM SETTINGS &amp; MEMORY</div>
+                        <div class="lcars-btn-arrow">▶</div>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT SPINE -->
+        <div class="lcars-spine-right">
+            <div class="spine-block sbr1"></div>
+            <div class="spine-block sbr2"></div>
+            <div class="spine-block sbr3"></div>
+            <div class="spine-block sbr4"></div>
+            <div class="spine-block sbr5"></div>
+            <div class="spine-block sbr6"></div>
+            <div class="spine-block sbr7"></div>
+        </div>
+
+    </div>
+
+    <!-- BOTTOM BARS -->
+    <div class="lcars-bottom">
+        <div class="bot-left"><span class="bot-left-label">USS ADAPTER CORE</span></div>
+        <div class="bot-gap"></div>
+        <div class="bot-segments">
+            <div class="bot-seg bseg1"></div>
+            <div class="bot-seg bseg2"></div>
+            <div class="bot-seg bseg3"></div>
+        </div>
+        <div class="bot-right"></div>
+    </div>
+
+    <!-- TICKER -->
+    <div class="lcars-ticker">
+        <span class="ticker-label">INFO:</span>
+        <div class="ticker-dot"></div>
+        <div class="ticker-track">
+            <span class="ticker-text">
+                WELCOME TO USB2C64_ADV ··· THIS PROGRAM WILL ALLOW YOU TO CONFIGURE A USB JOYSTICK OR MOUSE FOR COMMODORE 64 AND AMIGA ··· FOR LAST MINUTE NOTES AND CHANGES PLEASE REFER TO: HTTPS://GITHUB.COM/JAJPOHKE/USBTOC64_AMI_CFG_ADV ··· HAVE FUN ···
+            </span>
+        </div>
+    </div>
+
+</body>
+</html>

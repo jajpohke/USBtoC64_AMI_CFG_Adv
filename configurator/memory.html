@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTHER SETTINGS - LCARS CONFIGURATION</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --lcars-bg: #000;
+            --lcars-purple: #9C27B0;
+            --lcars-mauve: #CC99CC;
+            --lcars-teal: #009688;
+            --lcars-cyan: #00BCD4;
+            --lcars-magenta: #E91E63;
+            --lcars-gold: #FF9800;
+            --lcars-amber: #FFC107;
+            --lcars-green: #32CD32;
+            --lcars-red: #dc3545;
+            --lcars-text: #e0e0e0;
+            --lcars-fuchsia: #FF99CC;
+            --lcars-orange-pastel: #FFB366;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 2px,
+                rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+            );
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        body { 
+            background-color: var(--lcars-bg); 
+            color: var(--lcars-text); 
+            font-family: 'Oswald', sans-serif; 
+            text-transform: uppercase;
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center;
+        }
+
+        .lcars-frame { display: flex; width: 100%; max-width: 900px; }
+
+        .lcars-spine { width: 130px; display: flex; flex-direction: column; margin-right: 20px; flex-shrink: 0; }
+        .spine-elbow { background-color: var(--lcars-teal); height: 70px; border-top-left-radius: 35px; border-bottom-left-radius: 35px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; color: #000; font-weight: bold; font-size: 1.1em; text-decoration: none; transition: 0.2s; }
+        .spine-elbow:hover { filter: brightness(1.2); }
+        .spine-bar-top { background-color: var(--lcars-mauve); flex-grow: 2; margin-bottom: 10px; }
+        .spine-bar-mid { background-color: var(--lcars-orange-pastel); margin-bottom: 10px; flex-grow: 3; }
+        .spine-block-1 { height: 60px; background-color: var(--lcars-amber); margin-bottom: 10px; }
+        .spine-block-2 { height: 100px; background-color: var(--lcars-teal); border-bottom-left-radius: 35px; }
+
+        .lcars-content { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; padding-bottom: 80px; }
+
+        .lcars-header { display: flex; align-items: stretch; height: 70px; margin-bottom: 20px; }
+        .header-cap { background-color: var(--lcars-amber); width: 30px; border-top-left-radius: 15px; border-bottom-left-radius: 15px; flex-shrink: 0; }
+        .header-title-band { background-color: var(--lcars-amber); flex-grow: 1; display: flex; align-items: center; padding: 0 20px; font-size: 1.5em; font-weight: bold; color: #000; gap: 15px; }
+        .header-status-pill { background: #000; color: var(--lcars-magenta); border-radius: 10px; padding: 5px 14px; font-size: 0.55em; font-weight: bold; cursor: pointer; transition: 0.2s; white-space: nowrap; letter-spacing: 1px; }
+        .header-status-pill.synced { color: var(--lcars-green); }
+        .header-status-pill.failed { color: var(--lcars-red); text-decoration: underline; }
+        .header-end-cap { background-color: var(--lcars-amber); width: 20px; border-top-right-radius: 15px; border-bottom-right-radius: 15px; flex-shrink: 0; }
+
+        .lcars-panel { background: #111; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: inset 0 0 10px rgba(200,200,200,0.08); }
+        .panel-mem    { border-left: 10px solid var(--lcars-mauve); }
+        .panel-hw     { border-left: 10px solid var(--lcars-gold); }
+        .panel-danger { border-left: 10px solid var(--lcars-red); }
+
+        .section-title { font-size: 1.1em; font-weight: bold; color: #aaa; margin-bottom: 15px; border-bottom: 1px dashed #333; padding-bottom: 5px; }
+
+        .status-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #222; transition: 0.2s; }
+        .status-row:last-child { border-bottom: none; }
+        .item-name { font-size: 1.1em; font-weight: 500; color: var(--lcars-cyan); }
+
+        .badge { padding: 4px 12px; border-radius: 15px; font-size: 0.85em; font-weight: bold; font-family: sans-serif; text-transform: none; }
+        .badge.saved { background: rgba(50,205,50,0.15); color: var(--lcars-green); border: 1px solid var(--lcars-green); }
+        .badge.empty { background: rgba(136,136,136,0.15); color: #888; border: 1px solid #555; }
+
+        .hw-readout { font-size: 1.8em; font-weight: bold; color: #555; }
+
+        /* ── CHECKBOXES ── */
+        .custom-chk { width: 22px; height: 22px; border: 2px solid var(--lcars-mauve); border-radius: 6px; display: inline-block; position: relative; transition: 0.2s; flex-shrink: 0; }
+        input:checked + .custom-chk { background: var(--lcars-mauve); border-color: var(--lcars-mauve); }
+        input:checked + .custom-chk::after { content: '✔'; color: #000; position: absolute; left: 4px; top: -2px; font-size: 16px; font-weight: bold; }
+        .chk-cyan { border-color: var(--lcars-cyan); }
+        input:checked + .chk-cyan { background: var(--lcars-cyan); border-color: var(--lcars-cyan); }
+        .chk-gold { border-color: var(--lcars-gold); }
+        input:checked + .chk-gold { background: var(--lcars-gold); border-color: var(--lcars-gold); }
+        .chk-red { border-color: var(--lcars-red); }
+        input:checked + .chk-red { background: var(--lcars-red); border-color: var(--lcars-red); }
+
+        /* ── NVS ROWS with inline clear ── */
+        .nvs-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #222; }
+        .nvs-row:last-child { border-bottom: none; }
+
+        .nvs-clear-wrap {
+            display: flex; align-items: center; gap: 8px;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.25s ease;
+            cursor: pointer;
+        }
+        .nvs-clear-wrap.visible { opacity: 1; pointer-events: all; }
+        .nvs-clear-label { font-size: 0.75em; color: var(--lcars-red); letter-spacing: 1px; white-space: nowrap; }
+
+        /* ── DEVELOPER MODE HOVER TICKER ── */
+        .dev-row-wrap { position: relative; }
+
+        .dev-info-ticker {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+        }
+        .dev-row-wrap:hover .dev-info-ticker {
+            max-height: 30px;
+            opacity: 1;
+        }
+        .dev-info-ticker-inner {
+            display: inline-block;
+            white-space: nowrap;
+            font-size: 0.78em;
+            color: var(--lcars-gold);
+            font-family: sans-serif;
+            text-transform: none;
+            letter-spacing: 1px;
+            padding: 3px 0;
+            animation: devTicker 18s linear infinite;
+        }
+        .dev-row-wrap:not(:hover) .dev-info-ticker-inner {
+            animation-play-state: paused;
+        }
+        @keyframes devTicker {
+            0%   { transform: translateX(60vw); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* ── STICKY APPLY ── */
+        .sticky-apply-bar { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, #000 35%); padding: 30px 20px 20px; display: flex; justify-content: center; pointer-events: none; z-index: 100; }
+        .btn-apply { width: 100%; max-width: 900px; background: var(--lcars-green); color: #000; border: none; border-radius: 25px; padding: 15px; font-family: 'Oswald', sans-serif; font-size: 1.2em; font-weight: bold; cursor: pointer; transition: 0.3s; pointer-events: all; }
+        .btn-apply:disabled { background: #222; color: #555; cursor: not-allowed; border: 1px solid #333; }
+        .btn-apply:not(:disabled):hover { filter: brightness(1.2); box-shadow: 0 0 20px rgba(50,205,50,0.5); }
+
+        .lcars-btn-danger { width: 100%; border: none; border-radius: 25px; padding: 15px; font-family: 'Oswald', sans-serif; font-size: 1.2em; font-weight: bold; cursor: pointer; background: var(--lcars-red); color: #fff; }
+        .lcars-btn-danger:hover { filter: brightness(1.15); }
+    </style>
+</head>
+<body>
+
+<div class="lcars-frame">
+
+    <div class="lcars-spine">
+        <a href="index.html" class="spine-elbow">← BACK</a>
+        <div class="spine-bar-top"></div>
+        <div class="spine-bar-mid"></div>
+        <div class="spine-block-1"></div>
+        <div class="spine-block-2"></div>
+    </div>
+
+    <div class="lcars-content">
+
+        <div class="lcars-header">
+            <div class="header-cap"></div>
+            <div class="header-title-band">
+                <span>OTHER SETTINGS AND SAVED MEMORY</span>
+                <span id="syncStatus" class="header-status-pill">🔄 REFRESH STAT.</span>
+            </div>
+            <div class="header-end-cap"></div>
+        </div>
+
+        <!-- HARDWARE CONFIG PANEL -->
+        <div class="lcars-panel panel-hw">
+            <div class="section-title">ACTIVE HARDWARE CONFIGURATION</div>
+
+            <div class="status-row" style="margin-bottom: 10px;">
+                <span class="item-name" style="color: var(--lcars-gold);">CURRENT MODE:</span>
+                <span id="hw-mode-readout" class="hw-readout">WAITING SYNC...</span>
+            </div>
+
+            <!-- SWITCH INVERT -->
+            <div class="status-row">
+                <div>
+                    <span class="item-name" style="color: var(--lcars-cyan);">SWITCH LOGIC INVERT:</span>
+                    <div style="font-size: 0.85em; color: #888; text-transform: none; font-family: sans-serif;">Check to invert physical logic. Press APPLY CHANGES below to save.</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span id="inv-mode-status" style="font-size: 1.2em; font-weight: bold; color: #555;">UNKNOWN</span>
+                    <label style="cursor: pointer; display: flex; align-items: center;">
+                        <input type="checkbox" id="chk-inv" style="display: none;" onchange="handleStateChange()" disabled>
+                        <span class="custom-chk chk-cyan"></span>
+                    </label>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- NVS MEMORY STATUS — CLEAR checkbox appears only when SAVED -->
+        <div class="lcars-panel panel-mem">
+            <div class="section-title">NVS MEMORY BANKS STATUS</div>
+
+            <div class="nvs-row">
+                <span class="item-name">🖱️ Mouse Configuration</span>
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <span class="badge empty" id="stat-mouse">LOADING...</span>
+                    <label id="clr-wrap-mouse" class="nvs-clear-wrap">
+                        <input type="checkbox" value="mouse" class="mem-chk" style="display:none;" onchange="checkApplyState()">
+                        <span class="custom-chk chk-red"></span>
+                        <span class="nvs-clear-label">CLEAR</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="nvs-row">
+                <span class="item-name">🕹️ Custom Gamepad Profile</span>
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <span class="badge empty" id="stat-pad">LOADING...</span>
+                    <label id="clr-wrap-pad" class="nvs-clear-wrap">
+                        <input type="checkbox" value="pad" class="mem-chk" style="display:none;" onchange="checkApplyState()">
+                        <span class="custom-chk chk-red"></span>
+                        <span class="nvs-clear-label">CLEAR</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="nvs-row">
+                <span class="item-name">💡 Custom LED Colors</span>
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <span class="badge empty" id="stat-led">LOADING...</span>
+                    <label id="clr-wrap-led" class="nvs-clear-wrap">
+                        <input type="checkbox" value="led" class="mem-chk" style="display:none;" onchange="checkApplyState()">
+                        <span class="custom-chk chk-red"></span>
+                        <span class="nvs-clear-label">CLEAR</span>
+                    </label>
+                </div>
+            </div>
+
+
+
+
+        </div>
+
+        <!-- DANGER PANEL -->
+        <div class="lcars-panel panel-danger">
+            <div class="section-title" style="color: var(--lcars-red);">CRITICAL COMMANDS</div>
+            <button class="lcars-btn-danger" onclick="factoryReset()">⚠️ FACTORY RESET (ERASE ALL)</button>
+
+            <div style="margin-top: 20px; border-top: 1px dashed #3a1a1a; padding-top: 20px;" class="dev-row-wrap">
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="flex-grow:1; min-width:0; overflow:hidden;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+                            <span class="item-name" style="color: var(--lcars-gold); font-size:1em;">🛠️ DEVELOPER MODE</span>
+                            <span id="dev-mode-status" style="font-size:1em; font-weight:bold; color:#555;">UNKNOWN</span>
+                        </div>
+                        <div style="font-size:0.82em; color:#666; text-transform:none; font-family:sans-serif; line-height:1.5;">
+                            Requires an external serial interface connected to the ESP32 <strong style="color:#888;">TX/RX pins</strong> (UART, 115200 baud) to activate.
+                        </div>
+                        <!-- scrolling warning on hover -->
+                        <div class="dev-info-ticker">
+                            <span class="dev-info-ticker-inner">
+                                ⚠️&nbsp; To DEACTIVATE developer mode without serial access: hold the BOOT button for 5 seconds → wait for 5 red LED blinks → factory reset will complete automatically. Developer mode can also be disabled via the external serial interface.
+                            </span>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px; flex-shrink:0; margin-left:20px;">
+                        <label style="cursor:pointer; display:flex; align-items:center;" id="dev-chk-label">
+                            <input type="checkbox" id="chk-dev" style="display:none;" onchange="handleStateChange()" disabled>
+                            <span class="custom-chk chk-gold"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- SW OVERRIDE (only when dev mode ON) -->
+                <div id="row-dev-override" style="display:none; margin-top:14px; padding-top:14px; border-top:1px dashed #333; flex-direction:row; justify-content:space-between; align-items:center;">
+                    <div>
+                        <span class="item-name" style="color:var(--lcars-gold); font-size:0.95em;">SOFTWARE OVERRIDE (DEV MODE):</span>
+                        <div style="font-size:0.82em; color:#888; text-transform:none; font-family:sans-serif;">Check to force Amiga mode. Press APPLY CHANGES to save.</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:15px; flex-shrink:0; margin-left:15px;">
+                        <span id="sw-override-status" style="font-size:1.1em; font-weight:bold; color:#555;">C64</span>
+                        <label style="cursor:pointer; display:flex; align-items:center;">
+                            <input type="checkbox" id="chk-override" style="display:none;" onchange="handleStateChange()">
+                            <span class="custom-chk chk-gold"></span>
+                        </label>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- STICKY APPLY BAR -->
+<div class="sticky-apply-bar">
+    <button id="btn-apply" class="btn-apply" onclick="applyAndReboot()" disabled>🔄 APPLY CHANGES & REBOOT ADAPTER</button>
+</div>
+
+<script>
+    let serialPort = null;
+    let isSyncing  = false;
+    let originalInvState = false;
+    let originalOvrState = false;
+    let originalDevState = false;
+
+    document.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', async function(e) {
+            e.preventDefault();
+            if (serialPort) { try { await serialPort.close(); } catch(err) {} await new Promise(r => setTimeout(r, 400)); }
+            window.location.href = this.href;
+        });
+    });
+
+    window.addEventListener('beforeunload', () => { if (serialPort && serialPort.readable) serialPort.close().catch(()=>{}); });
+
+    // Badge update + show/hide CLEAR checkbox conditionally
+    function updateBadge(id, isSaved) {
+        const b = document.getElementById('stat-' + id);
+        const w = document.getElementById('clr-wrap-' + id);
+        if (b) { b.className = isSaved ? 'badge saved' : 'badge empty'; b.innerText = isSaved ? 'SAVED' : 'DEFAULT / EMPTY'; }
+        if (w) {
+            if (isSaved) {
+                w.classList.add('visible');
+            } else {
+                w.classList.remove('visible');
+                const chk = w.querySelector('input');
+                if (chk) chk.checked = false;
+            }
+        }
+    }
+
+    function handleStateChange() {
+        const chkInv = document.getElementById('chk-inv');
+        const invStatus = document.getElementById('inv-mode-status');
+        if (chkInv) {
+            if (chkInv.checked !== originalInvState) { invStatus.innerText = "●"; invStatus.style.color = "var(--lcars-amber)"; }
+            else { invStatus.innerText = chkInv.checked ? "ACTIVE" : "INACTIVE"; invStatus.style.color = chkInv.checked ? "var(--lcars-cyan)" : "#555"; }
+        }
+
+        const chkDev = document.getElementById('chk-dev');
+        const devStatus = document.getElementById('dev-mode-status');
+        const devRow = document.getElementById('row-dev-override');
+        if (chkDev) {
+            if (chkDev.checked !== originalDevState) { devStatus.innerText = "●"; devStatus.style.color = "var(--lcars-amber)"; }
+            else { devStatus.innerText = chkDev.checked ? "ONLINE" : "OFFLINE"; devStatus.style.color = chkDev.checked ? "var(--lcars-green)" : "#555"; }
+            if (devRow) devRow.style.display = chkDev.checked ? 'flex' : 'none';        }
+
+        const chkOvr = document.getElementById('chk-override');
+        const ovrStatus = document.getElementById('sw-override-status');
+        if (chkOvr) {
+            if (chkOvr.checked !== originalOvrState) { ovrStatus.innerText = "●"; ovrStatus.style.color = "var(--lcars-amber)"; }
+            else { ovrStatus.innerText = chkOvr.checked ? "AMIGA (FORCED)" : "C64 (FORCED)"; ovrStatus.style.color = chkOvr.checked ? "#cccccc" : "var(--lcars-gold)"; }
+        }
+        checkApplyState();
+    }
+
+    function checkApplyState() {
+        let anyChecked = false;
+        document.querySelectorAll('.mem-chk').forEach(chk => { if (chk.checked) anyChecked = true; });
+        const chkInv = document.getElementById('chk-inv');
+        const chkOvr = document.getElementById('chk-override');
+        const chkDev = document.getElementById('chk-dev');
+        let invChanged = chkInv && !chkInv.disabled && chkInv.checked !== originalInvState;
+        let ovrChanged = chkOvr && !chkOvr.disabled && chkOvr.checked !== originalOvrState;
+        let devChanged = chkDev && !chkDev.disabled && chkDev.checked !== originalDevState;
+        document.getElementById('btn-apply').disabled = !(anyChecked || invChanged || ovrChanged || devChanged);
+    }
+
+    async function doSync() {
+        if (isSyncing) return;
+        isSyncing = true;
+        const statusEl = document.getElementById('syncStatus');
+        statusEl.innerText = "⏳ SYNCING..."; statusEl.className = "header-status-pill";
+        try {
+            if (!serialPort) throw new Error("No port");
+            let retries = 4;
+            while (retries > 0) {
+                try { if (!serialPort.readable || !serialPort.writable) await serialPort.open({ baudRate: 115200 }); break; }
+                catch (e) { retries--; if (retries === 0) throw e; await new Promise(res => setTimeout(res, 300)); }
+            }
+
+            async function fetchFromDevice(cmdString) {
+                const writer = serialPort.writable.getWriter();
+                await writer.write(new TextEncoder().encode(`{"cmd":"${cmdString}"}\n`));
+                writer.releaseLock();
+                const reader = serialPort.readable.getReader();
+                const decoder = new TextDecoder();
+                let incoming = ""; let jsonFound = false;
+                const readPromise = (async () => {
+                    while (true) { const { value, done } = await reader.read(); if (done) break; incoming += decoder.decode(value, { stream: true }); if (incoming.includes('}')) { jsonFound = true; break; } }
+                })();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 1500));
+                try { await Promise.race([readPromise, timeoutPromise]); } catch (e) { if (e.message === "TIMEOUT") reader.cancel().catch(()=>{}); throw e; } finally { try { reader.releaseLock(); } catch(e) {} }
+                if (jsonFound) { let s = incoming.indexOf('{'); let e = incoming.lastIndexOf('}'); if (s !== -1 && e !== -1) return JSON.parse(incoming.substring(s, e + 1)); }
+                throw new Error("Invalid JSON");
+            }
+
+	    let infoData = await fetchFromDevice("get_info");
+            await new Promise(r => setTimeout(r, 150)); 
+            let memData  = await fetchFromDevice("mem_status");
+
+            document.getElementById('hw-mode-readout').innerText = infoData.is_amiga ? "AMIGA MODE" : "COMMODORE 64 MODE";
+            document.getElementById('hw-mode-readout').style.color = infoData.is_amiga ? "#cccccc" : "var(--lcars-gold)";
+
+            originalInvState = infoData.inv_switch;
+            document.getElementById('chk-inv').checked = originalInvState;
+            document.getElementById('chk-inv').disabled = false;
+
+            // Developer mode: checkbox always usable after sync
+            originalDevState = infoData.dev_mode;
+            const chkDev   = document.getElementById('chk-dev');
+            const devLabel = document.getElementById('dev-chk-label');
+            chkDev.checked = originalDevState;
+            chkDev.disabled = false;
+            devLabel.style.cursor = 'pointer';
+
+            originalOvrState = infoData.dev_amiga;
+            document.getElementById('chk-override').checked = originalOvrState;
+            document.getElementById('chk-override').disabled = false;
+
+            handleStateChange();
+
+            updateBadge('mouse', memData.mouse);
+            updateBadge('pad',   memData.pad);
+            updateBadge('led',   memData.led);
+
+            statusEl.innerText = "✅ STATUS OK"; statusEl.className = "header-status-pill synced";
+        } catch (err) {
+            statusEl.innerText = "❌ SYNC FAIL"; statusEl.className = "header-status-pill failed";
+            if (serialPort) { try { await serialPort.close(); } catch(e){} serialPort = null; }
+        }
+        isSyncing = false;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(async () => {
+            if ('serial' in navigator) {
+                try { const ports = await navigator.serial.getPorts(); if (ports.length > 0) { serialPort = ports[0]; await doSync(); } } catch(e) {}
+            }
+        }, 300);
+    });
+
+    document.getElementById('syncStatus').addEventListener('click', async () => {
+        if (!('serial' in navigator)) return;
+        if (isSyncing) return;
+        try {
+            if (!serialPort) { const ports = await navigator.serial.getPorts(); if (ports.length > 0) serialPort = ports[0]; else serialPort = await navigator.serial.requestPort(); }
+            await doSync();
+        } catch (err) { serialPort = null; }
+    });
+
+    async function sendCommandOnly(payload) {
+        if (!serialPort || !serialPort.writable) return false;
+        try {
+            const writer = serialPort.writable.getWriter();
+            await writer.write(new TextEncoder().encode(JSON.stringify(payload) + '\n'));
+            writer.releaseLock(); return true;
+        } catch(e) { return false; }
+    }
+
+    async function applyAndReboot() {
+        const checkboxes = document.querySelectorAll('.mem-chk');
+        let targets = [];
+        checkboxes.forEach(chk => { if (chk.checked) targets.push(chk.value); });
+        let invChanged = (document.getElementById('chk-inv') && document.getElementById('chk-inv').checked !== originalInvState);
+        let ovrChanged = (document.getElementById('chk-override') && document.getElementById('chk-override').checked !== originalOvrState);
+        let devChanged = (document.getElementById('chk-dev') && document.getElementById('chk-dev').checked !== originalDevState);
+        if (targets.length === 0 && !invChanged && !ovrChanged && !devChanged) return;
+        if (confirm("Apply changes and reboot the adapter?")) {
+            document.getElementById('btn-apply').innerText = "⏳ APPLYING...";
+            document.getElementById('btn-apply').disabled = true;
+            if (invChanged) { await sendCommandOnly({cmd: "invert_toggle"}); await new Promise(r => setTimeout(r, 200)); }
+            if (ovrChanged) { await sendCommandOnly({cmd: "override_toggle"}); await new Promise(r => setTimeout(r, 200)); }
+            if (devChanged) { await sendCommandOnly({cmd: "devmode_toggle"}); await new Promise(r => setTimeout(r, 200)); }
+            for (let t of targets) { await sendCommandOnly({cmd: "clear_mem", target: t}); await new Promise(r => setTimeout(r, 100)); }
+            sendCommandOnly({cmd: "reboot_cmd"}).then(success => {
+                if (success) document.body.innerHTML = "<div style='color:var(--lcars-green);margin-top:50px;text-align:center;font-family:Oswald,sans-serif;font-size:1.5em;text-transform:uppercase;'>REBOOTING...<br>Please wait a few seconds and refresh this page.</div>";
+            });
+        }
+    }
+
+    function factoryReset() {
+        if (confirm("WARNING!\n\nYou are about to erase ALL saved settings.\nThis action cannot be undone.\n\nAre you absolutely sure?")) {
+            sendCommandOnly({cmd: "factory_reset"}).then(success => {
+                if (success) document.body.innerHTML = "<div style='color:var(--lcars-red);margin-top:50px;text-align:center;font-family:Oswald,sans-serif;font-size:1.5em;text-transform:uppercase;'>FACTORY RESET COMPLETE.<br>Device is rebooting.</div>";
+            });
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LCARS - LED COLOR STUDIO</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --lcars-bg: #000000;
+            --lcars-purple: #9C27B0;
+            --lcars-mauve: #CC99CC;
+            --lcars-teal: #009688;
+            --lcars-cyan: #00BCD4;
+            --lcars-magenta: #E91E63;
+            --lcars-gold: #FF9800;
+            --lcars-amber: #FFC107;
+            --lcars-green: #32CD32;
+            --lcars-red: #dc3545;
+            --lcars-text: #E0E0E0;
+            --lcars-fuchsia: #FF99CC;
+            --lcars-orange-pastel: #FFB366;
+            /* index palette for header/spine */
+            --purp: #CC66FF;
+            --rose: #FF99CC;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 2px,
+                rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+            );
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        body { 
+            background-color: var(--lcars-bg); 
+            color: var(--lcars-text); 
+            font-family: 'Oswald', sans-serif; 
+            text-transform: uppercase;
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center;
+        }
+
+        .lcars-frame { display: flex; width: 100%; max-width: 900px; }
+
+        /* ── SPINE ── */
+        .lcars-spine { width: 130px; display: flex; flex-direction: column; margin-right: 20px; flex-shrink: 0; }
+
+        /* BACK = teal/acqua */
+        .spine-elbow {
+            background-color: var(--lcars-teal);
+            height: 70px;
+            border-top-left-radius: 35px;
+            border-bottom-left-radius: 35px;
+            margin-bottom: 10px;
+            display: flex; align-items: center; justify-content: center;
+            color: #000; font-weight: bold; font-size: 1.1em;
+            text-decoration: none; transition: 0.2s;
+        }
+        .spine-elbow:hover { filter: brightness(1.2); }
+        .spine-bar-top  { background-color: var(--lcars-mauve);        flex-grow: 2; margin-bottom: 10px; }
+        .spine-bar-mid  { background-color: var(--lcars-orange-pastel); flex-grow: 3; margin-bottom: 10px; }
+        .spine-block-1  { height: 60px;  background-color: var(--lcars-amber); margin-bottom: 10px; }
+        .spine-block-2  { height: 100px; background-color: var(--lcars-teal);  border-bottom-left-radius: 35px; }
+
+        /* ── CONTENT ── */
+        .lcars-content { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; padding-bottom: 80px; }
+
+        /* ── HEADER (title inlay — rose background like index, BACK amber) ── */
+        .lcars-header { display: flex; align-items: stretch; height: 70px; margin-bottom: 20px; }
+        .header-cap   { background-color: var(--rose); width: 30px; border-top-left-radius: 15px; border-bottom-left-radius: 15px; flex-shrink: 0; }
+        .header-title-band {
+            background-color: var(--rose);
+            flex-grow: 1; display: flex; align-items: center;
+            padding: 0 20px; font-size: 1.5em; font-weight: bold; color: #000; gap: 15px;
+        }
+        .header-status-pill {
+            background: #000; color: var(--lcars-magenta);
+            border-radius: 10px; padding: 5px 14px; font-size: 0.55em;
+            font-weight: bold; cursor: pointer; transition: 0.2s;
+            white-space: nowrap; letter-spacing: 1px;
+        }
+        .header-status-pill.synced { color: var(--lcars-green); }
+        .header-status-pill.failed { color: var(--lcars-red); text-decoration: underline; }
+        .header-end-cap { background-color: var(--rose); width: 20px; border-top-right-radius: 15px; border-bottom-right-radius: 15px; flex-shrink: 0; }
+
+        /* ── PANELS ── */
+        .lcars-panel { background: #111; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: inset 0 0 10px rgba(200,200,200,0.08); }
+        .panel-cfg  { border-left: 10px solid var(--lcars-mauve); }
+        .panel-sys  { border-left: 10px solid var(--lcars-cyan); }
+        .panel-act  { border-left: 10px solid var(--lcars-red); }
+
+        .section-title { font-size: 1.1em; font-weight: bold; color: #aaa; margin-bottom: 15px; border-bottom: 1px dashed #333; padding-bottom: 5px; }
+
+        .lcars-section { margin-bottom: 0; }
+
+        .data-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 0; border-bottom: 1px solid #222;
+        }
+        .data-row:last-child { border-bottom: none; }
+
+        .data-label { font-size: 1.1em; color: #ccc; flex-grow: 1; }
+
+        .data-controls { display: flex; align-items: center; justify-content: flex-end; min-width: 60px; }
+
+        .color-swatch {
+            width: 45px; height: 30px; border-radius: 5px;
+            border: 2px solid #555; cursor: pointer;
+            transition: border-color 0.15s, transform 0.1s;
+        }
+        .color-swatch:hover { border-color: var(--lcars-amber); transform: scale(1.1); }
+        .color-swatch.active { border-color: #fff; box-shadow: 0 0 8px #fffa; }
+
+        select {
+            background-color: #1a1a1a; color: var(--lcars-mauve);
+            border: 1px solid var(--lcars-mauve); padding: 5px 10px;
+            font-family: 'Oswald', sans-serif; font-size: 1.1em;
+            border-radius: 5px; cursor: pointer;
+        }
+
+        .lcars-checkbox-wrap { display: inline-block; cursor: pointer; position: relative; }
+        .lcars-checkbox-wrap input[type="checkbox"] { display: none; }
+        .custom-chk {
+            width: 22px; height: 22px; border: 2px solid var(--lcars-mauve);
+            border-radius: 4px; display: inline-block; position: relative; background-color: transparent;
+        }
+        .lcars-checkbox-wrap input[type="checkbox"]:checked + .custom-chk { background-color: var(--lcars-mauve); }
+        .lcars-checkbox-wrap input[type="checkbox"]:checked + .custom-chk::after {
+            content: '✔'; color: #000; position: absolute; left: 4px; top: -3px; font-weight: bold;
+        }
+
+        /* ── STICKY BUTTONS ── */
+        .sticky-btn-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, #000 35%);
+            padding: 30px 20px 20px;
+            display: flex; justify-content: center;
+            pointer-events: none; z-index: 100;
+        }
+        .btn-row {
+            display: flex; gap: 12px;
+            width: 100%; max-width: 900px;
+            pointer-events: all;
+        }
+        .lcars-btn {
+            color: #000; border: none; padding: 12px 18px;
+            font-family: 'Oswald', sans-serif; font-size: 1.1em; font-weight: bold;
+            border-radius: 25px; cursor: pointer; flex-grow: 1;
+            text-align: center; transition: filter 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .lcars-btn:hover { filter: brightness(1.2); }
+        .btn-restore { background-color: var(--lcars-cyan);   flex-grow: 0.5; }
+        .btn-import  { background-color: #66FFCC;             flex-grow: 0.4; }
+        .btn-export  { background-color: #FFFF66;             flex-grow: 0.4; }
+        .btn-commit  { background-color: var(--lcars-green); }
+
+        /* ── COLOR PICKER POPUP ── */
+        #color-picker-overlay { display: none; position: fixed; inset: 0; z-index: 100; }
+
+        #color-picker-popup {
+            display: none; position: fixed; z-index: 101;
+            background: #0d0d0d;
+            border: 2px solid var(--lcars-amber);
+            border-radius: 14px; padding: 0;
+            box-shadow: 0 0 24px rgba(255,193,7,0.3), 0 8px 40px #000b;
+            width: 340px; overflow: hidden;
+        }
+
+        .picker-header {
+            background: var(--lcars-amber); color: #000;
+            font-weight: 700; font-size: 0.9em; letter-spacing: 2px;
+            padding: 9px 14px; display: flex; align-items: center; gap: 8px;
+        }
+        .picker-header-label { flex-grow: 1; }
+        .picker-close { background: none; border: none; color: #000; font-size: 1.2em; cursor: pointer; font-weight: bold; line-height: 1; padding: 0; }
+        .picker-close:hover { opacity: 0.5; }
+
+        .picker-body { padding: 12px 14px 14px; }
+
+        .picker-section-label {
+            font-size: 0.72em; color: var(--lcars-mauve);
+            letter-spacing: 3px; margin-bottom: 10px; margin-top: 4px;
+        }
+
+        .picker-grid { display: flex; gap: 7px; flex-wrap: wrap; }
+
+        .picker-dot {
+            width: 36px; height: 36px; border-radius: 50%;
+            cursor: pointer; border: 2px solid transparent;
+            transition: transform 0.1s, border-color 0.1s;
+            position: relative; flex-shrink: 0;
+        }
+        .picker-dot:hover { transform: scale(1.2); border-color: #fff; }
+        .picker-dot.selected { border-color: #fff; box-shadow: 0 0 8px #fff8; }
+        .picker-dot.selected::after {
+            content: '✔'; position: absolute; inset: 0;
+            display: grid; place-items: center; font-size: 1em;
+            color: #fff; text-shadow: 0 0 4px #000, 0 0 8px #000;
+        }
+
+        .picker-preview-row {
+            display: flex; align-items: center; gap: 12px;
+            margin-top: 14px; padding-top: 12px; border-top: 1px solid #2a2a2a;
+        }
+        .picker-preview-swatch { width: 50px; height: 34px; border-radius: 7px; border: 1px solid #666; flex-shrink: 0; }
+        .picker-hex-display { font-size: 1.1em; color: var(--lcars-amber); letter-spacing: 2px; flex-grow: 1; }
+        .picker-confirm {
+            background: var(--lcars-green); color: #000; border: none;
+            padding: 7px 18px; border-radius: 20px;
+            font-family: 'Oswald', sans-serif; font-size: 1em; font-weight: bold;
+            cursor: pointer; letter-spacing: 1px; white-space: nowrap;
+        }
+        .picker-confirm:hover { filter: brightness(1.2); }
+    </style>
+</head>
+<body>
+
+<div class="lcars-frame">
+    <div class="lcars-spine">
+        <a href="index.html" class="spine-elbow">← BACK</a>
+        <div class="spine-bar-top"></div>
+        <div class="spine-bar-mid"></div>
+        <div class="spine-block-1"></div>
+        <div class="spine-block-2"></div>
+    </div>
+
+    <div class="lcars-content">
+
+        <!-- HEADER: rose band, BACK teal -->
+        <div class="lcars-header">
+            <div class="header-cap"></div>
+            <div class="header-title-band">
+                <span>💡💡💡💡 LIGHTS COLOR STUDIO</span>
+                <span id="syncStatus" class="header-status-pill">🔄 REFRESH STAT.</span>
+            </div>
+            <div class="header-end-cap"></div>
+        </div>
+
+        <!-- SYSTEM STATUS PANEL -->
+        <div class="lcars-panel panel-sys">
+            <div class="section-title" style="color:var(--lcars-cyan);">SYSTEM STATUS</div>
+            <div class="data-row">
+                <div class="data-label">IDLE MODE (COMMODORE 64)</div>
+                <div class="data-controls"><div class="color-swatch" id="sw-idle-c64" style="background-color:#FF9900;" data-label="IDLE (C64)"></div></div>
+            </div>
+            <div class="data-row">
+                <div class="data-label">IDLE MODE (AMIGA)</div>
+                <div class="data-controls"><div class="color-swatch" id="sw-idle-amiga" style="background-color:#FFFFFF;" data-label="IDLE (AMIGA)"></div></div>
+            </div>
+        </div>
+
+        <!-- ACTIONS PANEL -->
+        <div class="lcars-panel panel-act">
+            <div class="section-title" style="color:var(--lcars-red);">ACTIONS</div>
+            <div class="data-row">
+                <div class="data-label">DIRECTIONS</div>
+                <div class="data-controls"><div class="color-swatch" id="sw-dir" style="background-color:#CC00CC;" data-label="DIRECTIONS"></div></div>
+            </div>
+            <div class="data-row">
+                <div class="data-label">FIRE BUTTON 1 (PRIMARY)</div>
+                <div class="data-controls"><div class="color-swatch" id="sw-fire1" style="background-color:#00AA00;" data-label="FIRE BUTTON 1"></div></div>
+            </div>
+            <div class="data-row">
+                <div class="data-label">FIRE BUTTON 2 (SECONDARY)</div>
+                <div class="data-controls"><div class="color-swatch" id="sw-fire2" style="background-color:#CC0000;" data-label="FIRE BUTTON 2"></div></div>
+            </div>
+            <div class="data-row">
+                <div class="data-label">FIRE BUTTON 3 (AUXILIARY)</div>
+                <div class="data-controls"><div class="color-swatch" id="sw-fire3" style="background-color:#00CCCC;" data-label="FIRE BUTTON 3"></div></div>
+            </div>
+            <div class="data-row">
+                <div class="data-label">UP / JUMP ON BUTTON</div>
+                <div class="data-controls"><div class="color-swatch" id="sw-jump" style="background-color:#0000CC;" data-label="UP/JUMP"></div></div>
+            </div>
+            <div class="data-row">
+                <div class="data-label">AUTOFIRE TRIGGER</div>
+                <div class="data-controls"><div class="color-swatch" id="sw-auto" style="background-color:#CCCC00;" data-label="AUTOFIRE"></div></div>
+            </div>
+        </div>
+
+        <!-- HARDWARE CONFIG PANEL — moved to bottom -->
+        <div class="lcars-panel panel-cfg">
+            <div class="section-title">HARDWARE CONFIGURATION</div>
+            <div class="data-row">
+                <div class="data-label" style="color:var(--lcars-mauve);">LED CHIP COLOR FORMAT</div>
+                <div class="data-controls">
+                    <select id="sel-format">
+                        <option value="0">GRB (Standard WS2812B)</option>
+                        <option value="1">RGB (Alternative format)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="data-row">
+                <div class="data-label" style="color:var(--lcars-mauve);">DISABLE MULTICOLOR MODE (FORCE MONOCHROME)</div>
+                <div class="data-controls">
+                    <label class="lcars-checkbox-wrap">
+                        <input type="checkbox" id="chk-mono">
+                        <span class="custom-chk"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- STICKY BUTTON BAR -->
+<div class="sticky-btn-bar">
+    <div class="btn-row">
+        <button class="lcars-btn btn-restore">RESTORE DEFAULTS</button>
+        <button class="lcars-btn btn-import">⬆ IMPORT</button>
+        <button class="lcars-btn btn-export">⬇ EXPORT</button>
+        <button class="lcars-btn btn-commit">💾 APPLY</button>
+    </div>
+</div>
+
+<!-- OVERLAY -->
+<div id="color-picker-overlay"></div>
+
+<!-- POPUP -->
+<div id="color-picker-popup">
+    <div class="picker-header">
+        <span class="picker-header-label" id="picker-title">SELECT COLOR</span>
+        <button class="picker-close" id="picker-close-btn">✕</button>
+    </div>
+    <div class="picker-body">
+        <div class="picker-section-label">SELECT A COLOR AND PRESS SET</div>
+        <div class="picker-grid" id="picker-grid-sat"></div>
+        <div class="picker-preview-row">
+            <div class="picker-preview-swatch" id="picker-preview"></div>
+            <div class="picker-hex-display" id="picker-hex">#000000</div>
+            <button class="picker-confirm" id="picker-confirm-btn">✔ SET</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ── SERIAL STATE ──
+    let serialPort = null;
+    let isSyncing  = false;
+
+    document.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', async function(e) {
+            e.preventDefault();
+            if (serialPort) { try { await serialPort.close(); } catch(err) {} await new Promise(r => setTimeout(r, 400)); }
+            window.location.href = this.href;
+        });
+    });
+    window.addEventListener('beforeunload', () => { if (serialPort && serialPort.readable) serialPort.close().catch(()=>{}); });
+
+    // Map firmware color index → palette hex
+    const IDX_TO_HEX = {
+        0: "#000000", // BLACK
+        1: "#FFFFFF", // WHITE
+        2: "#FF0000", // RED
+        3: "#FF9900", // ORANGE
+        4: "#FFFF00", // YELLOW
+        5: "#00FF00", // GREEN
+        6: "#0000FF", // BLUE
+        7: "#00FFFF", // CYAN
+        8: "#FF00FF", // PURPLE
+        9: "#FF99CC", // PINK
+    };
+    const HEX_TO_IDX = Object.fromEntries(Object.entries(IDX_TO_HEX).map(([k,v])=>[v,parseInt(k)]));
+
+    function setSwatchColor(id, colorValue) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (typeof colorValue === 'string' && colorValue.startsWith('#')) {
+            el.style.backgroundColor = colorValue;
+        } else if (IDX_TO_HEX[colorValue] !== undefined) {
+            el.style.backgroundColor = IDX_TO_HEX[colorValue];
+        }
+    }
+
+    async function doSync() {
+        if (isSyncing) return;
+        isSyncing = true;
+        const statusEl = document.getElementById('syncStatus');
+        statusEl.innerText = "⏳ SYNCING..."; statusEl.className = "header-status-pill";
+        try {
+            if (!serialPort) throw new Error("No port");
+            let retries = 4;
+            while (retries > 0) {
+                try { if (!serialPort.readable || !serialPort.writable) await serialPort.open({ baudRate: 115200 }); break; }
+                catch (e) { retries--; if (retries === 0) throw e; await new Promise(res => setTimeout(res, 300)); }
+            }
+
+            async function fetchFromDevice(cmdString) {
+                const writer = serialPort.writable.getWriter();
+                await writer.write(new TextEncoder().encode(`{"cmd":"${cmdString}"}\n`));
+                writer.releaseLock();
+                const reader = serialPort.readable.getReader();
+                const decoder = new TextDecoder();
+                let incoming = ""; let jsonFound = false;
+                const readPromise = (async () => {
+                    while (true) { const { value, done } = await reader.read(); if (done) break; incoming += decoder.decode(value, { stream: true }); if (incoming.includes('}')) { jsonFound = true; break; } }
+                })();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 1500));
+                try { await Promise.race([readPromise, timeoutPromise]); } catch (e) { if (e.message === "TIMEOUT") reader.cancel().catch(()=>{}); throw e; } finally { try { reader.releaseLock(); } catch(e) {} }
+                if (jsonFound) { let s = incoming.indexOf('{'); let e = incoming.lastIndexOf('}'); if (s !== -1 && e !== -1) return JSON.parse(incoming.substring(s, e + 1)); }
+                throw new Error("Invalid JSON");
+            }
+
+            const ledData = await fetchFromDevice("led_get");
+
+            // Populate swatches from device response
+            if (ledData.idle_c64    !== undefined) setSwatchColor('sw-idle-c64',   ledData.idle_c64);
+            if (ledData.idle_amiga  !== undefined) setSwatchColor('sw-idle-amiga', ledData.idle_amiga);
+            if (ledData.dir_glowing !== undefined) setSwatchColor('sw-dir',        ledData.dir_glowing);
+            if (ledData.btn_fire1   !== undefined) setSwatchColor('sw-fire1',      ledData.btn_fire1);
+            if (ledData.btn_fire2   !== undefined) setSwatchColor('sw-fire2',      ledData.btn_fire2);
+            if (ledData.btn_fire3   !== undefined) setSwatchColor('sw-fire3',      ledData.btn_fire3);
+            if (ledData.btn_alt     !== undefined) setSwatchColor('sw-jump',       ledData.btn_alt);
+            if (ledData.btn_auto    !== undefined) setSwatchColor('sw-auto',       ledData.btn_auto);
+            if (ledData.led_fmt     !== undefined) document.getElementById('sel-format').value = ledData.led_fmt;
+            if (ledData.multicolor  !== undefined) document.getElementById('chk-mono').checked = (ledData.multicolor === 0);
+
+            statusEl.innerText = "✅ STATUS OK"; statusEl.className = "header-status-pill synced";
+        } catch (err) {
+            statusEl.innerText = "❌ SYNC FAIL"; statusEl.className = "header-status-pill failed";
+            if (serialPort) { try { await serialPort.close(); } catch(e){} serialPort = null; }
+        }
+        isSyncing = false;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(async () => {
+            if ('serial' in navigator) {
+                try { const ports = await navigator.serial.getPorts(); if (ports.length > 0) { serialPort = ports[0]; await doSync(); } } catch(e) {}
+            }
+        }, 300);
+    });
+
+    document.getElementById('syncStatus').addEventListener('click', async () => {
+        if (!('serial' in navigator)) return;
+        if (isSyncing) return;
+        try {
+            if (!serialPort) { const ports = await navigator.serial.getPorts(); if (ports.length > 0) serialPort = ports[0]; else serialPort = await navigator.serial.requestPort(); }
+            await doSync();
+        } catch (err) { serialPort = null; }
+    });
+
+    async function sendCommandOnly(payload) {
+        if (!serialPort || !serialPort.writable) return false;
+        try {
+            const writer = serialPort.writable.getWriter();
+            await writer.write(new TextEncoder().encode(JSON.stringify(payload) + '\n'));
+            writer.releaseLock(); return true;
+        } catch(e) { return false; }
+    }
+
+    function getSwatchIdx(id) {
+        const el = document.getElementById(id);
+        if (!el) return 0;
+        const hex = rgbToHex(el.style.backgroundColor);
+        return HEX_TO_IDX[hex] !== undefined ? HEX_TO_IDX[hex] : 0;
+    }
+
+    function getSwatchHex(id) {
+        const el = document.getElementById(id);
+        if (!el) return '#000000';
+        return rgbToHex(el.style.backgroundColor);
+    }
+
+    // APPLY button → led_save
+    document.querySelector('.btn-commit').addEventListener('click', async () => {
+        const btn = document.querySelector('.btn-commit');
+        btn.textContent = '⏳ SAVING...';
+        btn.disabled = true;
+
+        const payload = {
+            cmd:         "led_save",
+            idle_c64:    getSwatchHex('sw-idle-c64'),
+            idle_amiga:  getSwatchHex('sw-idle-amiga'),
+            dir_glowing: getSwatchHex('sw-dir'),
+            btn_fire1:   getSwatchHex('sw-fire1'),
+            btn_fire2:   getSwatchHex('sw-fire2'),
+            btn_fire3:   getSwatchHex('sw-fire3'),
+            btn_alt:     getSwatchHex('sw-jump'),
+            btn_auto:    getSwatchHex('sw-auto'),
+            led_fmt:     parseInt(document.getElementById('sel-format').value),
+            multicolor:  document.getElementById('chk-mono').checked ? 0 : 1,
+        };
+        const ok = await sendCommandOnly(payload);
+        if (ok) {
+            document.body.innerHTML = `
+                <div style="
+                    display:flex; flex-direction:column; align-items:center; justify-content:center;
+                    min-height:100vh; background:#000; font-family:'Oswald',sans-serif;
+                    text-transform:uppercase; text-align:center; padding:40px; box-sizing:border-box;">
+                    <div style="color:var(--lcars-cyan,#00BCD4); font-size:2.2em; font-weight:700; letter-spacing:0.1em; margin-bottom:16px;">
+                        💾 LED SETTINGS SAVED
+                    </div>
+                    <div style="color:#aaa; font-size:1em; margin-bottom:12px; font-family:sans-serif; text-transform:none;">
+                        Color and format changes are now active on the adapter.
+                    </div>
+                    <div style="color:var(--lcars-amber,#FFC107); font-size:0.95em; margin-bottom:40px; font-family:sans-serif; text-transform:none;">
+                        If you changed the LED format (GRB ↔ RGB), refresh this page to verify the new state.
+                    </div>
+                    <button onclick="location.reload()" style="
+                        background:var(--lcars-cyan,#00BCD4); color:#000; border:none;
+                        border-radius:25px; padding:14px 48px; font-family:'Oswald',sans-serif;
+                        font-size:1.2em; font-weight:700; cursor:pointer; letter-spacing:0.08em;
+                        text-transform:uppercase;">
+                        🔄 REFRESH PAGE
+                    </button>
+                </div>`;
+        } else {
+            btn.textContent = '❌ SAVE FAILED — RETRY';
+            btn.disabled = false;
+        }
+    });
+
+    // RESTORE DEFAULTS
+    document.querySelector('.btn-restore').addEventListener('click', () => {
+        document.getElementById('sw-idle-c64').style.backgroundColor  = '#FF9900';
+        document.getElementById('sw-idle-amiga').style.backgroundColor = '#FFFFFF';
+        document.getElementById('sw-dir').style.backgroundColor        = '#CC00CC';
+        document.getElementById('sw-fire1').style.backgroundColor      = '#00AA00';
+        document.getElementById('sw-fire2').style.backgroundColor      = '#CC0000';
+        document.getElementById('sw-fire3').style.backgroundColor      = '#00CCCC';
+        document.getElementById('sw-jump').style.backgroundColor       = '#0000CC';
+        document.getElementById('sw-auto').style.backgroundColor       = '#CCCC00';
+        document.getElementById('sel-format').value = '0';
+        document.getElementById('chk-mono').checked = false;
+    });
+
+    // ── COLOR PICKER ──
+    const PALETTE = [
+        { hex: "#000000", name: "BLACK"  },
+        { hex: "#FFFFFF", name: "WHITE"  },
+        { hex: "#FF0000", name: "RED"    },
+        { hex: "#FF9900", name: "ORANGE" },
+        { hex: "#FFFF00", name: "YELLOW" },
+        { hex: "#00FF00", name: "GREEN"  },
+        { hex: "#0000FF", name: "BLUE"   },
+        { hex: "#00FFFF", name: "CYAN"   },
+        { hex: "#FF00FF", name: "PURPLE" },
+        { hex: "#FF99CC", name: "PINK"   },
+    ];
+
+    const popup       = document.getElementById('color-picker-popup');
+    const overlay     = document.getElementById('color-picker-overlay');
+    const previewSw   = document.getElementById('picker-preview');
+    const hexDisplay  = document.getElementById('picker-hex');
+    const pickerTitle = document.getElementById('picker-title');
+
+    let activeSwatch  = null;
+    let selectedColor = null;
+
+    function buildGrid(id, colors) {
+        const grid = document.getElementById(id);
+        colors.forEach(({hex, name}) => {
+            const dot = document.createElement('div');
+            dot.className = 'picker-dot';
+            dot.style.backgroundColor = hex;
+            dot.dataset.hex  = hex.toUpperCase();
+            dot.dataset.name = name;
+            dot.addEventListener('click', () => selectColor(hex.toUpperCase(), name));
+            grid.appendChild(dot);
+        });
+    }
+
+    function selectColor(hex, name) {
+        selectedColor = hex;
+        previewSw.style.backgroundColor = hex;
+        hexDisplay.textContent = name || hex;
+        document.querySelectorAll('.picker-dot').forEach(d => {
+            d.classList.toggle('selected', d.dataset.hex === hex);
+        });
+    }
+
+    function rgbToHex(rgb) {
+        if (!rgb || rgb.startsWith('#')) return (rgb || '#000000').toUpperCase();
+        const m = rgb.match(/\d+/g);
+        if (!m) return '#000000';
+        return '#' + m.slice(0,3).map(n => parseInt(n).toString(16).padStart(2,'0')).join('').toUpperCase();
+    }
+
+    function openPicker(swatchEl) {
+        activeSwatch = swatchEl;
+        const hex = rgbToHex(swatchEl.style.backgroundColor);
+        pickerTitle.textContent = '● ' + (swatchEl.dataset.label || 'COLOR');
+        const match = PALETTE.find(c => c.hex.toUpperCase() === hex);
+        selectColor(hex, match ? match.name : hex);
+
+        const rect = swatchEl.getBoundingClientRect();
+        const pw = 344, ph = 310;
+        let left = rect.right + 12;
+        let top  = rect.top - 8;
+        if (left + pw > window.innerWidth - 10)  left = rect.left - pw - 12;
+        if (left < 10) left = 10;
+        if (top + ph > window.innerHeight - 10) top = window.innerHeight - ph - 10;
+        if (top < 10) top = 10;
+
+        popup.style.left = left + 'px';
+        popup.style.top  = top + 'px';
+        popup.style.display = 'block';
+        overlay.style.display = 'block';
+        swatchEl.classList.add('active');
+    }
+
+    function closePicker() {
+        popup.style.display = 'none';
+        overlay.style.display = 'none';
+        if (activeSwatch) activeSwatch.classList.remove('active');
+        activeSwatch = null;
+    }
+
+    function confirmColor() {
+        if (activeSwatch && selectedColor) activeSwatch.style.backgroundColor = selectedColor;
+        closePicker();
+    }
+
+    buildGrid('picker-grid-sat', PALETTE);
+
+    document.querySelectorAll('.color-swatch').forEach(sw => {
+        sw.addEventListener('click', e => { e.stopPropagation(); openPicker(sw); });
+    });
+
+    document.getElementById('picker-close-btn').addEventListener('click', closePicker);
+    document.getElementById('picker-confirm-btn').addEventListener('click', confirmColor);
+    overlay.addEventListener('click', closePicker);
+</script>
+
+</body>
+</html>
