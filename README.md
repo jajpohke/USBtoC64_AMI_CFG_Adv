@@ -4,7 +4,7 @@ An ESP32-S3 firmware to connect modern USB controllers and mice to classic **Com
 
 This is a fork of the [original USBtoC64 project](https://github.com/emanuelelaface/USBtoC64) by Emanuele Laface.
 
-This fork was born with a few specific goals: improving compatibility with stubborn controllers that don't work out of the box, adding Fire 2 and Fire 3 support on both C64 and Amiga, and offering a more user-friendly experience — without needing the Arduino IDE or reflashing the board every time something needs to change. Most configuration is handled directly from the browser via the [built-in web configurator](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html).
+This fork was born with a few specific goals: improving compatibility with stubborn controllers that don't work out of the box, adding Fire 2 and Fire 3 support on both C64 and Amiga, and offering a more user-friendly experience — without needing the Arduino IDE or reflashing the board every time something needs to change. Most configuration is handled directly from the browser via the [built-in web configurator](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/index.html).
 
 For a full setup walkthrough, see the [Getting Started guide](GETSTARTED.md).
 

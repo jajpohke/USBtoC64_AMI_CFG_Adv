@@ -47,7 +47,7 @@ Replace `<PORT>` with your board's serial port (e.g. `COM3` on Windows, `/dev/tt
 Once flashed, you can verify that the adapter is running and responsive directly from the browser — no serial terminal needed.
 
 1. Connect the USB2C64 to your PC via USB-C.
-2. Open the [web configurator hub](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html) in Chrome.
+2. Open the [web configurator hub](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/index.html) in Chrome.
 3. Navigate to **Settings** (`memory.html`).
 
 You will see the **OTHER SETTINGS AND SAVED MEMORY** panel with a **REFRESH STAT.** button:
@@ -90,7 +90,7 @@ In the **Settings** page (`memory.html`), under **ACTIVE HARDWARE CONFIGURATION*
 
 ## 4. Configuring a Controller
 
-Open [`configurator.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/configurator.html) from the hub.
+Open [`configurator.html`](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/configurator.html) from the hub.
 
 ### How it works
 
@@ -156,7 +156,7 @@ If automatic detection is unreliable — for example, because the D-pad is small
 
 ## 7. What's Next
 
-- Customise LED colors → [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html)
-- Adjust mouse speed and mode → [`mouse.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/mouse.html)
-- Check NVS memory usage or factory reset → [`memory.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/memory.html)
+- Customise LED colors → [`led.html`](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/led.html)
+- Adjust mouse speed and mode → [`mouse.html`](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/mouse.html)
+- Check NVS memory usage or factory reset → [`memory.html`](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/memory.html)
 - Advanced diagnostics and serial commands → [DEVELOPER.md](DEVELOPER.md)

@@ -1,0 +1,45 @@
+# Copies configurator/ from main to the gh-pages branch, so the GitHub Pages
+# copy (https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/) always
+# matches main. Other files on gh-pages are left untouched.
+name: Sync configurator to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['configurator/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-configurator-pages
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
+
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      - name: Copy configurator and push
+        run: |
+          rm -rf site/configurator
+          cp -r src/configurator site/configurator
+          cd site
+          git add -A configurator
+          if git diff --cached --quiet; then
+            echo "Configurator already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Sync configurator from main@${GITHUB_SHA::7}"
+          git push

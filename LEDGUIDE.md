@@ -36,7 +36,7 @@ The USB2C64 uses a single WS2812B RGB LED to communicate the adapter's current s
 ## Customising Colors — Web UI
 
 1. Connect the adapter via USB-C to your PC.
-2. Open [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) in Chrome.
+2. Open [`led.html`](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/led.html) in Chrome.
 3. Select a color slot, adjust the RGB values using the sliders, and click **SAVE**. The LED updates immediately.
 
 Changes are saved to NVS and survive reboots.
@@ -64,7 +64,7 @@ The LED updates in real time as you type. The web UI and serial terminal share t
 
 ## Wrong Colors? GRB vs RGB
 
-Some WS2812B variants use GRB byte order instead of RGB. If your LED shows the wrong colors (e.g. green instead of red on Fire 1), fix it in [`led.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/led.html) → **LED Format** selector, or via `service → coloradj` in the serial terminal.
+Some WS2812B variants use GRB byte order instead of RGB. If your LED shows the wrong colors (e.g. green instead of red on Fire 1), fix it in [`led.html`](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/led.html) → **LED Format** selector, or via `service → coloradj` in the serial terminal.
 
 After changing the LED format, the web page will prompt you to refresh — this is expected.
 

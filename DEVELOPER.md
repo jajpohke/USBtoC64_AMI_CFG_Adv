@@ -98,7 +98,7 @@ When a controller is connected, the firmware checks TIER 0 first. If a matching 
 | `rules[].op` | `0` = JM_EQ, `1` = JM_BITANY, `2` = JM_HAT |
 | `rules[].f` | Output: `0`=UP, `1`=UP_RIGHT, `2`=RIGHT, `3`=RIGHT_DOWN, `4`=DOWN, `5`=DOWN_LEFT, `6`=LEFT, `7`=LEFT_UP, `8`=FIRE, `9`=FIRE2, `10`=FIRE3, `11`=AUTO_ON, `12`=AUTO_OFF, `13`=AUTO_HOLD |
 
-To inspect or reset NVS content, use `info` and `factory` from the service menu, or the **Settings** page in the web UI ([`memory.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/memory.html)).
+To inspect or reset NVS content, use `info` and `factory` from the service menu, or the **Settings** page in the web UI ([`memory.html`](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/memory.html)).
 
 ---
 

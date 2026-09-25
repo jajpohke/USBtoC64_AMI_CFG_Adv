@@ -27,7 +27,7 @@ The following controllers are pre-configured in the firmware (`JoystickProfiles.
 | **NES2USB RetroBit** | `4754` | `17987` | BITMASK | Optimized profile — fixes the silent diagonals bug |
 | **USB2SNES Mayflash** | `3727` | `12307` | AXIS | Smart Multiport: supports two SNES pads simultaneously (Co-Pilot Mode), filters false contacts from internal multiplexer |
 
-> **Note on Original PS4 (DualShock 4):** Due to the complexity of its protocol and multiple onboard sensors, the native profile may not interpret all signals correctly in every situation. If you experience issues, map it manually via the [web configurator](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/configurator.html). A manually saved NVS mapping always takes priority over the built-in profile.
+> **Note on Original PS4 (DualShock 4):** Due to the complexity of its protocol and multiple onboard sensors, the native profile may not interpret all signals correctly in every situation. If you experience issues, map it manually via the [web configurator](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/configurator.html). A manually saved NVS mapping always takes priority over the built-in profile.
 
 ---
 
@@ -37,7 +37,7 @@ If your controller is not in the list above, you can map it manually using the w
 
 This also applies to controllers that already have a native profile: a mapping saved via the web configurator always takes priority over the built-in one. This means you can fine-tune or completely override any pre-configured pad without touching the firmware.
 
-1. Connect the controller and open [`configurator.html`](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/configurator.html) in Chrome.
+1. Connect the controller and open [`configurator.html`](https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/configurator.html) in Chrome.
 2. Follow the on-screen connection flow (press any button → click the yellow banner → go green).
 3. Click each zone on the visual layout and press the corresponding button or direction on your controller.
 4. Click **💾 SAVE** when done. The mapping is written to NVS and active on every subsequent boot.
