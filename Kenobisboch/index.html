@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<title>USB2C64 · Link per Kenobisboch Production</title>
+<style>
+  :root {
+    --bg: #352879;        /* C64 blu */
+    --panel: #2a1f66;
+    --border: #6c5eb5;    /* C64 azzurro-viola */
+    --text: #e4e0ff;
+    --muted: #a59fe8;
+    --accent: #9ae29b;    /* C64 verde chiaro */
+    --warn: #eef08f;      /* C64 giallo */
+    --link: #8fd3ff;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--border);
+    color: var(--text);
+    font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .screen {
+    max-width: 760px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--bg);
+    padding: 28px 16px 40px;
+  }
+  @media (min-width: 800px) {
+    body { padding: 32px 0; }
+    .screen { min-height: 0; padding: 36px 40px 44px; }
+  }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; }
+  .boot { color: var(--muted); font-size: 14px; margin: 0 0 20px; letter-spacing: .02em; }
+  .boot .cursor { display: inline-block; width: .6em; height: 1em; background: var(--muted); vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .boot .cursor { animation: none; } }
+  h1 { font-size: 26px; line-height: 1.25; margin: 0 0 12px; }
+  h2 {
+    font-size: 15px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--accent); margin: 34px 0 12px;
+  }
+  p { margin: 0 0 12px; }
+  a { color: var(--link); text-underline-offset: 3px; }
+  a:hover { color: #fff; }
+  .notice {
+    border: 2px solid var(--warn); color: var(--warn);
+    padding: 12px 14px; margin: 22px 0 6px; font-size: 16px;
+  }
+  .notice strong { color: #fff; }
+  ul.links { list-style: none; padding: 0; margin: 0; }
+  ul.links > li {
+    background: var(--panel); border-left: 4px solid var(--border);
+    padding: 12px 14px; margin: 0 0 10px;
+  }
+  ul.links .title { display: block; font-weight: 600; }
+  ul.links .desc { display: block; color: var(--muted); font-size: 15px; margin-top: 2px; }
+  ul.links .alt { display: block; font-size: 15px; margin-top: 6px; }
+  ol.steps { margin: 12px 0 0; padding-left: 22px; }
+  ol.steps li { margin-bottom: 6px; }
+  code {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    background: var(--panel); padding: 1px 6px; color: var(--warn);
+  }
+  a, .desc, .alt { overflow-wrap: anywhere; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 15px; }
+</style>
+</head>
+<body>
+<main class="screen">
+  <p class="boot mono">**** COMMODORE 64 BASIC V2 ****<br>READY.<br>LOAD"KENOBISBOCH-LINKS",8,1 <span class="cursor"></span></p>
+
+  <h1>Caro lettore di Kenobisboch Production</h1>
+  <p>Se sei arrivato fin qui, ecco tutti i link e i riferimenti dell'articolo su USB2C64.</p>
+
+  <div class="notice">
+    <strong>Serve un PC con Google Chrome o Microsoft Edge.</strong>
+    Il caricamento del firmware e il configuratore comunicano con l'adattatore
+    via USB dal browser: dal telefono, da Firefox o da Safari non funzionano.
+  </div>
+
+  <h2>Firmware</h2>
+  <ul class="links">
+    <li>
+      <a class="title" href="https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/releases/latest/download/USBtoC64_Adv.bin">Firmware custom USBtoC64_Adv (ultima versione)</a>
+      <span class="desc">Pulsanti di fuoco 2 e 3 su C64 e Amiga, configurazione dal browser.</span>
+      <a class="alt" href="https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/releases">Tutte le versioni e le note di rilascio</a>
+    </li>
+    <li>
+      <a class="title" href="https://github.com/emanuelelaface/USBtoC64/tree/main/bin">Firmware originale di Emanuele Laface</a>
+      <span class="desc">Consigliato per un primo test di compatibilità del tuo joystick.</span>
+    </li>
+    <li>
+      <a class="title" href="https://espressif.github.io/esptool-js/">ESP Tool: caricare il firmware dal browser</a>
+      <ol class="steps">
+        <li>Stacca l'adattatore dal C64 o dall'Amiga.</li>
+        <li>Collegalo al PC via USB-C tenendo premuto il tastino <strong>B</strong>, e rilascialo dopo circa un secondo.</li>
+        <li>Nel tool premi <strong>Connect</strong> e scegli la porta dell'adattatore.</li>
+        <li>Imposta come flash address <code>0x0000</code> e scegli il file del firmware.</li>
+        <li>Premi <strong>Program</strong> e attendi qualche secondo.</li>
+      </ol>
+    </li>
+  </ul>
+
+  <h2>Configuratore web</h2>
+  <ul class="links">
+    <li>
+      <a class="title" href="https://jajpohke.github.io/USBtoC64_AMI_CFG_Adv/configurator/">Apri il configuratore</a>
+      <span class="desc">Collega l'adattatore a una porta USB del PC e il joystick a un'altra porta libera.</span>
+      <a class="alt" href="https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html">Indirizzo alternativo</a>
+    </li>
+    <li>
+      <a class="title" href="https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/archive/refs/heads/main.zip">Scarica il configuratore per usarlo in locale (ZIP)</a>
+      <span class="desc">Estrai l'archivio e apri <code>configurator/index.html</code> con Chrome o Edge: funziona anche senza internet.</span>
+    </li>
+  </ul>
+
+  <h2>I progetti</h2>
+  <ul class="links">
+    <li>
+      <a class="title" href="https://github.com/emanuelelaface/USBtoC64/tree/main">USB2C64 originale di Emanuele Laface</a>
+      <span class="desc">Progetto, istruzioni, schema e link al negozio Tindie per l'adattatore già assemblato.</span>
+    </li>
+    <li>
+      <a class="title" href="https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/tree/main">USBtoC64_Adv, il fork per i tasti 2 e 3</a>
+      <span class="desc">Descrizione, istruzioni e modelli 3D del guscio.</span>
+      <a class="alt" href="https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/blob/main/JOYSTICKGUIDE.md">Lista dei controller pre-configurati e di quelli non supportati</a>
+    </li>
+    <li>
+      <a class="title" href="https://github.com/crystalct/5plusbuttonsJoystick/">CrystalCT: 5plusbuttonsJoystick</a>
+      <span class="desc">Giochi C64 multi-pulsante e il joypad 5+1.</span>
+    </li>
+  </ul>
+
+  <h2>Contatti</h2>
+  <p>
+    Se mi vuoi contattare via mail e non tramite Facebook puoi scrivermi a
+    <span id="mail"><noscript>thelowest78 [chiocciola] gmail [punto] com</noscript></span>.
+  </p>
+
+  <footer>
+    Stefano Prenna · USB2C64 su Kenobisboch Production<br>
+    <span class="mono">READY.</span>
+  </footer>
+</main>
+<script>
+  (function () {
+    var u = ['thelowest', '78'].join(''), d = ['gmail', 'com'].join('.');
+    var a = document.createElement('a');
+    a.href = 'mailto:' + u + '@' + d;
+    a.textContent = u + '@' + d;
+    var el = document.getElementById('mail');
+    el.textContent = '';
+    el.appendChild(a);
+  })();
+</script>
+</body>
+</html>
