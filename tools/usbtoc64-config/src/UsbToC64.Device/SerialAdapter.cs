@@ -94,7 +94,7 @@ public sealed class SerialAdapterPort : IAdapterPort
     /// Windows applies the two lines. Like the Arduino IDE serial monitor, after a restart the port is reopened
     /// with both lines active; the combinations alternate so a reopen never repeats the one that just reset it.
     /// </summary>
-    private static readonly (bool Dtr, bool Rts)[] LineModes = { (true, false), (true, true), (false, false) };
+    private static readonly (bool Dtr, bool Rts)[] LineModes = { (true, true), (true, false), (false, false) };
 
     public string LastLines { get; private set; } = "";
 
@@ -108,6 +108,23 @@ public sealed class SerialAdapterPort : IAdapterPort
         _lastMode = _goodMode ?? _opens++ % LineModes.Length;
         var (dtr, rts) = LineModes[_lastMode];
         LastLines = $"DTR={(dtr ? 1 : 0)} RTS={(rts ? 1 : 0)}";
+
+        // Windows: open like the Arduino IDE (one SetCommState, no intermediate DTR/RTS changes).
+        if (OperatingSystem.IsWindows())
+        {
+            Exception? err = null;
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try { return Win32SerialLink.Open(Name, dtr, rts); }
+                catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+                {
+                    err = ex;
+                    Thread.Sleep(300);
+                }
+            }
+            throw err is UnauthorizedAccessException ua ? new IOException(ua.Message, ua) : (IOException)err!;
+        }
+
         var sp = new SerialPort(Name, 115200, Parity.None, 8, StopBits.One)
         {
             Handshake = Handshake.None,
