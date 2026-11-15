@@ -98,13 +98,15 @@ internal sealed class MainForm : Form
         var tools2 = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Padding = new Padding(6, 2, 6, 2) };
         var btnWrite = new ToolStripButton("Scrivi sull'adattatore e verifica") { Font = new Font(Font, FontStyle.Bold) };
         var btnRead = new ToolStripButton("Leggi dall'adattatore");
+        var btnPing = new ToolStripButton("Test connessione");
         tools2.Items.AddRange(new ToolStripItem[]
         {
-            new ToolStripLabel("Adattatore:"), _cbPorts, new ToolStripSeparator(), btnWrite, btnRead,
+            new ToolStripLabel("Adattatore:"), _cbPorts, btnPing, new ToolStripSeparator(), btnWrite, btnRead,
         });
+        btnPing.Click += async (_, _) => await PingAdapter();
         btnWrite.Click += async (_, _) => await WriteToAdapter();
         btnRead.Click += async (_, _) => await ReadFromAdapter();
-        _busyDisabled.AddRange(new ToolStripItem[] { btnWrite, btnRead, btnRefresh, btnImport, btnPropose, _cbPads, _cbPorts });
+        _busyDisabled.AddRange(new ToolStripItem[] { btnWrite, btnRead, btnPing, btnRefresh, btnImport, btnPropose, _cbPads, _cbPorts });
 
         SetupGrid();
 
@@ -596,6 +598,38 @@ internal sealed class MainForm : Form
         MessageBox.Show(this, text, result.Verified ? "Profilo scritto e verificato" : "Scrittura sull'adattatore", MessageBoxButtons.OK, icon);
     }
 
+    private async Task PingAdapter()
+    {
+        if (_busy) return;
+        AdapterPortInfo port;
+        try { port = AdapterPorts.Find(RequestedPort()); }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Test connessione", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        _tabs.SelectedTab = _tabAdapter;
+        Log($"--- Test connessione su {port}");
+        SetBusy(true);
+        string message;
+        bool ok = false;
+        try
+        {
+            var info = await Task.Run(() =>
+            {
+                using var link = new SerialAdapterPort(port.PortName).Open();
+                return new AdapterSession(link, Log).Ping();
+            });
+            ok = true;
+            message = $"L'adattatore su {port.PortName} risponde: {info}.";
+        }
+        catch (Exception ex) { message = ex.Message; }
+        finally { SetBusy(false); }
+        Log(message);
+        SetStatus(message);
+        MessageBox.Show(this, message, "Test connessione", MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+    }
+
     private async Task ReadFromAdapter()
     {
         if (_busy) return;
@@ -617,7 +651,9 @@ internal sealed class MainForm : Form
             stored = await Task.Run(() =>
             {
                 using var link = new SerialAdapterPort(port.PortName).Open();
-                return new AdapterSession(link, Log).ReadStored();
+                var session = new AdapterSession(link, Log);
+                Log($"Comunicazione OK ({session.Ping()}).");
+                return session.ReadStored();
             });
         }
         catch (Exception ex) { error = ex.Message; }

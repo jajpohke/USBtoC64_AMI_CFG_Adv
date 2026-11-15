@@ -14,6 +14,7 @@ internal sealed class FakeAdapter : IAdapterPort
     public bool CorruptOnSave { get; init; }     // store something different from what was sent
     public bool RebootBeforeReply { get; init; } // saves, but the port vanishes before "ok" is read (seen on Windows)
     public bool ThrowOnSend { get; init; }       // ... and the send itself fails with "device not functioning"
+    public bool NoComm { get; init; }            // nothing answers (wrong port, connected to the C64, dev mode)
     public JmProfile? Stored { get; private set; }
     public int Opens { get; private set; }
     private int _absentPolls;
@@ -41,6 +42,12 @@ internal sealed class FakeAdapter : IAdapterPort
 
         public void SendLine(string line)
         {
+            if (_a.NoComm) return;
+            if (line == "{\"cmd\":\"get_info\"}")
+            {
+                _out.Enqueue("{\"is_amiga\":false,\"dev_mode\":false,\"inv_switch\":false,\"dev_amiga\":false}");
+                return;
+            }
             if (line.StartsWith("{\"cmd\":\"save_jm\""))
             {
                 if (_a.Silent) return;
@@ -159,6 +166,17 @@ public class ProtocolTests
         var r = Writer(new FakeAdapter { RebootBeforeReply = true, ThrowOnSend = true }, log).WriteAndVerify(Sample());
         Assert.True(r.Verified, r.Message);
         Assert.Contains(log, l => l.Contains("scomparsa durante l'invio"));
+    }
+
+    [Fact]
+    public void Write_NoCommunication_NothingIsSent()
+    {
+        var a = new FakeAdapter { NoComm = true };
+        var log = new List<string>();
+        var r = Writer(a, log).WriteAndVerify(Sample());
+        Assert.False(r.Saved);
+        Assert.StartsWith("Profilo NON inviato", r.Message);
+        Assert.DoesNotContain(log, l => l.Contains("save_jm"));
     }
 
     [Fact]

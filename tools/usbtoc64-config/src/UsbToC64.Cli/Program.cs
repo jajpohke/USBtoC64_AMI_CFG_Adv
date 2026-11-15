@@ -31,6 +31,7 @@ internal static class Program
 
         Adattatore (collegato al PC con la USB-C, non al C64/Amiga, Developer Mode spenta):
           ports                            Elenca le porte seriali (l'ESP32 è riconosciuto da solo)
+          ping [--port COMx]               Verifica che l'adattatore risponda (get_info)
           write <file.json|.h> [--port COMx]   Scrive il profilo, attende il riavvio e lo rilegge per verifica
           read [--port COMx] [--json]      Legge il profilo pad salvato sull'adattatore
 
@@ -58,6 +59,7 @@ internal static class Program
                 "convert" => Convert(args[1..]),
                 "descriptor" => Descriptor(args[1..]),
                 "ports" => Ports(),
+                "ping" => Ping(args[1..]),
                 "write" => Write(args[1..]),
                 "read" => Read(args[1..]),
                 _ => Fail($"Comando sconosciuto: {args[0]}\n\n{Usage}"),
@@ -220,12 +222,23 @@ internal static class Program
         return r.Verified ? 0 : r.Saved ? 3 : 1;
     }
 
+    private static int Ping(string[] args)
+    {
+        var port = AdapterPorts.Find(Option(args, "--port"));
+        using var link = new SerialAdapterPort(port.PortName).Open();
+        var info = new AdapterSession(link, s => Console.WriteLine("  " + s)).Ping();
+        Console.WriteLine($"L'adattatore su {port.PortName} risponde: {info}.");
+        return 0;
+    }
+
     private static int Read(string[] args)
     {
         var port = AdapterPorts.Find(Option(args, "--port"));
         bool json = HasFlag(args, "--json");
         using var link = new SerialAdapterPort(port.PortName).Open();
-        var stored = new AdapterSession(link, json ? null : s => Console.WriteLine("  " + s)).ReadStored();
+        var session = new AdapterSession(link, json ? null : s => Console.WriteLine("  " + s));
+        session.Ping();
+        var stored = session.ReadStored();
         if (stored.Profile == null)
         {
             Console.WriteLine("Nessun profilo pad (TIER 0) salvato sull'adattatore.");

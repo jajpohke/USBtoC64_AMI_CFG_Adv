@@ -20,7 +20,9 @@ Due programmi:
 3. Nella colonna **Azione sul C64** si sceglie cosa fa ogni controllo. **Proposta automatica** ripristina i valori iniziali.
 4. A destra si vede dal vivo cosa riceverebbe il C64 (direzioni, F1–F3, autofire).
 5. In basso: **Avvisi** (problemi del profilo), **Regole per il firmware**, **JSON save_jm**.
-6. **Scrivi sull'adattatore e verifica**: trova da solo la porta dell'ESP32, invia il profilo, attende il
+6. **Test connessione** verifica che l'adattatore risponda (comando `get_info`, presente anche nel firmware
+   originale). Lo stesso test viene fatto in automatico prima di ogni scrittura e lettura.
+   **Scrivi sull'adattatore e verifica**: trova da solo la porta dell'ESP32, invia il profilo, attende il
    riavvio e lo rilegge confrontandolo con quello inviato. **Leggi dall'adattatore** mostra il profilo salvato.
    L'adattatore va collegato al PC con la USB-C, senza C64/Amiga, Developer Mode spenta. Chiudere il
    configuratore web o terminali seriali che tengono occupata la porta.
@@ -46,6 +48,7 @@ usbtoc64 check JoystickMapping.h
 usbtoc64 convert JoystickMapping.h -o profilo.json
 usbtoc64 descriptor descrittore.txt
 usbtoc64 ports
+usbtoc64 ping
 usbtoc64 write profilo.json
 usbtoc64 read
 ```

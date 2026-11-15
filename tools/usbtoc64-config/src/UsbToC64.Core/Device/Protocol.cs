@@ -108,6 +108,12 @@ public static class DumppadParser
 
 public enum ReadMethod { GetJm, Dumppad }
 
+/// <summary>Reply to get_info (exists in the original firmware too).</summary>
+public sealed record AdapterInfo(bool IsAmiga, bool DevMode, bool InvertSwitch, string Raw)
+{
+    public override string ToString() => $"modalità {(IsAmiga ? "Amiga" : "C64")}, Developer Mode {(DevMode ? "ON" : "OFF")}";
+}
+
 public sealed record StoredProfile(JmProfile? Profile, ReadMethod Method, bool HasCustom);
 
 /// <summary>Requests on an open link. JSON replies are recognised by their leading '{'; other lines (boot banner, menu text) are logged.</summary>
@@ -158,6 +164,23 @@ public sealed class AdapterSession
         }
         foreach (var l in lines) _log($"← {l}");
         return string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// Communication test with a command the original firmware already has (get_info, used by the web memory page).
+    /// No reply means: wrong port, adapter connected to the C64/Amiga, or Developer Mode on.
+    /// </summary>
+    public AdapterInfo Ping(TimeSpan? timeout = null)
+    {
+        using var doc = RequestJson("{\"cmd\":\"get_info\"}", timeout ?? TimeSpan.FromSeconds(2))
+            ?? throw new TimeoutException(
+                "L'adattatore non risponde al comando di prova (get_info). Controlla che sia collegato solo al PC " +
+                "(non al C64/Amiga), che la Developer Mode sia spenta e che la porta sia quella giusta.");
+        var r = doc.RootElement;
+        bool B(string name) => r.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
+        if (!r.TryGetProperty("is_amiga", out _))
+            throw new InvalidOperationException($"Risposta inattesa al comando di prova: {r.GetRawText()}");
+        return new AdapterInfo(B("is_amiga"), B("dev_mode"), B("inv_switch"), r.GetRawText());
     }
 
     /// <summary>Reads the stored TIER 0 profile: get_jm (firmware proto 1) or, on older firmware, the dumppad text.</summary>
@@ -218,6 +241,16 @@ public sealed class AdapterWriter
             link = _port.Open();
             _log($"Porta {link.Name} aperta.");
             var session = new AdapterSession(link, _log);
+
+            // 0) communication test before sending anything
+            AdapterInfo info;
+            try { info = session.Ping(); }
+            catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or IOException)
+            {
+                return new WriteResult(false, false, null, new(), "Profilo NON inviato. " + ex.Message);
+            }
+            _log($"Comunicazione OK ({info}).");
+
             JsonDocument? reply;
             try
             {
