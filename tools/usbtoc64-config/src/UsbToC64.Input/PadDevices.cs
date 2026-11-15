@@ -103,7 +103,12 @@ public static class PadDevices
     /// </summary>
     public static (XInputKind Kind, ushort Vid, ushort Pid, string? Note) ResolveXInput(ushort vid, ushort pid, IReadOnlyList<UsbDeviceInfo> usb)
     {
-        static bool IsGip(UsbDeviceInfo u) => u.Service.Equals("xboxgip", StringComparison.OrdinalIgnoreCase);
+        // Wired Xbox One/Series pads are bound to xboxgip (recent Windows) or dc1-controller ("Xbox Gaming Device");
+        // as a fallback, a known Xbox One/Series VID/PID.
+        static bool IsGip(UsbDeviceInfo u) =>
+            u.Service.Equals("xboxgip", StringComparison.OrdinalIgnoreCase) ||
+            u.Service.Equals("dc1-controller", StringComparison.OrdinalIgnoreCase) ||
+            (XInputLayout.IsKnownXboxOne(u.Vid, u.Pid) && !(u.Vid == VirtualGipVid && u.Pid == VirtualGipPid));
         static bool Is360(UsbDeviceInfo u) => u.Service.StartsWith("xusb", StringComparison.OrdinalIgnoreCase);
 
         var same = usb.Where(u => u.Vid == vid && u.Pid == pid).ToList();
@@ -123,9 +128,13 @@ public static class PadDevices
             return (XInputKind.Gip, rv, rp, note);
         }
         if (virtualGip)
+        {
+            var ms = usb.Where(u => u.Vid == 0x045E).Select(u => $"{u.Vid:X4}:{u.Pid:X4} (driver \"{u.Service}\")").Distinct().ToList();
             return (XInputKind.Gip, vid, pid,
                 "Controller Xbox One/Series, ma il dispositivo USB reale non è stato trovato: il VID/PID del profilo (045E:02FF) " +
-                "non corrisponderà a quello che vede l'adattatore.");
+                "non corrisponderà a quello che vede l'adattatore. Dispositivi USB Microsoft collegati: " +
+                (ms.Count == 0 ? "nessuno" : string.Join(", ", ms)) + ".");
+        }
         return (XInputLayout.IsKnownXboxOne(vid, pid) ? XInputKind.Gip : XInputKind.Xbox360, vid, pid, null);
     }
 }

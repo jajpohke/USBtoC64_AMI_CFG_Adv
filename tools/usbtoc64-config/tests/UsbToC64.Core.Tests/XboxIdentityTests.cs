@@ -19,6 +19,26 @@ public class XboxIdentityTests
         Assert.NotNull(note);
     }
 
+    [Theory]
+    [InlineData("dc1-controller")]
+    [InlineData("")]           // driver name not readable: known PID 02EA
+    public void VirtualGipDevice_OtherDriverNames(string service)
+    {
+        var usb = new[] { new UsbDeviceInfo(0x045E, 0x02EA, service, @"USB\VID_045E&PID_02EA\1") };
+        var (kind, _, pid, _) = PadDevices.ResolveXInput(0x045E, 0x02FF, usb);
+        Assert.Equal(XInputKind.Gip, kind);
+        Assert.Equal(0x02EA, pid);
+    }
+
+    [Fact]
+    public void VirtualGipDevice_NotFound_ListsMicrosoftDevices()
+    {
+        var usb = new[] { new UsbDeviceInfo(0x045E, 0x0999, "foo", @"USB\VID_045E&PID_0999\1") };
+        var (_, _, pid, note) = PadDevices.ResolveXInput(0x045E, 0x02FF, usb);
+        Assert.Equal(0x02FF, pid);
+        Assert.Contains("045E:0999", note);
+    }
+
     [Fact]
     public void Xbox360Clone_StaysXbox360()
     {

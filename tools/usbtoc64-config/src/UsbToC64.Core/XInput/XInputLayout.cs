@@ -42,7 +42,8 @@ public static class XInputLayout
     private static readonly HashSet<(ushort, ushort)> KnownGip = new()
     {
         (0x045E, 0x02D1), (0x045E, 0x02DD), (0x045E, 0x02E3), (0x045E, 0x02EA),
-        (0x045E, 0x0B00), (0x045E, 0x0B12),
+        (0x045E, 0x0B00), (0x045E, 0x0B12), (0x045E, 0x0B0A),
+        (0x045E, 0x02FF), // virtual device created by Windows for GIP pads (never seen by the adapter)
     };
 
     /// <summary>Xbox 360 wireless receiver: different report format, not supported.</summary>
