@@ -292,6 +292,11 @@ Implementate in `USBtoC64/USBtoC64_Adv.ino`, solo sul branch di sviluppo. Sono *
    `{"status":"ok","proto":1,"has_custom":true,"vid":..,"pid":..,"dpad_idx":..,"use_analog":..,"analog_x":[..],"analog_y":[..],"rules":[..]}`.
    Senza profilo: `{"status":"empty","proto":1}`.
 
+3. `Serial.setRxBufferSize(4096)` prima di `Serial.begin` (standalone). Il buffer predefinito di 256 byte è
+   più piccolo di un `save_jm` completo (~700 byte): il JSON arrivava troncato e veniva scartato senza risposta.
+   Era la causa dei SAVE del configuratore web che mostravano "CONFIGURATION SAVED" senza salvare nulla.
+   Il tool comunque invia a blocchi da 32 byte con pause di 15 ms, così funziona anche con il firmware originale.
+
 **Compatibilità con il configuratore web attuale**
 
 - Le risposte esistenti (`get_info`, `mem_status`, `mouse_get`, `led_get`, gli `ok` di salvataggio…)

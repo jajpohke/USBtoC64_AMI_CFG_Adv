@@ -511,6 +511,9 @@ void setup() {
     //    C64 +  dev → niente  (fisicamente impossibile collegare adattatore)
     if (!C64_Amiga_Connected) {
         if (!dev_mode) {
+            // Added: the default RX buffer (256 bytes) is smaller than a full save_jm JSON (~700+ bytes),
+            // which then arrived truncated and was silently ignored. Must be set before begin().
+            Serial.setRxBufferSize(4096);
             Serial.begin(115200);
             delay(2000);
             Serial.println("\n=================================");

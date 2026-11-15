@@ -124,10 +124,23 @@ internal sealed class SerialLink : IAdapterLink
     public string Name => _sp.PortName;
     public bool Lost { get; private set; }
 
+    private const int ChunkSize = 32;
+    private const int ChunkDelayMs = 15;
+
     public void SendLine(string line)
     {
+        // Sent in small paced chunks: the original firmware has a 256-byte USB RX buffer and reads it only
+        // from loop(), so a ~700-byte save_jm line written at once overflows it and is silently dropped.
         // No BaseStream.Flush(): on Windows it can block until the adapter reboots and then fail.
-        try { _sp.Write(line + "\n"); }
+        var data = line + "\n";
+        try
+        {
+            for (int i = 0; i < data.Length; i += ChunkSize)
+            {
+                _sp.Write(data.Substring(i, Math.Min(ChunkSize, data.Length - i)));
+                if (i + ChunkSize < data.Length) Thread.Sleep(ChunkDelayMs);
+            }
+        }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
         {
             Lost = true;
