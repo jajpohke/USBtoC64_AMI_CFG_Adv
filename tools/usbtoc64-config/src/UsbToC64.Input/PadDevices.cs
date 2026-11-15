@@ -64,7 +64,8 @@ public static class PadDevices
             if (!isGame && !xinput) continue;
 
             string name;
-            try { name = d.GetProductName(); } catch { name = "(senza nome)"; }
+            try { name = d.GetProductName()?.Trim() ?? ""; } catch { name = ""; }
+            if (name.Length == 0) name = "(senza nome)";
             result.Add(new PadDevice(d, name, xinput, raw, err));
         }
         // Windows can expose the same pad more than once (one entry per top-level collection).

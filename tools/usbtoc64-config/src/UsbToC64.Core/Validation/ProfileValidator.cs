@@ -72,7 +72,9 @@ public static class ProfileValidator
                                              && (byteHasBits.Contains(r.Index) || p.Rules.Count(o => o.Index == r.Index) > 1)))
             Add(Severity.Warning, "EQ_ON_BUTTON_BYTE",
                 $"{Names.Rule(r)}: confronto esatto (==) su un byte di pulsanti: scatta solo se quel tasto è l'unico premuto. Meglio BIT.");
-        foreach (var r in p.Rules.Where(r => r.Op == JmOp.Hat && byteHasBits.Contains(r.Index)))
+        // HAT compares only the low nibble: buttons in the high nibble (bits 4-7) do not disturb it.
+        var lowNibbleButtons = p.Rules.Where(r => r.Op == JmOp.BitAny && (r.Value & 0x0F) != 0).Select(r => r.Index).ToHashSet();
+        foreach (var r in p.Rules.Where(r => r.Op == JmOp.Hat && lowNibbleButtons.Contains(r.Index)))
             Add(Severity.Warning, "HAT_ON_BUTTON_BYTE",
                 $"{Names.Rule(r)}: op HAT su un byte che contiene pulsanti: scatta solo se i 4 bit bassi valgono esattamente {r.Value}, cioè con nessun altro tasto premuto.");
 

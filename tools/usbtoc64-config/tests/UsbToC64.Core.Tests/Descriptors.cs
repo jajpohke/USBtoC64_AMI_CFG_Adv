@@ -30,6 +30,19 @@ internal static class Descriptors
         05 09 19 01 29 08 15 00 25 01 75 01 95 08 81 02
         C0");
 
+    /// <summary>
+    /// Real descriptor of the "USB Gamepad" 0810:0001 (PS3 clone), read on Windows with the tool.
+    /// Report id 1: Rz, Z, X, Y (8 bit), hat low nibble of byte 5, 12 buttons from byte 5 bit 4.
+    /// </summary>
+    public static readonly byte[] Ps3Clone0810 = Hex(@"
+        05 01 09 04 A1 01 85 01 09 00 A1 02 09 35 15 00
+        25 FF 35 00 45 FF 65 00 55 00 75 08 95 01 81 02
+        09 32 81 02 09 30 81 02 09 31 81 02 09 39 25 07
+        46 3B 01 65 14 75 04 81 42 05 09 19 01 29 0C 25
+        01 45 01 65 00 75 01 95 0C 81 02 95 08 81 03 C1
+        00 06 00 FF 09 00 A1 02 09 02 25 FF 45 FF 75 08
+        95 04 91 02 C1 00 C1 00");
+
     /// <summary>Signed 16 bit axes (not usable by the firmware) + 4 buttons in byte 4.</summary>
     public static readonly byte[] SignedAxes = Hex(@"
         05 01 09 05 A1 01
