@@ -32,6 +32,8 @@ internal static class Program
         Adattatore (collegato al PC con la USB-C, non al C64/Amiga, Developer Mode spenta):
           ports                            Elenca le porte seriali (l'ESP32 è riconosciuto da solo)
           ping [--port COMx]               Verifica che l'adattatore risponda (get_info)
+          version [--port COMx]            Firmware sull'adattatore e firmware incluso nel programma
+          flash [--port COMx] [--yes]      Installa il firmware incluso (CANCELLA TUTTE LE IMPOSTAZIONI)
           write <file.json|.h> [--port COMx]   Scrive il profilo, attende il riavvio e lo rilegge per verifica
           read [--port COMx] [--json]      Legge il profilo pad salvato sull'adattatore
 
@@ -60,12 +62,14 @@ internal static class Program
                 "descriptor" => Descriptor(args[1..]),
                 "ports" => Ports(),
                 "ping" => Ping(args[1..]),
+                "version" => Version(args[1..]),
+                "flash" => Flash(args[1..]),
                 "write" => Write(args[1..]),
                 "read" => Read(args[1..]),
                 _ => Fail($"Comando sconosciuto: {args[0]}\n\n{Usage}"),
             };
         }
-        catch (Exception ex) when (ex is ArgumentException or FormatException or IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is ArgumentException or FormatException or IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException or InvalidDataException)
         {
             return Fail(ex.Message);
         }
@@ -229,6 +233,42 @@ internal static class Program
         var info = conn.Info;
         Console.WriteLine($"L'adattatore su {port.PortName} risponde: {info}.");
         return 0;
+    }
+
+    private static FirmwareManifest? Manifest() => FirmwareManifest.FindNextTo(AppContext.BaseDirectory);
+
+    private static int Version(string[] args)
+    {
+        var port = AdapterPorts.Find(Option(args, "--port"));
+        using var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), s => Console.WriteLine("  " + s));
+        var fw = conn.Session.GetFirmware();
+        Console.WriteLine($"Adattatore su {port.PortName}: {fw}");
+        var m = Manifest();
+        if (m == null) { Console.WriteLine("Nessun firmware incluso (manca firmware.json)."); return 0; }
+        Console.WriteLine($"Firmware incluso: {m.Version} (build {m.Build})");
+        Console.WriteLine(FirmwareCheck.Compare(fw, m) switch
+        {
+            FirmwareStatus.UpdateAvailable => "→ aggiornamento disponibile: usbtoc64 flash",
+            FirmwareStatus.UpToDate => "→ aggiornato",
+            _ => "→ sull'adattatore c'è un firmware più recente",
+        });
+        return 0;
+    }
+
+    private static int Flash(string[] args)
+    {
+        var m = Manifest() ?? throw new InvalidOperationException("Nessun firmware incluso (manca firmware.json accanto al programma).");
+        var port = AdapterPorts.Find(Option(args, "--port"));
+        Console.WriteLine($"Firmware {m.Version} (build {m.Build}) → {port}");
+        Console.WriteLine("ATTENZIONE: l'aggiornamento cancella TUTTE le impostazioni dell'adattatore (profilo pad, mouse, LED, Developer Mode).");
+        if (!HasFlag(args, "--yes"))
+        {
+            Console.Write("Scrivi SI per continuare: ");
+            if (!string.Equals(Console.ReadLine()?.Trim(), "SI", StringComparison.OrdinalIgnoreCase)) return Fail("Annullato.");
+        }
+        var r = new FirmwareUpdater(s => Console.WriteLine(s)).Update(port.PortName, m);
+        Console.WriteLine(r.Message);
+        return r.Success ? 0 : 1;
     }
 
     private static int Read(string[] args)

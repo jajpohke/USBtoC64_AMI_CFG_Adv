@@ -16,6 +16,13 @@
 // 1. INCLUDE GLOBALS.H FIRST
 #include "Globals.h"
 
+// Firmware version, reported by {"cmd":"get_version"} and shown in the boot banner.
+// FW_BUILD is set by the GitHub Actions build (commit id); local builds report "local".
+#define FW_VERSION "1.2.1"
+#ifndef FW_BUILD
+#define FW_BUILD "local"
+#endif
+
 // 2. DEFINE GLOBAL VARIABLES
 Preferences prefs;
 SystemColors sys_colors;
@@ -517,14 +524,14 @@ void setup() {
             Serial.begin(115200);
             delay(2000);
             Serial.println("\n=================================");
-            Serial.println("  USB -> DB9 ADAPTER v1.2        ");
+            Serial.println("  USB -> DB9 ADAPTER v" FW_VERSION "      ");
             Serial.println("--- Booting: Configuration Mode ---");
             Serial.println("=================================");
             current_mode = MODE_SERVICE;
         } else {
             Serial2.begin(115200, SERIAL_8N1, GP_RX, GP_TX);
             Serial2.println("\n=================================");
-            Serial2.println("  USB -> DB9 ADAPTER v1.2        ");
+            Serial2.println("  USB -> DB9 ADAPTER v" FW_VERSION "      ");
             Serial2.println("--- Booting: DEVELOPER MODE ---");
             Serial2.println("--- Serial2 su GPIO 43/44 ---");
             Serial2.println("=================================");
@@ -737,6 +744,10 @@ void loop() {
                 activePort->printf("{\"status\":\"error\",\"reason\":\"%s\",\"detail\":\"%s\"}\n",
                                    error ? "json" : "no_rules", error ? error.c_str() : "");
             }
+        }
+        else if (incoming.startsWith("{\"cmd\":\"get_version\"")) {
+            // Added (proto 1): firmware version for the config tool. The original firmware does not answer.
+            activePort->printf("{\"fw\":\"%s\",\"build\":\"%s\",\"proto\":1}\n", FW_VERSION, FW_BUILD);
         }
         else if (incoming.startsWith("{\"cmd\":\"get_jm\"")) {
             // Added (proto 1): read back the TIER 0 blob in the same format as save_jm, for verification.

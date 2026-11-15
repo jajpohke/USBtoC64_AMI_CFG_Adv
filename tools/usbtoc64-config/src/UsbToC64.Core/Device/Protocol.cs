@@ -231,6 +231,16 @@ public sealed class AdapterSession
         }
     }
 
+    /// <summary>Firmware version (get_version). The original firmware does not know the command and stays silent.</summary>
+    public AdapterFirmware GetFirmware()
+    {
+        using var doc = RequestJson("{\"cmd\":\"get_version\"}", TimeSpan.FromMilliseconds(1500));
+        if (doc == null || !doc.RootElement.TryGetProperty("fw", out var fw) || fw.GetString() is not { } v)
+            return new AdapterFirmware(FirmwareVersion.Original, null, IsOriginal: true);
+        string? build = doc.RootElement.TryGetProperty("build", out var b) ? b.GetString() : null;
+        return new AdapterFirmware(FirmwareVersion.Parse(v), build, IsOriginal: false);
+    }
+
     /// <summary>Reads the stored TIER 0 profile: get_jm (firmware proto 1) or, on older firmware, the dumppad text.</summary>
     public StoredProfile ReadStored()
     {
@@ -420,7 +430,7 @@ public sealed class AdapterWriter
             return new WriteResult(false, false, stored.Method, new(), "Dopo il riavvio l'adattatore non ha un profilo pad salvato: il salvataggio non è riuscito.");
 
         var diff = ProfileComparer.Compare(profile, stored.Profile);
-        string via = stored.Method == ReadMethod.GetJm ? "get_jm" : "dumppad (firmware senza get_jm)";
+        string via = stored.Method == ReadMethod.GetJm ? "get_jm" : "dumppad, firmware senza get_jm";
         if (diff.Count == 0)
             return new WriteResult(true, true, stored.Method, diff, $"Salvato e verificato ({via}): l'adattatore contiene esattamente il profilo inviato.");
         return new WriteResult(confirmed, false, stored.Method, diff, confirmed

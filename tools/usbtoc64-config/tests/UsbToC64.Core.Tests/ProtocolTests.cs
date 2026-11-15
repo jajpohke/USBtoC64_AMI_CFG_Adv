@@ -16,6 +16,7 @@ internal sealed class FakeAdapter : IAdapterPort
     public bool ThrowOnSend { get; init; }       // ... and the send itself fails with "device not functioning"
     public bool NoComm { get; init; }            // nothing answers (wrong port, connected to the C64, dev mode)
     public bool ResetOnOpen { get; init; }       // opening the port restarts the chip (seen on Windows)
+    public string? Version { get; init; }        // null = original firmware (no get_version)
     public int ResetAndDropOnOpen { get; set; }  // ... and the USB reconnection at boot kills the handle (n times)
     public JmProfile? Stored { get; private set; }
     public int Opens { get; private set; }
@@ -73,6 +74,11 @@ internal sealed class FakeAdapter : IAdapterPort
             if (line == "{\"cmd\":\"get_info\"}")
             {
                 _out.Enqueue("{\"is_amiga\":false,\"dev_mode\":false,\"inv_switch\":false,\"dev_amiga\":false}");
+                return;
+            }
+            if (line == "{\"cmd\":\"get_version\"}")
+            {
+                if (_a.Version != null) _out.Enqueue($"{{\"fw\":\"{_a.Version}\",\"build\":\"abc1234\",\"proto\":1}}");
                 return;
             }
             if (line.StartsWith("{\"cmd\":\"save_jm\""))

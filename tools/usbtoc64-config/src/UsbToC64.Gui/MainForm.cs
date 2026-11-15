@@ -27,6 +27,11 @@ internal sealed class MainForm : Form
     private readonly TabPage _tabAdapter = new("Adattatore");
     private readonly ToolStripComboBox _cbPorts = new() { DropDownStyle = ComboBoxStyle.DropDownList, AutoSize = false, Width = 300 };
     private readonly List<ToolStripItem> _busyDisabled = new();
+    private readonly Panel _fwBanner = new() { Dock = DockStyle.Top, Height = 40, Visible = false, BackColor = Color.FromArgb(255, 243, 205), Padding = new Padding(10, 6, 10, 6) };
+    private readonly Label _fwLabel = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+    private readonly Button _fwButton = new() { Dock = DockStyle.Right, Width = 190, Text = "Aggiorna firmware…" };
+    private FirmwareManifest? _manifest;
+    private string? _bannerPort;
     private readonly ToolStripStatusLabel _status = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly System.Windows.Forms.Timer _uiTimer = new() { Interval = 40 };
 
@@ -69,7 +74,15 @@ internal sealed class MainForm : Form
 
         BuildLayout();
         _uiTimer.Tick += (_, _) => RefreshLive();
-        Load += (_, _) => { RefreshDevices(); RefreshPorts(); _uiTimer.Start(); };
+        Load += async (_, _) =>
+        {
+            RefreshDevices();
+            RefreshPorts();
+            _uiTimer.Start();
+            try { _manifest = FirmwareManifest.FindNextTo(AppContext.BaseDirectory); }
+            catch (Exception ex) { Log($"firmware.json non leggibile: {ex.Message}"); }
+            await CheckFirmware(silent: true);
+        };
         FormClosing += (_, _) => { _uiTimer.Stop(); StopReader(); };
     }
 
@@ -99,14 +112,20 @@ internal sealed class MainForm : Form
         var btnWrite = new ToolStripButton("Scrivi sull'adattatore e verifica") { Font = new Font(Font, FontStyle.Bold) };
         var btnRead = new ToolStripButton("Leggi dall'adattatore");
         var btnPing = new ToolStripButton("Test connessione");
+        var btnFirmware = new ToolStripButton("Firmware…");
         tools2.Items.AddRange(new ToolStripItem[]
         {
             new ToolStripLabel("Adattatore:"), _cbPorts, btnPing, new ToolStripSeparator(), btnWrite, btnRead,
+            new ToolStripSeparator(), btnFirmware,
         });
+        btnFirmware.Click += async (_, _) => await CheckFirmware(silent: false);
+        _fwBanner.Controls.Add(_fwLabel);
+        _fwBanner.Controls.Add(_fwButton);
+        _fwButton.Click += async (_, _) => { if (_bannerPort != null) await UpdateFirmware(_bannerPort); };
         btnPing.Click += async (_, _) => await PingAdapter();
         btnWrite.Click += async (_, _) => await WriteToAdapter();
         btnRead.Click += async (_, _) => await ReadFromAdapter();
-        _busyDisabled.AddRange(new ToolStripItem[] { btnWrite, btnRead, btnPing, btnRefresh, btnImport, btnPropose, _cbPads, _cbPorts });
+        _busyDisabled.AddRange(new ToolStripItem[] { btnWrite, btnRead, btnPing, btnFirmware, btnRefresh, btnImport, btnPropose, _cbPads, _cbPorts });
 
         SetupGrid();
 
@@ -131,6 +150,7 @@ internal sealed class MainForm : Form
         statusStrip.Items.Add(_status);
 
         Controls.Add(main);
+        Controls.Add(_fwBanner);
         Controls.Add(tools2);
         Controls.Add(tools);
         Controls.Add(statusStrip);
@@ -628,6 +648,105 @@ internal sealed class MainForm : Form
         Log(message);
         SetStatus(message);
         MessageBox.Show(this, message, "Test connessione", MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+    }
+
+    // ================================================================ firmware
+
+    private async Task CheckFirmware(bool silent)
+    {
+        if (_busy) return;
+        AdapterPortInfo port;
+        try { port = AdapterPorts.Find(RequestedPort()); }
+        catch (InvalidOperationException ex)
+        {
+            if (!silent) MessageBox.Show(this, ex.Message, "Firmware", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        Log($"--- Controllo firmware su {port}");
+        SetBusy(true);
+        AdapterFirmware? fw = null;
+        string? error = null;
+        try
+        {
+            fw = await Task.Run(() =>
+            {
+                using var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), Log);
+                return conn.Session.GetFirmware();
+            });
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { SetBusy(false); }
+
+        if (error != null)
+        {
+            Log(error);
+            if (!silent) MessageBox.Show(this, error, "Firmware", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        Log($"Sull'adattatore: {fw}");
+
+        if (_manifest == null)
+        {
+            SetStatus($"Adattatore: {fw}. Questo programma non include un firmware da installare.");
+            if (!silent) MessageBox.Show(this, $"Sull'adattatore c'è il {fw}.\n\nQuesto programma non include un firmware (manca firmware.json).",
+                "Firmware", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var status = FirmwareCheck.Compare(fw!, _manifest);
+        string available = $"{_manifest.Version}" + (string.IsNullOrEmpty(_manifest.Build) ? "" : $" (build {_manifest.Build})");
+        if (status == FirmwareStatus.UpdateAvailable)
+        {
+            _bannerPort = port.PortName;
+            _fwLabel.Text = $"⚠  Sull'adattatore ({port.PortName}) c'è il {fw}. Con il programma è incluso il firmware {available}.";
+            _fwBanner.Visible = true;
+            if (!silent) await UpdateFirmware(port.PortName);
+        }
+        else
+        {
+            _fwBanner.Visible = false;
+            string msg = status == FirmwareStatus.UpToDate
+                ? $"Il firmware dell'adattatore è aggiornato ({fw})."
+                : $"Sull'adattatore c'è un firmware più recente ({fw}) di quello incluso ({available}).";
+            SetStatus(msg);
+            if (!silent) MessageBox.Show(this, msg, "Firmware", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+
+    private async Task UpdateFirmware(string portName)
+    {
+        if (_busy || _manifest == null) return;
+        var answer = MessageBox.Show(this,
+            $"Installare il firmware {_manifest.Version} sull'adattatore su {portName}?\n\n" +
+            "⚠ L'aggiornamento cancella TUTTE le impostazioni salvate sull'adattatore e lo riporta ai valori predefiniti, " +
+            "come \"erase all\" dalla pagina web: profilo pad, impostazioni mouse e LED, Developer Mode, inversione dello switch.\n\n" +
+            "Durante l'aggiornamento non scollegare l'adattatore. Deve essere collegato solo al PC, non al C64/Amiga.",
+            "Aggiorna firmware", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+        if (answer != DialogResult.OK) return;
+
+        _tabs.SelectedTab = _tabAdapter;
+        Log($"--- Aggiornamento firmware su {portName}");
+        SetBusy(true);
+        SetStatus("Aggiornamento del firmware in corso: non scollegare l'adattatore…");
+        FlashResult result;
+        try
+        {
+            var manifest = _manifest;
+            result = await Task.Run(() => new FirmwareUpdater(Log).Update(portName, manifest));
+        }
+        catch (Exception ex) { result = new FlashResult(false, ex.Message); }
+        finally
+        {
+            SetBusy(false);
+            RefreshPorts();
+        }
+
+        Log(result.Message);
+        SetStatus(result.Message);
+        if (result.Success) _fwBanner.Visible = false;
+        MessageBox.Show(this, result.Message, result.Success ? "Firmware aggiornato" : "Aggiornamento firmware",
+            MessageBoxButtons.OK, result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Error);
     }
 
     private async Task ReadFromAdapter()

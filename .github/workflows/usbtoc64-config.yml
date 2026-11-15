@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "tools/usbtoc64-config/**"
+      - "USBtoC64/**"
     tags:
       - "config-tool-v*"
   workflow_dispatch:
@@ -11,13 +12,71 @@ on:
 permissions:
   contents: read
 
-defaults:
-  run:
-    working-directory: tools/usbtoc64-config
+# --- Firmware build settings -------------------------------------------------------------
+# PROVISIONAL: to be aligned with the Arduino IDE settings used for the published .bin
+# (Boards Manager core version, Tools menu, library versions).
+env:
+  ESP32_CORE: "esp32:esp32@3.0.7"
+  ESP32_INDEX: "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
+  FQBN: "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashSize=4M,PartitionScheme=default,PSRAM=disabled,CPUFreq=240"
+  LIB_ARDUINOJSON: "ArduinoJson@6.21.5"
+  LIB_NEOPIXEL: "Adafruit NeoPixel@1.12.3"
+  LIB_USB_HOST_HID: "https://github.com/esp32beans/ESP32_USB_Host_HID.git"
+  ESPTOOL_VERSION: "v4.8.1"
 
 jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Install core and libraries
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls "$ESP32_INDEX"
+          arduino-cli config set library.enable_unsafe_install true
+          arduino-cli core update-index
+          arduino-cli core install "$ESP32_CORE"
+          arduino-cli lib install "$LIB_ARDUINOJSON" "$LIB_NEOPIXEL"
+          arduino-cli lib install --git-url "$LIB_USB_HOST_HID"
+
+      - name: Compile firmware
+        run: |
+          BUILD_ID=$(git rev-parse --short=7 HEAD)
+          VERSION=$(grep -oP '#define FW_VERSION "\K[^"]+' USBtoC64/USBtoC64_Adv.ino)
+          echo "BUILD_ID=$BUILD_ID" >> "$GITHUB_ENV"
+          echo "FW_VERSION=$VERSION" >> "$GITHUB_ENV"
+          arduino-cli compile --fqbn "$FQBN" \
+            --build-property "compiler.cpp.extra_flags=-DFW_BUILD=\"$BUILD_ID\"" \
+            --output-dir out USBtoC64
+          ls -la out
+
+      - name: Firmware image and manifest
+        run: |
+          MERGED=$(ls out/*.merged.bin | head -1)
+          mkdir -p fw
+          cp "$MERGED" fw/USBtoC64_Adv.bin
+          SHA=$(sha256sum fw/USBtoC64_Adv.bin | cut -d' ' -f1)
+          printf '{"version":"%s","build":"%s","file":"USBtoC64_Adv.bin","sha256":"%s","address":"0x0","chip":"esp32s3"}\n' \
+            "$FW_VERSION" "$BUILD_ID" "$SHA" > fw/firmware.json
+          cat fw/firmware.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: fw/
+          if-no-files-found: error
+
   build:
+    needs: firmware
+    # The tool is built even if the firmware does not compile (the zip then has no firmware).
+    if: ${{ !cancelled() }}
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: tools/usbtoc64-config
     steps:
       - uses: actions/checkout@v4
 
@@ -48,13 +107,33 @@ jobs:
           -p:DebugType=None
           -o publish
 
+      - name: Firmware (if built)
+        if: ${{ needs.firmware.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: tools/usbtoc64-config/publish
+
+      - name: esptool.exe
+        if: ${{ needs.firmware.result == 'success' }}
+        shell: pwsh
+        run: |
+          $zip = "esptool.zip"
+          Invoke-WebRequest "https://github.com/espressif/esptool/releases/download/$env:ESPTOOL_VERSION/esptool-$env:ESPTOOL_VERSION-win64.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath esptool-x
+          $exe = Get-ChildItem esptool-x -Recurse -Filter esptool.exe | Select-Object -First 1
+          Copy-Item $exe.FullName publish/esptool.exe
+
       - uses: actions/upload-artifact@v4
         with:
           name: usbtoc64-config-win-x64
           path: |
             tools/usbtoc64-config/publish/USBtoC64Config.exe
             tools/usbtoc64-config/publish/usbtoc64.exe
-          if-no-files-found: error
+            tools/usbtoc64-config/publish/esptool.exe
+            tools/usbtoc64-config/publish/USBtoC64_Adv.bin
+            tools/usbtoc64-config/publish/firmware.json
+          if-no-files-found: warn
 
   release:
     if: startsWith(github.ref, 'refs/tags/config-tool-v')
@@ -71,3 +150,6 @@ jobs:
           files: |
             USBtoC64Config.exe
             usbtoc64.exe
+            esptool.exe
+            USBtoC64_Adv.bin
+            firmware.json
