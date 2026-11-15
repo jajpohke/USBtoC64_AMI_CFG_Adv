@@ -1,10 +1,12 @@
 ﻿using System.Text;
+using UsbToC64.Core.Device;
 using UsbToC64.Core.Emulation;
 using UsbToC64.Core.Formats;
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.Mapping;
 using UsbToC64.Core.Model;
 using UsbToC64.Core.Validation;
+using UsbToC64.Device;
 using UsbToC64.Input;
 
 namespace UsbToC64.Cli;
@@ -26,6 +28,11 @@ internal static class Program
           check <file.h|file.json>         Legge un profilo esistente e lo controlla
           convert <file.h> [-o out.json]   Converte un JoystickMapping.h nel JSON save_jm
           descriptor <file>                Analizza un descrittore HID salvato come testo esadecimale
+
+        Adattatore (collegato al PC con la USB-C, non al C64/Amiga, Developer Mode spenta):
+          ports                            Elenca le porte seriali (l'ESP32 è riconosciuto da solo)
+          write <file.json|.h> [--port COMx]   Scrive il profilo, attende il riavvio e lo rilegge per verifica
+          read [--port COMx] [--json]      Legge il profilo pad salvato sull'adattatore
 
         Azioni: None, Fire1, Fire2, Fire3, AutofireOn, AutofireOff, AutofireHold,
                 Up, Down, Left, Right, UpRight, RightDown, DownLeft, LeftUp,
@@ -50,10 +57,13 @@ internal static class Program
                 "check" => Check(args[1..]),
                 "convert" => Convert(args[1..]),
                 "descriptor" => Descriptor(args[1..]),
+                "ports" => Ports(),
+                "write" => Write(args[1..]),
+                "read" => Read(args[1..]),
                 _ => Fail($"Comando sconosciuto: {args[0]}\n\n{Usage}"),
             };
         }
-        catch (Exception ex) when (ex is ArgumentException or FormatException or IOException or InvalidOperationException)
+        catch (Exception ex) when (ex is ArgumentException or FormatException or IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
         {
             return Fail(ex.Message);
         }
@@ -183,6 +193,47 @@ internal static class Program
         ApplySets(mapping, args);
         PrintMapping(mapping);
         PrintProfile(ProfileBuilder.Build(mapping, 0, 0), null, skipVidPid: true);
+        return 0;
+    }
+
+    private static int Ports()
+    {
+        var ports = AdapterPorts.List();
+        if (ports.Count == 0) { Console.WriteLine("Nessuna porta seriale."); return 1; }
+        foreach (var p in ports) Console.WriteLine($"{(p.IsEspressif ? "*" : " ")} {p}");
+        Console.WriteLine("(* = ESP32, scelto in automatico)");
+        return 0;
+    }
+
+    private static int Write(string[] args)
+    {
+        if (args.Length < 1 || args[0].StartsWith('-')) return Fail("Specifica il file del profilo (.json o .h)");
+        var (profile, header) = LoadProfile(args[0]);
+        if (!PrintProfile(profile, header))
+            return Fail("\nIl profilo ha errori: non lo scrivo. Correggilo prima (o usa il JSON solo per prova).");
+        var port = AdapterPorts.Find(Option(args, "--port"));
+        Console.WriteLine($"\nAdattatore: {port}");
+        var writer = new AdapterWriter(new SerialAdapterPort(port.PortName), s => Console.WriteLine("  " + s));
+        var r = writer.WriteAndVerify(profile);
+        Console.WriteLine($"\n{r.Message}");
+        foreach (var d in r.Differences) Console.WriteLine($"  ≠ {d}");
+        return r.Verified ? 0 : r.Saved ? 3 : 1;
+    }
+
+    private static int Read(string[] args)
+    {
+        var port = AdapterPorts.Find(Option(args, "--port"));
+        bool json = HasFlag(args, "--json");
+        using var link = new SerialAdapterPort(port.PortName).Open();
+        var stored = new AdapterSession(link, json ? null : s => Console.WriteLine("  " + s)).ReadStored();
+        if (stored.Profile == null)
+        {
+            Console.WriteLine("Nessun profilo pad (TIER 0) salvato sull'adattatore.");
+            return 1;
+        }
+        if (json) { Console.WriteLine(SaveJmJson.Serialize(stored.Profile)); return 0; }
+        Console.WriteLine($"\nLetto con {(stored.Method == ReadMethod.GetJm ? "get_jm" : "dumppad (firmware senza get_jm)")}:");
+        PrintProfile(stored.Profile, null);
         return 0;
     }
 

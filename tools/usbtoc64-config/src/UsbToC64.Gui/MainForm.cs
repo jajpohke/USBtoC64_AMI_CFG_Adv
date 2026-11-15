@@ -1,10 +1,12 @@
 using System.Text;
+using UsbToC64.Core.Device;
 using UsbToC64.Core.Emulation;
 using UsbToC64.Core.Formats;
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.Mapping;
 using UsbToC64.Core.Model;
 using UsbToC64.Core.Validation;
+using UsbToC64.Device;
 using UsbToC64.Input;
 using PadControl = UsbToC64.Core.Hid.Control;
 
@@ -19,7 +21,12 @@ internal sealed class MainForm : Form
     private readonly TextBox _txtIssues = ReadOnlyBox();
     private readonly TextBox _txtRules = ReadOnlyBox();
     private readonly TextBox _txtJson = ReadOnlyBox();
+    private readonly TextBox _txtAdapter = ReadOnlyBox();
+    private readonly TabControl _tabs = new() { Dock = DockStyle.Fill };
     private readonly TabPage _tabIssues = new("Avvisi");
+    private readonly TabPage _tabAdapter = new("Adattatore");
+    private readonly ToolStripComboBox _cbPorts = new() { DropDownStyle = ComboBoxStyle.DropDownList, AutoSize = false, Width = 300 };
+    private readonly List<ToolStripItem> _busyDisabled = new();
     private readonly ToolStripStatusLabel _status = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly System.Windows.Forms.Timer _uiTimer = new() { Interval = 40 };
 
@@ -31,7 +38,10 @@ internal sealed class MainForm : Form
     private PadDescription? _pad;
     private PadMapping? _mapping;
     private JmProfile? _profile;
-    private ImportedHeader? _viewHeader;            // profile opened without a pad (view only)
+    private ImportedHeader? _viewHeader;            // profile opened read-only (no pad, or not matching the pad)
+    private bool _viewOnly;                          // the editor is suspended, _profile is the imported one
+    private List<AdapterPortInfo> _ports = new();
+    private bool _busy;
     private readonly List<string> _extraNotes = new(); // e.g. rules not matched on import
 
     // --- live reading (reader thread -> UI timer)
@@ -59,7 +69,7 @@ internal sealed class MainForm : Form
 
         BuildLayout();
         _uiTimer.Tick += (_, _) => RefreshLive();
-        Load += (_, _) => { RefreshDevices(); _uiTimer.Start(); };
+        Load += (_, _) => { RefreshDevices(); RefreshPorts(); _uiTimer.Start(); };
         FormClosing += (_, _) => { _uiTimer.Stop(); StopReader(); };
     }
 
@@ -78,22 +88,34 @@ internal sealed class MainForm : Form
             new ToolStripLabel("Pad:"), _cbPads, btnRefresh, new ToolStripSeparator(),
             btnPropose, btnImport, new ToolStripSeparator(), btnSave, btnCopy,
         });
-        btnRefresh.Click += (_, _) => RefreshDevices();
+        btnRefresh.Click += (_, _) => { RefreshDevices(); RefreshPorts(); };
         btnPropose.Click += (_, _) => ProposeAgain();
         btnImport.Click += (_, _) => ImportProfile();
         btnSave.Click += (_, _) => SaveJson();
         btnCopy.Click += (_, _) => CopyJson();
         _cbPads.SelectedIndexChanged += (_, _) => OpenSelectedDevice();
 
+        var tools2 = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Padding = new Padding(6, 2, 6, 2) };
+        var btnWrite = new ToolStripButton("Scrivi sull'adattatore e verifica") { Font = new Font(Font, FontStyle.Bold) };
+        var btnRead = new ToolStripButton("Leggi dall'adattatore");
+        tools2.Items.AddRange(new ToolStripItem[]
+        {
+            new ToolStripLabel("Adattatore:"), _cbPorts, new ToolStripSeparator(), btnWrite, btnRead,
+        });
+        btnWrite.Click += async (_, _) => await WriteToAdapter();
+        btnRead.Click += async (_, _) => await ReadFromAdapter();
+        _busyDisabled.AddRange(new ToolStripItem[] { btnWrite, btnRead, btnRefresh, btnImport, btnPropose, _cbPads, _cbPorts });
+
         SetupGrid();
 
-        var tabs = new TabControl { Dock = DockStyle.Fill };
+        var tabs = _tabs;
         _tabIssues.Controls.Add(_txtIssues);
+        _tabAdapter.Controls.Add(_txtAdapter);
         var tabRules = new TabPage("Regole per il firmware");
         tabRules.Controls.Add(_txtRules);
         var tabJson = new TabPage("JSON save_jm");
         tabJson.Controls.Add(_txtJson);
-        tabs.TabPages.AddRange(new[] { _tabIssues, tabRules, tabJson });
+        tabs.TabPages.AddRange(new[] { _tabIssues, tabRules, tabJson, _tabAdapter });
 
         var top = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, FixedPanel = FixedPanel.Panel2 };
         top.Panel1.Controls.Add(_grid);
@@ -107,6 +129,7 @@ internal sealed class MainForm : Form
         statusStrip.Items.Add(_status);
 
         Controls.Add(main);
+        Controls.Add(tools2);
         Controls.Add(tools);
         Controls.Add(statusStrip);
 
@@ -204,6 +227,8 @@ internal sealed class MainForm : Form
 
         _device = _devices[i];
         _viewHeader = null;
+        _viewOnly = false;
+        _grid.Enabled = true;
         _extraNotes.Clear();
         try
         {
@@ -304,17 +329,21 @@ internal sealed class MainForm : Form
         if (_pad == null) { SetStatus("Collega e seleziona un pad per la proposta automatica."); return; }
         _mapping = MappingProposer.Propose(_pad);
         _extraNotes.Clear();
+        _viewOnly = false;
+        _viewHeader = null;
+        _grid.Enabled = true;
         PopulateGrid();
         RebuildProfile();
     }
 
     private void RebuildProfile()
     {
-        if (_mapping != null && _device != null)
+        if (!_viewOnly && _mapping != null && _device != null)
             _profile = ProfileBuilder.Build(_mapping, _device.Vid, _device.Pid, _device.Name);
         lock (_sync)
         {
-            _engine = _profile != null && _mapping != null ? new DynamicEngine(_profile) : null;
+            // In view-only mode the preview shows how the imported profile behaves on this pad.
+            _engine = _profile != null && _device != null ? new DynamicEngine(_profile) : null;
             _lastState = null;
         }
         ShowProfile();
@@ -398,16 +427,44 @@ internal sealed class MainForm : Form
             return;
         }
 
-        if (imported.Vid != _device.Vid || imported.Pid != _device.Pid)
+        var res = MappingImporter.FromProfile(_pad, imported);
+        int total = imported.Rules.Count + imported.AnalogX.Count + imported.AnalogY.Count;
+        int unmatched = res.UnmatchedRules.Count + res.UnmatchedAxes.Count;
+        bool sameDevice = imported.Vid == _device.Vid && imported.Pid == _device.Pid;
+        bool poorMatch = total == 0 || unmatched * 2 > total;
+
+        if (!sameDevice || poorMatch)
         {
-            var answer = MessageBox.Show(this,
-                $"Il profilo è per VID {imported.Vid:X4} PID {imported.Pid:X4}, il pad collegato è {_device.Vid:X4}:{_device.Pid:X4}.\n\n" +
-                "Applicarlo comunque ai controlli di questo pad?",
-                "Pad diverso", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (answer != DialogResult.Yes) return;
+            var msg = new StringBuilder();
+            if (!sameDevice)
+                msg.AppendLine($"Il profilo è per VID {imported.Vid:X4} PID {imported.Pid:X4}, il pad collegato è {_device.Vid:X4}:{_device.Pid:X4}.");
+            msg.AppendLine(total == 0
+                ? "Il profilo è vuoto."
+                : $"Solo {total - unmatched} elementi su {total} corrispondono ai controlli di questo pad.");
+            msg.AppendLine();
+            msg.AppendLine("Sì = apri in sola lettura (vedi regole e problemi del profilo così com'è)");
+            msg.AppendLine("No = applica ai controlli di questo pad (gli elementi senza corrispondenza vengono scartati)");
+            var answer = MessageBox.Show(this, msg.ToString(), "Il profilo non corrisponde a questo pad",
+                MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question,
+                poorMatch ? MessageBoxDefaultButton.Button1 : MessageBoxDefaultButton.Button2);
+            if (answer == DialogResult.Cancel) return;
+            if (answer == DialogResult.Yes)
+            {
+                _viewOnly = true;
+                _viewHeader = header ?? new ImportedHeader { Profile = imported, Generator = HeaderGenerator.Unknown };
+                _profile = imported;
+                _extraNotes.Clear();
+                _grid.Enabled = false;
+                RebuildProfile();
+                SetStatus($"{Path.GetFileName(dlg.FileName)} aperto in sola lettura: l'anteprima mostra come si comporterebbe su questo pad. " +
+                          "\"Proposta automatica\" torna all'editor.");
+                return;
+            }
         }
 
-        var res = MappingImporter.FromProfile(_pad, imported);
+        _viewOnly = false;
+        _viewHeader = null;
+        _grid.Enabled = true;
         _mapping = res.Mapping;
         _extraNotes.Clear();
         foreach (var r in res.UnmatchedRules)
@@ -452,6 +509,142 @@ internal sealed class MainForm : Form
         if (!ConfirmIfErrors("Copiare")) return;
         Clipboard.SetText(SaveJmJson.Serialize(_profile!));
         SetStatus("JSON copiato negli appunti: si può incollare in un terminale seriale (115200, fine riga LF).");
+    }
+
+    // ================================================================ adapter (serial)
+
+    private const string AutoPort = "Automatica (ESP32)";
+
+    private void RefreshPorts()
+    {
+        string? previous = _cbPorts.SelectedIndex > 0 ? _ports.ElementAtOrDefault(_cbPorts.SelectedIndex - 1)?.PortName : null;
+        try { _ports = AdapterPorts.List(); }
+        catch (Exception) { _ports = new(); }
+        _cbPorts.Items.Clear();
+        _cbPorts.Items.Add(AutoPort);
+        foreach (var p in _ports) _cbPorts.Items.Add(p.ToString());
+        int keep = previous == null ? -1 : _ports.FindIndex(p => p.PortName == previous);
+        _cbPorts.SelectedIndex = keep >= 0 ? keep + 1 : 0;
+    }
+
+    private string? RequestedPort() =>
+        _cbPorts.SelectedIndex > 0 ? _ports.ElementAtOrDefault(_cbPorts.SelectedIndex - 1)?.PortName : null;
+
+    private void Log(string line)
+    {
+        if (InvokeRequired) { BeginInvoke(() => Log(line)); return; }
+        _txtAdapter.AppendText($"{DateTime.Now:HH:mm:ss}  {line}{Environment.NewLine}");
+    }
+
+    private void SetBusy(bool busy)
+    {
+        _busy = busy;
+        foreach (var item in _busyDisabled) item.Enabled = !busy;
+        UseWaitCursor = busy;
+    }
+
+    private async Task WriteToAdapter()
+    {
+        if (_busy) return;
+        if (!ConfirmIfErrors("Scrivere sull'adattatore")) return;
+        var profile = _profile!;
+
+        AdapterPortInfo port;
+        try { port = AdapterPorts.Find(RequestedPort()); }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Adattatore", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        if (_device != null && (profile.Vid != _device.Vid || profile.Pid != _device.Pid))
+        {
+            if (MessageBox.Show(this,
+                    $"Il profilo è per VID {profile.Vid:X4} PID {profile.Pid:X4}, diverso dal pad collegato al PC. Scriverlo comunque?",
+                    "Adattatore", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        }
+        if (MessageBox.Show(this,
+                $"Scrivere il profilo ({profile.Rules.Count} regole) sull'adattatore su {port.PortName}?\n\n" +
+                "Sostituisce il profilo pad salvato. L'adattatore si riavvia e il profilo viene riletto per verifica.",
+                "Scrivi sull'adattatore", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+
+        _tabs.SelectedTab = _tabAdapter;
+        Log($"--- Scrittura su {port}");
+        SetBusy(true);
+        SetStatus($"Scrittura in corso su {port.PortName}…");
+        WriteResult result;
+        try
+        {
+            var writer = new AdapterWriter(new SerialAdapterPort(port.PortName), Log);
+            result = await Task.Run(() => writer.WriteAndVerify(profile));
+        }
+        catch (Exception ex)
+        {
+            result = new WriteResult(false, false, null, new(), ex.Message);
+        }
+        finally
+        {
+            SetBusy(false);
+            RefreshPorts();
+        }
+
+        Log(result.Message);
+        foreach (var d in result.Differences) Log("  ≠ " + d);
+        SetStatus(result.Message);
+        var icon = result.Verified ? MessageBoxIcon.Information : MessageBoxIcon.Warning;
+        var text = result.Message + (result.Differences.Count > 0 ? "\n\n" + string.Join("\n", result.Differences.Select(d => "• " + d)) : "");
+        MessageBox.Show(this, text, result.Verified ? "Profilo scritto e verificato" : "Scrittura sull'adattatore", MessageBoxButtons.OK, icon);
+    }
+
+    private async Task ReadFromAdapter()
+    {
+        if (_busy) return;
+        AdapterPortInfo port;
+        try { port = AdapterPorts.Find(RequestedPort()); }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Adattatore", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        _tabs.SelectedTab = _tabAdapter;
+        Log($"--- Lettura da {port}");
+        SetBusy(true);
+        StoredProfile? stored = null;
+        string? error = null;
+        try
+        {
+            stored = await Task.Run(() =>
+            {
+                using var link = new SerialAdapterPort(port.PortName).Open();
+                return new AdapterSession(link, Log).ReadStored();
+            });
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { SetBusy(false); }
+
+        if (error != null) { Log("Errore: " + error); SetStatus("Lettura non riuscita: " + error); return; }
+        var p = stored!.Profile;
+        string via = stored.Method == ReadMethod.GetJm ? "get_jm" : "dumppad";
+        if (p == null)
+        {
+            Log($"Nessun profilo HTML (TIER 0) salvato sull'adattatore ({via}).");
+            SetStatus("Sull'adattatore non c'è un profilo pad salvato con il configuratore.");
+            return;
+        }
+        Log($"Profilo sull'adattatore ({via}): VID {p.Vid:X4} PID {p.Pid:X4}, {p.Rules.Count} regole");
+        for (int i = 0; i < p.Rules.Count; i++) Log($"  {i + 1,2}. {Names.Rule(p.Rules[i])}");
+        if (p.UseAnalog) Log($"  Assi X [{string.Join(", ", p.AnalogX)}]  Y [{string.Join(", ", p.AnalogY)}]");
+
+        if (_profile != null)
+        {
+            var diff = ProfileComparer.Compare(_profile, p);
+            if (diff.Count == 0) Log("✔ Identico al profilo mostrato nel programma.");
+            else { Log("Differenze rispetto al profilo mostrato nel programma:"); foreach (var d in diff) Log("  ≠ " + d); }
+            SetStatus(diff.Count == 0 ? "L'adattatore contiene lo stesso profilo mostrato nel programma."
+                                      : $"L'adattatore contiene un profilo diverso ({diff.Count} differenze, vedi scheda Adattatore).");
+        }
+        foreach (var i in ProfileValidator.Validate(p)) Log("  " + i);
     }
 
     // ================================================================ live reading

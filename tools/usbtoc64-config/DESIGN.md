@@ -207,7 +207,7 @@ tools/usbtoc64-config/
 │   │   ├── Emulation/             replica del motore dinamico firmware (anteprima)
 │   │   └── Formats/               JSON save_jm, .h (con WEB_META), import .h/.json
 │   ├── UsbToC64.Input/            lettura pad: HidSharp (HID, descrittore) e XInput
-│   ├── UsbToC64.Device/           (fase 2) seriale, ricerca porta, save/verify
+│   ├── UsbToC64.Device/           seriale: ricerca porta (VID Espressif), apertura; la logica save/verify è in Core/Device
 │   ├── UsbToC64.Gui/              WinForms: elenco pad, editor azioni, anteprima, avvisi, export
 │   └── UsbToC64.Cli/              comandi da terminale
 └── tests/UsbToC64.Core.Tests/     xUnit, incluse catture reali (file 24/25)
@@ -259,7 +259,7 @@ Criteri di accettazione fase 1:
 - Il JSON generato è valido per `save_jm` (verifica manuale con terminale, come fatto nella prova B).
 - I test di `Core` girano senza Windows.
 
-### Fase 2 — Scrittura e verifica
+### Fase 2 — Scrittura e verifica (implementata)
 
 - Porta trovata per VID `0x303A`; uso esclusivo della porta.
 - Invio `save_jm`, attesa `{"status":"ok"}` con timeout → errore esplicito.
@@ -281,14 +281,35 @@ Monitor: console seriale integrata, log su file di tutto lo scambio, anteprima r
 
 ---
 
-## 7. Richieste di modifica firmware (per la fase 2, da concordare)
+## 7. Modifiche al firmware (protocollo 1) e compatibilità
 
-Non bloccanti per la fase 1.
+Implementate in `USBtoC64/USBtoC64_Adv.ino`, solo sul branch di sviluppo. Sono **solo aggiunte**:
 
-1. Risposta d'errore per JSON non valido: `{"status":"error","reason":"json|nomem|..."}`.
-2. Comando `{"cmd":"get_jm"}` che restituisce il blob in JSON (stesso formato di `save_jm`), per la verifica.
-3. (Opzionale) `fw_version` / `proto_version` in `get_info`, per controllare la compatibilità.
-4. (Futuro) supporto stick signed per XInput (nuovo op o soglie signed).
+1. `save` e `save_jm`: se il JSON non è valido (o manca `rules`) il firmware ora risponde
+   `{"status":"error","reason":"json|no_rules","detail":"..."}`. Prima non rispondeva nulla.
+2. Nuovo comando `{"cmd":"get_jm"}`: restituisce il blob TIER 0 nello stesso formato di `save_jm`
+   (senza `cmd`), più `status`, `proto` e `has_custom`:
+   `{"status":"ok","proto":1,"has_custom":true,"vid":..,"pid":..,"dpad_idx":..,"use_analog":..,"analog_x":[..],"analog_y":[..],"rules":[..]}`.
+   Senza profilo: `{"status":"empty","proto":1}`.
+
+**Compatibilità con il configuratore web attuale**
+
+- Le risposte esistenti (`get_info`, `mem_status`, `mouse_get`, `led_get`, gli `ok` di salvataggio…)
+  sono invariate, carattere per carattere. Le pagine web leggono fino alla prima `}` e fanno `JSON.parse`:
+  nessun campo nuovo è stato aggiunto alle risposte che usano.
+- `get_jm` non è usato dalle pagine web.
+- La risposta d'errore arriva solo dove prima c'era silenzio: `configurator.html` la legge e la ignora,
+  quindi si comporta come prima.
+- Il tool funziona anche con il firmware **non aggiornato**: se `get_jm` non risponde, rilegge il profilo
+  con il comando testuale `dumppad` (stesso confronto, formato meno robusto).
+
+**Verifica dopo la scrittura (tool, fase 2)**
+
+`save_jm` → attesa di `{"status":"ok"}` (timeout 3 s, errore esplicito altrimenti) → la porta scompare e
+ricompare per il riavvio (max 20 s) → attesa del boot (3 s) → `get_jm` (o `dumppad`) → confronto campo per campo
+con quanto inviato (VID/PID, `dpad_idx`, regole nell'ordine, assi; tenendo conto del limite di 32 regole).
+
+Ancora da valutare (futuro): supporto degli stick XInput signed (nuovo op o soglie signed).
 
 ---
 

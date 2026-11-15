@@ -5,7 +5,7 @@ Progetto e motivazioni: [DESIGN.md](DESIGN.md).
 
 **Stato: fase 1** — classificazione automatica dei controlli, proposta della mappatura,
 editor delle azioni, controlli di validità, anteprima dal vivo, import dei vecchi `.h`/`.json`,
-export del JSON `save_jm`. Nessuna scrittura sull'ESP32 (arriva con la fase 2).
+export del JSON `save_jm`, **scrittura sull'adattatore con verifica** (fase 2).
 
 Due programmi:
 
@@ -20,7 +20,11 @@ Due programmi:
 3. Nella colonna **Azione sul C64** si sceglie cosa fa ogni controllo. **Proposta automatica** ripristina i valori iniziali.
 4. A destra si vede dal vivo cosa riceverebbe il C64 (direzioni, F1–F3, autofire).
 5. In basso: **Avvisi** (problemi del profilo), **Regole per il firmware**, **JSON save_jm**.
-6. **Salva JSON…** / **Copia JSON** esportano il profilo. **Importa profilo…** apre un `JoystickMapping.h`
+6. **Scrivi sull'adattatore e verifica**: trova da solo la porta dell'ESP32, invia il profilo, attende il
+   riavvio e lo rilegge confrontandolo con quello inviato. **Leggi dall'adattatore** mostra il profilo salvato.
+   L'adattatore va collegato al PC con la USB-C, senza C64/Amiga, Developer Mode spenta. Chiudere il
+   configuratore web o terminali seriali che tengono occupata la porta.
+7. **Salva JSON…** / **Copia JSON** esportano il profilo. **Importa profilo…** apre un `JoystickMapping.h`
    o un `.json` e lo applica ai controlli del pad collegato (senza pad: sola lettura con i controlli).
 
 ## Scaricare l'exe
@@ -41,6 +45,9 @@ usbtoc64 monitor 0 --profile profilo.json
 usbtoc64 check JoystickMapping.h
 usbtoc64 convert JoystickMapping.h -o profilo.json
 usbtoc64 descriptor descrittore.txt
+usbtoc64 ports
+usbtoc64 write profilo.json
+usbtoc64 read
 ```
 
 - `analyze` legge il descrittore HID del pad, classifica in automatico direzioni (hat, D-pad,
@@ -49,8 +56,7 @@ usbtoc64 descriptor descrittore.txt
   del motore del firmware.
 - `check` / `convert` leggono i `JoystickMapping.h` dei configuratori web (anche il vecchio
   `config.html`) e segnalano i problemi noti.
-- `-o` produce la riga JSON `save_jm`: si può inviare all'adattatore con un terminale seriale
-  (115200, fine riga LF) finché la fase 2 non è pronta.
+- `write` / `read` scrivono (con verifica) e leggono il profilo sull'adattatore.
 
 Pad XInput (Xbox 360 cablato): il tool usa il layout nativo che riceve l'ESP32, non il report
 HID mostrato da Windows. Gli stick XInput non sono utilizzabili con il firmware attuale.
@@ -66,6 +72,7 @@ dotnet run --project src/UsbToC64.Cli -- check tests/UsbToC64.Core.Tests/Fixture
 |---|---|
 | `src/UsbToC64.Core` | modello firmware, parser descrittore HID, classificazione, proposta, validazione, emulatore, formati |
 | `src/UsbToC64.Input` | lettura pad: HidSharp (HID) e XInput |
+| `src/UsbToC64.Device` | porta seriale dell'adattatore (ricerca per VID Espressif, apertura) |
 | `src/UsbToC64.Cli` | comandi da terminale (`usbtoc64.exe`) |
 | `src/UsbToC64.Gui` | interfaccia grafica WinForms (`USBtoC64Config.exe`) |
 | `tests/UsbToC64.Core.Tests` | test xUnit, con profili reali in `Fixtures/` |

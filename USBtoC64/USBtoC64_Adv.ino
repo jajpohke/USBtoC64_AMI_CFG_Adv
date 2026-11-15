@@ -689,6 +689,9 @@ void loop() {
                 prefs.putBool("has_custom", true);
                 activePort->print("{\"status\":\"ok\"}\n");
                 delay(200); esp_restart();
+            } else {
+                // Added (proto 1): previously no reply at all on a bad JSON
+                activePort->printf("{\"status\":\"error\",\"reason\":\"json\",\"detail\":\"%s\"}\n", error.c_str());
             }
         }
         else if (incoming.startsWith("{\"cmd\":\"save_jm\"")) {
@@ -726,6 +729,50 @@ void loop() {
                 prefs.putBool("has_custom", true);
                 activePort->print("{\"status\":\"ok\"}\n");
                 delay(200); esp_restart();
+            } else {
+                // Added (proto 1): previously no reply at all (bad JSON, buffer too small, missing rules)
+                activePort->printf("{\"status\":\"error\",\"reason\":\"%s\",\"detail\":\"%s\"}\n",
+                                   error ? "json" : "no_rules", error ? error.c_str() : "");
+            }
+        }
+        else if (incoming.startsWith("{\"cmd\":\"get_jm\"")) {
+            // Added (proto 1): read back the TIER 0 blob in the same format as save_jm, for verification.
+            // Not used by the web configurator pages.
+            size_t blob_len = prefs.getBytesLength("jm_blob");
+            if (blob_len == 0) {
+                activePort->print("{\"status\":\"empty\",\"proto\":1}\n");
+            } else if (blob_len != sizeof(NVS_JM_Blob)) {
+                activePort->printf("{\"status\":\"error\",\"reason\":\"blob_size\",\"size\":%u,\"expected\":%u,\"proto\":1}\n",
+                                   (unsigned)blob_len, (unsigned)sizeof(NVS_JM_Blob));
+            } else {
+                NVS_JM_Blob blob;
+                prefs.getBytes("jm_blob", &blob, sizeof(NVS_JM_Blob));
+                uint8_t rc = blob.rule_count <= JM_DYN_MAX_RULES ? blob.rule_count : JM_DYN_MAX_RULES;
+                uint8_t xc = blob.analog_x_count <= JM_DYN_MAX_ANALOG ? blob.analog_x_count : JM_DYN_MAX_ANALOG;
+                uint8_t yc = blob.analog_y_count <= JM_DYN_MAX_ANALOG ? blob.analog_y_count : JM_DYN_MAX_ANALOG;
+                String out;
+                out.reserve(200 + rc * 32);
+                out += "{\"status\":\"ok\",\"proto\":1,\"has_custom\":";
+                out += prefs.getBool("has_custom", false) ? "true" : "false";
+                out += ",\"vid\":";        out += String((unsigned)blob.vid);
+                out += ",\"pid\":";        out += String((unsigned)blob.pid);
+                out += ",\"dpad_idx\":";   out += String((int)blob.dpad_index);
+                out += ",\"use_analog\":"; out += blob.use_analog ? "1" : "0";
+                out += ",\"analog_x\":[";
+                for (uint8_t i = 0; i < xc; i++) { if (i) out += ","; out += String((unsigned)blob.analog_x[i]); }
+                out += "],\"analog_y\":[";
+                for (uint8_t i = 0; i < yc; i++) { if (i) out += ","; out += String((unsigned)blob.analog_y[i]); }
+                out += "],\"rules\":[";
+                for (uint8_t i = 0; i < rc; i++) {
+                    if (i) out += ",";
+                    out += "{\"i\":";  out += String((unsigned)blob.rules[i].index);
+                    out += ",\"v\":";  out += String((unsigned)blob.rules[i].value);
+                    out += ",\"op\":"; out += String((unsigned)blob.rules[i].op);
+                    out += ",\"f\":";  out += String((unsigned)blob.rules[i].func);
+                    out += "}";
+                }
+                out += "]}\n";
+                activePort->print(out);
             }
         }
         else if (incoming.startsWith("{\"cmd\":\"get_info\"")) {
