@@ -187,7 +187,27 @@ Conseguenze:
 - D-pad e pulsanti: regole BITANY sui byte 2/3 → **supportati**.
 - Grilletti: BITANY `0x80` su byte 4/5 = premuto oltre metà corsa → **supportati come pulsanti**.
 - Stick: valori signed → **non supportati** con il firmware attuale (le soglie unsigned 64/190 non funzionano). Richiede un'estensione firmware (fuori da questa fase).
-- Xbox One/Series richiedono un pacchetto di init (GIP) che il firmware non invia → **non supportati**, il tool lo segnala.
+- Xbox One/Series (GIP): supportati dal firmware **1.2.2** (vedi sotto).
+
+### 4.1 Firmware 1.2.2: pad Xbox
+
+- **Interfaccia giusta**: prima il firmware rivendicava l'*ultima* interfaccia del dispositivo e leggeva il
+  *primo* endpoint di input; sui pad Xbox (più interfacce, input sulla 0) non funzionava. Ora rivendica
+  l'interfaccia che possiede l'endpoint (solo alternate setting 0). Pad HID a interfaccia singola: invariato.
+- **Riconoscimento** dalla classe dell'interfaccia: 0xFF/0x5D/0x01 = Xbox 360, 0xFF/0x47/0xD0 = GIP.
+- **Avvio GIP**: sull'endpoint OUT della stessa interfaccia, in catena (ogni pacchetto parte al completamento
+  del precedente): power-on `05 20 seq 01 00`; Microsoft anche `05 20 seq 0F 06` e LED `0A 20 seq 03 00 01 14`;
+  PDP LED + `06 20 seq 02 01 00` (stessi pacchetti del driver Linux xpad). Xbox 360: LED giocatore 1 `01 03 06`.
+- **Filtro**: solo i report di input arrivano al motore delle regole (GIP: byte 0 = 0x20; 360: byte 0 = 0x00).
+  Guide, keep-alive e messaggi di stato non possono più far scattare regole.
+- Log: la riga `CONNECTED` riporta interfaccia, endpoint e protocollo; errori di claim/submit/init sono stampati.
+
+Layout GIP (report che riceve l'ESP32): byte 4 Menu 0x04, View 0x08, A 0x10, B 0x20, X 0x40, Y 0x80;
+byte 5 Up 0x01, Down 0x02, Left 0x04, Right 0x08, LB 0x10, RB 0x20, LS 0x40, RS 0x80; byte 6-7 / 8-9 LT / RT
+(10 bit LE, "oltre metà" = bit 0x02 del byte alto); byte 10-17 stick int16 (non utilizzabili, signed).
+
+Tool: Windows mostra anche i pad GIP come XInput; il tipo (360 o GIP) si ricava dal driver associato al
+dispositivo USB nel registro (`xboxgip` / `xusb2x`), poi dalla lista VID/PID nota, altrimenti Xbox 360.
 
 ---
 

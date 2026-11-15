@@ -86,7 +86,13 @@ public static class ProfileValidator
 
         // --- XInput (P8) ------------------------------------------------------------------------
         if (XInputLayout.IsKnownXboxOne(p.Vid, p.Pid))
-            Add(Severity.Error, "XBOXONE_UNSUPPORTED", "Controller Xbox One/Series: richiede un'inizializzazione (GIP) che il firmware non esegue.");
+        {
+            Add(Severity.Info, "GIP_FIRMWARE", $"Controller Xbox One/Series (GIP): funziona solo con il firmware {XInputLayout.GipMinFirmware} o successivo.");
+            if (p.Rules.Any(r => r.Index < 4 || r.Index > 9) || p.UseAnalog)
+                Add(Severity.Error, "GIP_SYNTHETIC_INDEXES",
+                    "Pad Xbox One/Series: gli indici non corrispondono al report GIP nativo (pulsanti ai byte 4-5, grilletti 6-9). " +
+                    "Probabilmente vengono dal report HID sintetico di Windows: queste regole non funzionano sull'adattatore.");
+        }
         else if (XInputLayout.IsKnownWirelessReceiver(p.Vid, p.Pid))
             Add(Severity.Error, "XBOX_RECEIVER_UNSUPPORTED", "Ricevitore wireless Xbox 360: formato dei report diverso, non supportato.");
         else if (XInputLayout.IsKnownXbox360Wired(p.Vid, p.Pid))

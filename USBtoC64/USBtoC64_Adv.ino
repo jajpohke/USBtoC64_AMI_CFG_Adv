@@ -18,7 +18,7 @@
 
 // Firmware version, reported by {"cmd":"get_version"} and shown in the boot banner.
 // FW_BUILD is set by the GitHub Actions build (commit id); local builds report "local".
-#define FW_VERSION "1.2.1"
+#define FW_VERSION "1.2.2"
 #ifndef FW_BUILD
 #define FW_BUILD "local"
 #endif
@@ -172,12 +172,60 @@ void wheelTask(void *pvParameters) {
 // ==========================================
 // 🕹️ ENGINE 0: RAW USB HOST (JOYSTICK)
 // ==========================================
+// Protocol of the claimed interface. Xbox controllers are vendor-class devices:
+//   Xbox 360 (XInput): class 0xFF, subclass 0x5D, protocol 0x01 - input reports start with 0x00 0x14
+//   Xbox One/Series (GIP): class 0xFF, subclass 0x47, protocol 0xD0 - input reports start with 0x20,
+//   and the pad sends nothing until the host powers it on through the OUT endpoint.
+enum PadProto : uint8_t { PROTO_HID = 0, PROTO_XINPUT360 = 1, PROTO_GIP = 2 };
+static volatile uint8_t s_proto = PROTO_HID;
+static uint8_t  s_out_ep = 0;
+static uint16_t s_out_mps = 0;
+static usb_transfer_t* s_out_xfer = nullptr;
+
+// Start-up packets (byte 2 of GIP packets is the sequence number, filled in when sending).
+// Same packets as the Linux xpad driver.
+static const uint8_t GIP_POWER_ON[] = { 0x05, 0x20, 0x00, 0x01, 0x00 };
+static const uint8_t GIP_S_INIT[]   = { 0x05, 0x20, 0x00, 0x0F, 0x06 };
+static const uint8_t GIP_LED_ON[]   = { 0x0A, 0x20, 0x00, 0x03, 0x00, 0x01, 0x14 };
+static const uint8_t GIP_PDP_AUTH[] = { 0x06, 0x20, 0x00, 0x02, 0x01, 0x00 };
+static const uint8_t X360_LED_P1[]  = { 0x01, 0x03, 0x06 };
+
+static const uint8_t* s_init_pkt[6];
+static uint8_t s_init_len[6];
+static uint8_t s_init_count = 0, s_init_next = 0;
+static uint8_t s_gip_seq = 1;
+
+static void send_next_init_packet() {
+    if (!s_out_xfer || s_init_next >= s_init_count) return;
+    uint8_t len = s_init_len[s_init_next];
+    memcpy(s_out_xfer->data_buffer, s_init_pkt[s_init_next], len);
+    if (s_proto == PROTO_GIP) s_out_xfer->data_buffer[2] = s_gip_seq++;
+    s_out_xfer->num_bytes = len;
+    s_init_next++;
+    esp_err_t err = usb_host_transfer_submit(s_out_xfer);
+    if (err != ESP_OK) dual_printf(">>> USB: init packet %u failed (%s)\n", s_init_next, esp_err_to_name(err));
+}
+
+static void out_transfer_cb(usb_transfer_t *xfer) {
+    // Next start-up packet once the previous one is out (called from usb_host_client_handle_events).
+    if (xfer->status == USB_TRANSFER_STATUS_COMPLETED) send_next_init_packet();
+}
+
 static void in_transfer_cb(usb_transfer_t *xfer) {
     if (xfer->status == USB_TRANSFER_STATUS_COMPLETED) {
-        pkt_t p;
-        p.len = xfer->actual_num_bytes;
-        memcpy(p.data, xfer->data_buffer, p.len > 64 ? 64 : p.len);
-        xQueueSendFromISR(s_pkt_q, &p, nullptr);
+        const uint8_t *d = xfer->data_buffer;
+        int n = xfer->actual_num_bytes;
+        // Xbox controllers also send status messages (LED, Guide button, keep-alive, announce):
+        // only input reports reach the mapping engine, so they cannot trigger rules by mistake.
+        bool input = true;
+        if (s_proto == PROTO_GIP)       input = (n >= 4 && d[0] == 0x20);
+        if (s_proto == PROTO_XINPUT360) input = (n >= 2 && d[0] == 0x00);
+        if (input) {
+            pkt_t p;
+            p.len = n;
+            memcpy(p.data, d, p.len > 64 ? 64 : p.len);
+            xQueueSendFromISR(s_pkt_q, &p, nullptr);
+        }
         usb_host_transfer_submit(xfer);
     }
 }
@@ -208,6 +256,10 @@ void start_sniff(uint8_t addr) {
     // works on single-interface pads; Xbox controllers have several interfaces, input on interface 0.)
     uint8_t cur_if_num = 0;
     uint8_t cur_alt = 0;
+    uint8_t cur_cls = 0, cur_sub = 0, cur_prt = 0;
+    uint8_t temp_proto = PROTO_HID;
+    uint8_t out_ep_by_if[16] = {0};
+    uint16_t out_mps_by_if[16] = {0};
 
     while (next_desc) {
         if (next_desc->bDescriptorType == USB_B_DESCRIPTOR_TYPE_INTERFACE) {
@@ -217,6 +269,9 @@ void start_sniff(uint8_t addr) {
             }
             cur_if_num = intf->bInterfaceNumber;
             cur_alt = intf->bAlternateSetting;
+            cur_cls = intf->bInterfaceClass;
+            cur_sub = intf->bInterfaceSubClass;
+            cur_prt = intf->bInterfaceProtocol;
         }
         if (next_desc->bDescriptorType == USB_B_DESCRIPTOR_TYPE_ENDPOINT) {
             const usb_ep_desc_t *ep = (const usb_ep_desc_t *)next_desc;
@@ -226,6 +281,15 @@ void start_sniff(uint8_t addr) {
                     temp_in_ep = ep->bEndpointAddress;
                     temp_in_mps = ep->wMaxPacketSize;
                     temp_if_num = cur_if_num;
+                    if (cur_cls == 0xFF && cur_sub == 0x47 && cur_prt == 0xD0) temp_proto = PROTO_GIP;
+                    else if (cur_cls == 0xFF && cur_sub == 0x5D && cur_prt == 0x01) temp_proto = PROTO_XINPUT360;
+                }
+            }
+            // Interrupt OUT endpoint of each interface (alternate setting 0), for the start-up packets.
+            if ((ep->bmAttributes & 0x03) == 0x03 && !(ep->bEndpointAddress & 0x80) && cur_alt == 0 && cur_if_num < 16) {
+                if (out_ep_by_if[cur_if_num] == 0) {
+                    out_ep_by_if[cur_if_num] = ep->bEndpointAddress;
+                    out_mps_by_if[cur_if_num] = ep->wMaxPacketSize;
                 }
             }
         }
@@ -261,6 +325,9 @@ void start_sniff(uint8_t addr) {
     s_if_num = temp_if_num;
     s_in_ep = temp_in_ep;
     s_in_mps = temp_in_mps;
+    s_proto = temp_proto;
+    s_out_ep = temp_if_num < 16 ? out_ep_by_if[temp_if_num] : 0;
+    s_out_mps = temp_if_num < 16 ? out_mps_by_if[temp_if_num] : 0;
     is_mouse_connected = false;
     
     bool found_custom = false;
@@ -306,8 +373,9 @@ void start_sniff(uint8_t addr) {
     };
     do_blink(active_driver == 1 ? C_BLUE : C_GREEN, 2);
 
-    dual_printf("\n*** CONNECTED: VID:%04x PID:%04x (IF %u, EP 0x%02X, %u byte) ***\n",
-                connected_vid, connected_pid, s_if_num, s_in_ep, s_in_mps);
+    dual_printf("\n*** CONNECTED: VID:%04x PID:%04x (IF %u, EP 0x%02X, %u byte, %s) ***\n",
+                connected_vid, connected_pid, s_if_num, s_in_ep, s_in_mps,
+                s_proto == PROTO_GIP ? "Xbox One/Series GIP" : s_proto == PROTO_XINPUT360 ? "Xbox 360 XInput" : "HID");
     if (use_html_configurator) {
         dual_println(">>> TIER 0 MATCH: HTML Configurator Rules Active");
     } else if (found_custom) {
@@ -331,6 +399,32 @@ void start_sniff(uint8_t addr) {
         if (submit_err != ESP_OK)
             dual_printf(">>> USB: reading endpoint 0x%02X failed (%s)\n", s_in_ep, esp_err_to_name(submit_err));
         device_connected = true;
+
+        // Xbox pads: power-on (GIP) / player LED (360) through the OUT endpoint of the same interface.
+        s_init_count = 0; s_init_next = 0; s_gip_seq = 1;
+        if (s_proto == PROTO_GIP) {
+            s_init_pkt[s_init_count] = GIP_POWER_ON; s_init_len[s_init_count++] = sizeof(GIP_POWER_ON);
+            if (connected_vid == 0x045E) {          // Microsoft: Xbox One S / Elite 2 / Series need the extra init
+                s_init_pkt[s_init_count] = GIP_S_INIT; s_init_len[s_init_count++] = sizeof(GIP_S_INIT);
+                s_init_pkt[s_init_count] = GIP_LED_ON; s_init_len[s_init_count++] = sizeof(GIP_LED_ON);
+            } else if (connected_vid == 0x0E6F) {   // PDP
+                s_init_pkt[s_init_count] = GIP_LED_ON;   s_init_len[s_init_count++] = sizeof(GIP_LED_ON);
+                s_init_pkt[s_init_count] = GIP_PDP_AUTH; s_init_len[s_init_count++] = sizeof(GIP_PDP_AUTH);
+            }
+        } else if (s_proto == PROTO_XINPUT360) {
+            s_init_pkt[s_init_count] = X360_LED_P1; s_init_len[s_init_count++] = sizeof(X360_LED_P1);
+        }
+        if (s_init_count > 0) {
+            if (s_out_ep == 0) {
+                dual_println(">>> USB: Xbox pad without OUT endpoint: cannot send the start-up packets");
+            } else if (usb_host_transfer_alloc(64, 0, &s_out_xfer) == ESP_OK) {
+                s_out_xfer->device_handle = s_dev;
+                s_out_xfer->callback = out_transfer_cb;
+                s_out_xfer->bEndpointAddress = s_out_ep;
+                s_out_xfer->context = nullptr;
+                send_next_init_packet();
+            }
+        }
     }
 }
 
@@ -345,6 +439,13 @@ static void client_event_cb(const usb_host_client_event_msg_t *msg, void *arg) {
                 usb_host_transfer_free(s_in_xfer);
                 s_in_xfer = nullptr;
             }
+            if (s_out_xfer) {
+                usb_host_transfer_free(s_out_xfer);
+                s_out_xfer = nullptr;
+            }
+            s_proto = PROTO_HID;
+            s_out_ep = 0;
+            s_init_count = s_init_next = 0;
             usb_host_interface_release(s_client, s_dev, s_if_num);
             usb_host_device_close(s_client, s_dev);
             s_dev = nullptr;

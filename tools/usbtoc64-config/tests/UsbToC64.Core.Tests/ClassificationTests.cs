@@ -126,3 +126,45 @@ public class ClassificationTests
         Assert.Equal(win, ReportView.FromWindows(win, usesReportIds: true));
     }
 }
+
+public class GipTests
+{
+    [Fact]
+    public void Gip_LayoutAndProposal()
+    {
+        var pad = UsbToC64.Core.XInput.XInputLayout.Describe(UsbToC64.Core.XInput.XInputKind.Gip);
+        var p = UsbToC64.Core.Mapping.ProfileBuilder.Build(UsbToC64.Core.Mapping.MappingProposer.Propose(pad), 0x045E, 0x0B12);
+        Assert.Contains(new UsbToC64.Core.Model.JmRule(5, 0x01, UsbToC64.Core.Model.JmOp.BitAny, UsbToC64.Core.Model.JmFunc.Up), p.Rules);
+        Assert.Contains(new UsbToC64.Core.Model.JmRule(4, 0x10, UsbToC64.Core.Model.JmOp.BitAny, UsbToC64.Core.Model.JmFunc.Fire1), p.Rules); // A
+        Assert.All(p.Rules, r => Assert.InRange(r.Index, 4, 9));
+        Assert.False(p.UseAnalog);
+        var codes = UsbToC64.Core.Validation.ProfileValidator.Validate(p).Select(i => i.Code).ToList();
+        Assert.Contains("GIP_FIRMWARE", codes);
+        Assert.DoesNotContain("GIP_SYNTHETIC_INDEXES", codes);
+    }
+
+    [Fact]
+    public void Gip_ReportFromXInputState_DrivesTheEngine()
+    {
+        var X = UsbToC64.Core.XInput.XInputLayout.Buttons.A | UsbToC64.Core.XInput.XInputLayout.Buttons.DpadRight;
+        var report = UsbToC64.Core.XInput.XInputLayout.BuildGipReport((ushort)X, 255, 0, 0, 0, 0, 0);
+        Assert.Equal(0x20, report[0]);
+        Assert.Equal(0x10, report[4]);   // A
+        Assert.Equal(0x08, report[5]);   // right
+        Assert.Equal(0x03, report[7]);   // LT fully pressed: 1023 -> high byte 3
+        var pad = UsbToC64.Core.XInput.XInputLayout.Describe(UsbToC64.Core.XInput.XInputKind.Gip);
+        var m = UsbToC64.Core.Mapping.MappingProposer.Propose(pad);
+        m.Set(pad.Controls.Single(c => c.Id == "trg_lt"), UsbToC64.Core.Mapping.PadAction.Fire3);
+        var s = new UsbToC64.Core.Emulation.DynamicEngine(UsbToC64.Core.Mapping.ProfileBuilder.Build(m, 0x045E, 0x0B12)).Process(report)!.Value;
+        Assert.True(s.Fire1 && s.Right && s.Fire3);
+        Assert.False(s.Up || s.Left || s.Down);
+    }
+
+    [Fact]
+    public void Gip_SyntheticIndexes_AreReported()
+    {
+        var p = new UsbToC64.Core.Model.JmProfile { Vid = 0x045E, Pid = 0x02EA };
+        p.Rules.Add(new UsbToC64.Core.Model.JmRule(10, 1, UsbToC64.Core.Model.JmOp.BitAny, UsbToC64.Core.Model.JmFunc.Fire1));
+        Assert.Contains(UsbToC64.Core.Validation.ProfileValidator.Validate(p), i => i.Code == "GIP_SYNTHETIC_INDEXES");
+    }
+}

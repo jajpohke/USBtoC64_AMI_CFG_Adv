@@ -15,6 +15,7 @@ public sealed class PadReader : IDisposable
     private readonly byte[] _buffer = Array.Empty<byte>();
     private readonly bool _usesReportIds;
     private readonly int _xinputSlot = -1;
+    private readonly XInputKind _kind;
     private uint _lastPacket = uint.MaxValue;
 
     public PadReader(PadDevice device, PadDescription description, int xinputSlot = 0)
@@ -23,6 +24,7 @@ public sealed class PadReader : IDisposable
         {
             if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("XInput è disponibile solo su Windows.");
             _xinputSlot = xinputSlot;
+            _kind = device.XInputKind;
             return;
         }
         _usesReportIds = description.UsesReportIds;
@@ -51,8 +53,9 @@ public sealed class PadReader : IDisposable
         if (st.dwPacketNumber == _lastPacket) return null;
         _lastPacket = st.dwPacketNumber;
         var g = st.Gamepad;
-        return XInputLayout.BuildNativeReport(g.wButtons, g.bLeftTrigger, g.bRightTrigger,
-            g.sThumbLX, g.sThumbLY, g.sThumbRX, g.sThumbRY);
+        return _kind == XInputKind.Gip
+            ? XInputLayout.BuildGipReport(g.wButtons, g.bLeftTrigger, g.bRightTrigger, g.sThumbLX, g.sThumbLY, g.sThumbRX, g.sThumbRY)
+            : XInputLayout.BuildNativeReport(g.wButtons, g.bLeftTrigger, g.bRightTrigger, g.sThumbLX, g.sThumbLY, g.sThumbRX, g.sThumbRY);
     }
 
     /// <summary>XInput slots (0-3) with a connected controller.</summary>
