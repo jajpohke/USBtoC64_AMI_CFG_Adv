@@ -88,11 +88,14 @@ public sealed class SerialAdapterPort : IAdapterPort
 
     public IAdapterLink Open()
     {
-        // DTR and RTS stay off: on the ESP32-S3 native USB port they drive the chip reset
-        // (auto-reset for flashing), and asserting them restarted the adapter on open.
+        // ESP32-S3 native USB (USB-Serial-JTAG): the chip is reset when RTS is active while DTR is not
+        // (esptool auto-reset; the adapter reported "rst:0x15 (USB_UART_CHIP_RESET)" on open).
+        // Both on or both off made Windows pass through RTS=1/DTR=0 while applying them one at a time.
+        // DTR on + RTS off never does, whatever the order.
         var sp = new SerialPort(Name, 115200, Parity.None, 8, StopBits.One)
         {
-            DtrEnable = false,
+            Handshake = Handshake.None,
+            DtrEnable = true,
             RtsEnable = false,
             Encoding = Encoding.UTF8,
             NewLine = "\n",
