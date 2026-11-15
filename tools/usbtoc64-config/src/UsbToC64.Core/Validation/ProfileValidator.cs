@@ -85,7 +85,11 @@ public static class ProfileValidator
             Add(Severity.Warning, "AXIS_ON_RULE_BYTE", $"Il byte {idx} è usato sia come asse sia nelle regole: probabilmente non è un asse.");
 
         // --- XInput (P8) ------------------------------------------------------------------------
-        if (XInputLayout.IsKnownXboxOne(p.Vid, p.Pid))
+        if (p.Vid == 0x045E && p.Pid == 0x02FF)
+            Add(Severity.Error, "VIRTUAL_XBOX_ID",
+                "VID/PID 045E:02FF è il controller virtuale che Windows crea per i pad Xbox One/Series: l'adattatore vede " +
+                "il VID/PID USB reale (es. 045E:02EA), quindi questo profilo non si attiverebbe mai.");
+        else if (XInputLayout.IsKnownXboxOne(p.Vid, p.Pid))
         {
             Add(Severity.Info, "GIP_FIRMWARE", $"Controller Xbox One/Series (GIP): funziona solo con il firmware {XInputLayout.GipMinFirmware} o successivo.");
             if (p.Rules.Any(r => r.Index < 4 || r.Index > 9) || p.UseAnalog)

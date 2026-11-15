@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\UsbToC64.Core\UsbToC64.Core.csproj" />
+    <ProjectReference Include="..\..\src\UsbToC64.Input\UsbToC64.Input.csproj" />
   </ItemGroup>
 
   <ItemGroup>

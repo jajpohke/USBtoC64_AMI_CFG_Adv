@@ -1,5 +1,4 @@
 using HidSharp;
-using Microsoft.Win32;
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.XInput;
 
@@ -10,8 +9,11 @@ public sealed class PadDevice
 {
     internal HidDevice Hid { get; }
     public string Path => Hid.DevicePath;
-    public ushort Vid => (ushort)Hid.VendorID;
-    public ushort Pid => (ushort)Hid.ProductID;
+    /// <summary>VID/PID the adapter will see (for Xbox One/Series: the real USB device, not the Windows virtual one).</summary>
+    public ushort Vid { get; }
+    public ushort Pid { get; }
+    /// <summary>Set when Windows shows a different (virtual) VID/PID than the USB device.</summary>
+    public string? IdNote { get; }
     public string Name { get; }
     /// <summary>XInput pad: Windows shows a synthetic HID report, the layout comes from <see cref="XInputLayout"/>.</summary>
     public bool IsXInput { get; }
@@ -20,15 +22,22 @@ public sealed class PadDevice
     public byte[]? RawDescriptor { get; }
     public string? DescriptorError { get; }
 
-    internal PadDevice(HidDevice hid, string name, bool isXInput, XInputKind kind, byte[]? raw, string? error)
+    internal PadDevice(HidDevice hid, string name, bool isXInput, XInputKind kind, ushort vid, ushort pid, string? idNote,
+        byte[]? raw, string? error)
     {
-        Hid = hid; Name = name; IsXInput = isXInput; XInputKind = kind; RawDescriptor = raw; DescriptorError = error;
+        Hid = hid; Name = name; IsXInput = isXInput; XInputKind = kind; Vid = vid; Pid = pid; IdNote = idNote;
+        RawDescriptor = raw; DescriptorError = error;
     }
 
     /// <summary>Controls of the pad, located as the ESP32 sees them.</summary>
     public PadDescription Describe()
     {
-        if (IsXInput) return XInputLayout.Describe(XInputKind);
+        if (IsXInput)
+        {
+            var x = XInputLayout.Describe(XInputKind);
+            if (IdNote != null) x.Notes.Add(IdNote);
+            return x;
+        }
         if (RawDescriptor == null)
             throw new InvalidOperationException($"Descrittore HID non disponibile: {DescriptorError}");
         return ControlClassifier.Classify(RawDescriptor);
@@ -46,6 +55,7 @@ public static class PadDevices
     public static List<PadDevice> List()
     {
         var result = new List<PadDevice>();
+        var usb = UsbDevices.Present();
         foreach (var d in DeviceList.Local.GetHidDevices())
         {
             byte[]? raw = null; string? err = null;
@@ -70,40 +80,52 @@ public static class PadDevices
             string name;
             try { name = d.GetProductName()?.Trim() ?? ""; } catch { name = ""; }
             if (name.Length == 0) name = "(senza nome)";
-            var kind = xinput ? ResolveXInputKind((ushort)d.VendorID, (ushort)d.ProductID) : XInputKind.Xbox360;
-            result.Add(new PadDevice(d, name, xinput, kind, raw, err));
+            ushort vid = (ushort)d.VendorID, pid = (ushort)d.ProductID;
+            var kind = XInputKind.Xbox360;
+            string? note = null;
+            if (xinput) (kind, vid, pid, note) = ResolveXInput(vid, pid, usb);
+            result.Add(new PadDevice(d, name, xinput, kind, vid, pid, note, raw, err));
         }
         // Windows can expose the same pad more than once (one entry per top-level collection).
         return result.GroupBy(p => p.Path).Select(g => g.First()).ToList();
     }
 
+    /// <summary>Virtual HID device that Windows (xboxgip / Windows.Gaming.Input) creates for every GIP pad.</summary>
+    private const ushort VirtualGipVid = 0x045E, VirtualGipPid = 0x02FF;
+
     /// <summary>
-    /// Xbox 360 or Xbox One/Series: the Windows driver bound to the USB device tells it for sure
-    /// (xboxgip = GIP, xusb2x = Xbox 360); otherwise the list of known VID/PID; default Xbox 360.
+    /// Xbox 360 or Xbox One/Series, and the VID/PID the adapter will see.
+    /// 1) The USB device with the same VID/PID is present: its Windows driver tells the protocol
+    ///    (xboxgip = GIP, xusb2x = Xbox 360).
+    /// 2) Otherwise (e.g. 045E:02FF, the virtual device of GIP pads) the present USB device bound to xboxgip
+    ///    is the real controller: GIP, with its VID/PID.
+    /// 3) Otherwise the known VID/PID list; default Xbox 360.
     /// </summary>
-    public static XInputKind ResolveXInputKind(ushort vid, ushort pid)
+    public static (XInputKind Kind, ushort Vid, ushort Pid, string? Note) ResolveXInput(ushort vid, ushort pid, IReadOnlyList<UsbDeviceInfo> usb)
     {
-        if (OperatingSystem.IsWindows())
+        static bool IsGip(UsbDeviceInfo u) => u.Service.Equals("xboxgip", StringComparison.OrdinalIgnoreCase);
+        static bool Is360(UsbDeviceInfo u) => u.Service.StartsWith("xusb", StringComparison.OrdinalIgnoreCase);
+
+        var same = usb.Where(u => u.Vid == vid && u.Pid == pid).ToList();
+        if (same.Any(IsGip)) return (XInputKind.Gip, vid, pid, null);
+        if (same.Any(Is360)) return (XInputKind.Xbox360, vid, pid, null);
+
+        var gip = usb.Where(IsGip).Select(u => (u.Vid, u.Pid)).Distinct().ToList();
+        bool virtualGip = vid == VirtualGipVid && pid == VirtualGipPid;
+        if (gip.Count > 0 && (virtualGip || same.Count == 0))
         {
-            try
-            {
-                using var usb = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Enum\USB");
-                string prefix = $"VID_{vid:X4}&PID_{pid:X4}";
-                foreach (var dev in usb?.GetSubKeyNames() ?? Array.Empty<string>())
-                {
-                    if (!dev.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
-                    using var devKey = usb!.OpenSubKey(dev);
-                    foreach (var inst in devKey?.GetSubKeyNames() ?? Array.Empty<string>())
-                    {
-                        using var instKey = devKey!.OpenSubKey(inst);
-                        var service = instKey?.GetValue("Service") as string ?? "";
-                        if (service.Equals("xboxgip", StringComparison.OrdinalIgnoreCase)) return XInputKind.Gip;
-                        if (service.StartsWith("xusb", StringComparison.OrdinalIgnoreCase)) return XInputKind.Xbox360;
-                    }
-                }
-            }
-            catch (Exception) { /* registry not readable: fall back to the known list */ }
+            var (rv, rp) = gip[0];
+            string note = $"Windows mostra il controller come {vid:X4}:{pid:X4} (dispositivo virtuale del driver Xbox): " +
+                          $"il profilo usa il VID/PID USB reale {rv:X4}:{rp:X4}, quello che vede l'adattatore.";
+            if (gip.Count > 1)
+                note += $" Attenzione: ci sono {gip.Count} controller Xbox One/Series collegati ({string.Join(", ", gip.Select(g => $"{g.Vid:X4}:{g.Pid:X4}"))}): " +
+                        "lasciane collegato uno solo.";
+            return (XInputKind.Gip, rv, rp, note);
         }
-        return XInputLayout.IsKnownXboxOne(vid, pid) ? XInputKind.Gip : XInputKind.Xbox360;
+        if (virtualGip)
+            return (XInputKind.Gip, vid, pid,
+                "Controller Xbox One/Series, ma il dispositivo USB reale non è stato trovato: il VID/PID del profilo (045E:02FF) " +
+                "non corrisponderà a quello che vede l'adattatore.");
+        return (XInputLayout.IsKnownXboxOne(vid, pid) ? XInputKind.Gip : XInputKind.Xbox360, vid, pid, null);
     }
 }
