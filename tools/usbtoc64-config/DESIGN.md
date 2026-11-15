@@ -127,6 +127,43 @@ controllo: usage, report ID, bit offset, dimensione, logical min/max. Quindi:
 
 ---
 
+## 3bis. Classificazione automatica dei controlli (principio della fase 1)
+
+Nel configuratore web l'utente doveva capire da solo se leva e D-pad erano
+"assi" o "pulsanti" (opzione "Force Axis"). Errori di questa scelta sono
+all'origine di P5, P6 e P7.
+
+Il tool **non chiede più questa scelta**: ogni pad HID dichiara nel descriptor
+che cosa è ogni controllo (usage standard), e Windows lo espone. Il tool lo
+legge e assegna le funzioni in automatico.
+
+| Usage nel descriptor | Cos'è | Assegnazione automatica |
+|---|---|---|
+| Generic Desktop `X` / `Y` (0x30 / 0x31) | stick sinistro, o D-pad dei pad economici | assi analogici → direzioni (soglie firmware 64/190) |
+| Generic Desktop `Rx` / `Ry` / `Z` / `Rz` (0x33 / 0x34 / 0x32 / 0x35) | secondo stick o grilletti | non assegnati di default (attivabili come assi) |
+| Generic Desktop `Hat switch` (0x39) | D-pad a croce | regole HAT → 8 direzioni |
+| Generic Desktop `D-pad Up/Down/Right/Left` (0x90–0x93) | D-pad come 4 tasti | regole BITANY → direzioni |
+| Button page (0x09) `Button 1…N` | pulsanti | azioni FIRE / autofire con proposta predefinita |
+| Pad XInput | layout fisso (§4) | direzioni, pulsanti e grilletti noti, nomi A/B/X/Y |
+
+Casi particolari, gestiti senza domande all'utente:
+
+- **D-pad dichiarato come asse X/Y** (pad economici, valori 0/127/255): resta un asse; le soglie 64/190 del firmware lo leggono correttamente come digitale.
+- **Stick e D-pad insieme**: hat → direzioni, X/Y → assi; il firmware combina entrambi.
+- **Asse 16 bit unsigned**: si usa il byte alto. **Asse signed**: avviso, non compatibile con il firmware attuale.
+
+Cosa Windows **non** sa: quale pulsante deve fare FIRE 1. I pulsanti HID sono
+solo numerati. Il tool propone una mappatura predefinita
+(Button 1 → FIRE 1, Button 2 → UP, Button 3 → FIRE 2, …) e l'utente la
+cambia nell'editor. Premere un tasto lo evidenzia nella lista: serve solo a
+riconoscerlo fisicamente, non a classificarlo.
+
+**Fallback a procedura guidata** ("premi il tasto", cattura del bit che cambia)
+solo quando il descriptor non basta: usage vendor-defined, hat non allineato al
+nibble basso, report non decodificabile.
+
+---
+
 ## 4. Pad XInput (X360, compatibili)
 
 Windows non espone il report nativo: crea un HID sintetico per DirectInput
@@ -183,6 +220,18 @@ si sviluppano e testano anche fuori da Windows.
 
 ---
 
+## 5bis. Build e distribuzione
+
+- **Nessuna build sul PC dell'utente**: l'exe viene compilato da **GitHub Actions** su runner `windows-latest`.
+- Workflow (`.github/workflows/usbtoc64-config.yml`), attivato da push sui file in `tools/usbtoc64-config/**` e manualmente (`workflow_dispatch`):
+  1. test di `UsbToC64.Core` (xUnit);
+  2. `dotnet publish` GUI e CLI, `win-x64`, single-file, self-contained (non serve installare .NET);
+  3. upload dell'exe come **artifact** scaricabile dalla pagina della run.
+- Release: sui tag `config-tool-v*` l'exe viene allegato a una GitHub Release.
+- Senza firma del codice Windows SmartScreen mostra un avviso al primo avvio ("Esegui comunque").
+
+---
+
 ## 6. Piano a fasi
 
 ### Fase 1 — Preparazione della configurazione (prima fase)
@@ -190,11 +239,9 @@ si sviluppano e testano anche fuori da Windows.
 Nessuna scrittura sull'ESP32. Output: profilo validato, esportabile.
 
 1. **Rilevamento pad**: elenco dispositivi HID gamepad/joystick + XInput, con VID/PID e nome; scelta del pad.
-2. **Analisi automatica**:
-   - HID: parse del descriptor → elenco controlli con byte/bit/tipo.
-   - XInput: tabella nativa (§4).
-3. **Wizard guidato**: per ogni controllo (o solo quelli che l'utente vuole) "premi il tasto"; il tool conferma quale controllo del descriptor è cambiato. Niente catture a byte interi, niente "Force Axis".
-4. **Proposta automatica** di una mappatura predefinita: D-pad/hat → direzioni, primo pulsante → FIRE 1, ecc.
+2. **Classificazione automatica** (§3bis): dal descriptor (HID) o dalla tabella (XInput) il tool sa quali controlli sono direzionali e quali pulsanti, con byte/bit/tipo. Nessuna scelta "assi o pulsanti", niente "Force Axis".
+3. **Proposta automatica** della mappatura: hat/D-pad/assi X-Y → direzioni, pulsanti → FIRE 1, UP, FIRE 2, … secondo l'ordine predefinito.
+4. **Identificazione dal vivo**: premendo un tasto o muovendo la leva, il controllo corrispondente si evidenzia. Procedura guidata "premi il tasto" solo come fallback (§3bis).
 5. **Editor azioni**: per ogni controllo scelta della funzione (tabella §2.2), colori opzionali.
 6. **Validazione**, prima di consentire l'export:
    - conflitti (stesso byte+maschera su due controlli, P6);
@@ -207,7 +254,7 @@ Nessuna scrittura sull'ESP32. Output: profilo validato, esportabile.
 
 Criteri di accettazione fase 1:
 - I file 24 e 25 importati producono avvisi che spiegano P5/P6/P7/P8.
-- Un pad HID generico viene mappato senza premere ogni tasto due volte e senza scelte manuali di byte.
+- Un pad HID generico riceve direzioni e pulsanti assegnati automaticamente dal descriptor, senza scelte manuali "assi/pulsanti" né di byte.
 - Il JSON generato è valido per `save_jm` (verifica manuale con terminale, come fatto nella prova B).
 - I test di `Core` girano senza Windows.
 
