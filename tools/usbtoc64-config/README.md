@@ -3,19 +3,34 @@
 Strumento Windows per preparare i profili gamepad dell'adattatore USBtoC64.
 Progetto e motivazioni: [DESIGN.md](DESIGN.md).
 
-**Stato: fase 1 in corso** — classificazione automatica dei controlli, proposta della
-mappatura, controlli di validità, anteprima dal vivo, conversione dei vecchi `.h`.
-Nessuna scrittura sull'ESP32 (fase 2). Per ora c'è solo la versione a riga di comando;
-l'interfaccia grafica arriva nel passo successivo.
+**Stato: fase 1** — classificazione automatica dei controlli, proposta della mappatura,
+editor delle azioni, controlli di validità, anteprima dal vivo, import dei vecchi `.h`/`.json`,
+export del JSON `save_jm`. Nessuna scrittura sull'ESP32 (arriva con la fase 2).
+
+Due programmi:
+
+- **`USBtoC64Config.exe`** — interfaccia grafica.
+- **`usbtoc64.exe`** — stessa logica da riga di comando.
+
+## Interfaccia grafica
+
+1. Collega il pad al PC e avvia `USBtoC64Config.exe`: il pad viene scelto e analizzato in automatico.
+2. La tabella elenca i controlli trovati (pulsanti, D-pad/hat, assi) con byte e bit che userà l'adattatore.
+   Premendo un tasto la riga si evidenzia in verde.
+3. Nella colonna **Azione sul C64** si sceglie cosa fa ogni controllo. **Proposta automatica** ripristina i valori iniziali.
+4. A destra si vede dal vivo cosa riceverebbe il C64 (direzioni, F1–F3, autofire).
+5. In basso: **Avvisi** (problemi del profilo), **Regole per il firmware**, **JSON save_jm**.
+6. **Salva JSON…** / **Copia JSON** esportano il profilo. **Importa profilo…** apre un `JoystickMapping.h`
+   o un `.json` e lo applica ai controlli del pad collegato (senza pad: sola lettura con i controlli).
 
 ## Scaricare l'exe
 
 L'exe viene compilato da GitHub Actions (workflow *USBtoC64 Config Tool*):
-aprire la run più recente → sezione **Artifacts** → `usbtoc64-config-win-x64`.
-È un singolo file, non serve installare .NET. Al primo avvio Windows SmartScreen
+aprire la run più recente → sezione **Artifacts** → `usbtoc64-config-win-x64`
+(zip con i due exe). Sono file singoli, non serve installare .NET. Al primo avvio Windows SmartScreen
 può mostrare un avviso (exe non firmato): *Ulteriori informazioni → Esegui comunque*.
 
-## Comandi
+## Riga di comando
 
 ```
 usbtoc64 devices
@@ -52,4 +67,5 @@ dotnet run --project src/UsbToC64.Cli -- check tests/UsbToC64.Core.Tests/Fixture
 | `src/UsbToC64.Core` | modello firmware, parser descrittore HID, classificazione, proposta, validazione, emulatore, formati |
 | `src/UsbToC64.Input` | lettura pad: HidSharp (HID) e XInput |
 | `src/UsbToC64.Cli` | comandi da terminale (`usbtoc64.exe`) |
+| `src/UsbToC64.Gui` | interfaccia grafica WinForms (`USBtoC64Config.exe`) |
 | `tests/UsbToC64.Core.Tests` | test xUnit, con profili reali in `Fixtures/` |

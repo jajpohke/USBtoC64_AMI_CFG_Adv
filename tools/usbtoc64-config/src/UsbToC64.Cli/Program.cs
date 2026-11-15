@@ -134,7 +134,7 @@ internal static class Program
             if (report == null) continue;
             var state = engine.Process(report);
             if (state == null) continue;
-            var active = pad.Controls.Where(c => IsActive(c, report)).Select(c => c.Name);
+            var active = pad.Controls.Where(c => c.IsActive(report)).Select(c => c.Name);
             string line = $"C64: {state.Value}   pad: {string.Join(", ", active)}";
             if (line == lastLine) continue;
             lastLine = line;
@@ -260,14 +260,6 @@ internal static class Program
         foreach (var i in issues.OrderByDescending(i => i.Severity)) Console.WriteLine($"  {i}");
         return issues.All(i => i.Severity != Severity.Error);
     }
-
-    private static bool IsActive(Control c, ReadOnlySpan<byte> report) => c.Kind switch
-    {
-        ControlKind.Button or ControlKind.DpadButton => c.ReadValue(report) != 0,
-        ControlKind.Hat => c.ReadValue(report) is var v && v >= c.HatBase && v < c.HatBase + c.HatPositions,
-        ControlKind.Axis => c.Supported && c.ReadValue(report) is var a && (a < FirmwareLimits.AnalogDeadLow || a > FirmwareLimits.AnalogDeadHigh),
-        _ => false,
-    };
 
     private static string KindLabel(ControlKind k) => k switch
     {

@@ -42,6 +42,16 @@ public sealed record Control
     public bool Supported { get; init; } = true;
     public string? Note { get; init; }
 
+    /// <summary>True when the control is pressed / moved past the firmware thresholds in this report.</summary>
+    public bool IsActive(ReadOnlySpan<byte> report) => Kind switch
+    {
+        ControlKind.Button or ControlKind.DpadButton => ReadValue(report) != 0,
+        ControlKind.Hat => ReadValue(report) is var v && v >= HatBase && v < HatBase + HatPositions,
+        ControlKind.Axis => Supported && ReadValue(report) is var a
+                            && (a < Model.FirmwareLimits.AnalogDeadLow || a > Model.FirmwareLimits.AnalogDeadHigh),
+        _ => false,
+    };
+
     /// <summary>Reads the current state of the control from an ESP32-view report, for UI highlighting.</summary>
     public int ReadValue(ReadOnlySpan<byte> report)
     {

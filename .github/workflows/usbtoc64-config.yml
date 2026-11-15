@@ -38,10 +38,22 @@ jobs:
           -p:DebugType=None
           -o publish
 
+      - name: Publish GUI (win-x64, single file)
+        run: >
+          dotnet publish src/UsbToC64.Gui -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=None
+          -o publish
+
       - uses: actions/upload-artifact@v4
         with:
           name: usbtoc64-config-win-x64
-          path: tools/usbtoc64-config/publish/usbtoc64.exe
+          path: |
+            tools/usbtoc64-config/publish/USBtoC64Config.exe
+            tools/usbtoc64-config/publish/usbtoc64.exe
           if-no-files-found: error
 
   release:
@@ -56,4 +68,6 @@ jobs:
           name: usbtoc64-config-win-x64
       - uses: softprops/action-gh-release@v2
         with:
-          files: usbtoc64.exe
+          files: |
+            USBtoC64Config.exe
+            usbtoc64.exe
