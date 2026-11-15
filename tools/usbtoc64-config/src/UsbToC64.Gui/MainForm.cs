@@ -617,8 +617,8 @@ internal sealed class MainForm : Form
         {
             var info = await Task.Run(() =>
             {
-                using var link = new SerialAdapterPort(port.PortName).Open();
-                return new AdapterSession(link, Log).Ping();
+                using var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), Log);
+                return conn.Info;
             });
             ok = true;
             message = $"L'adattatore su {port.PortName} risponde: {info}.";
@@ -650,10 +650,8 @@ internal sealed class MainForm : Form
         {
             stored = await Task.Run(() =>
             {
-                using var link = new SerialAdapterPort(port.PortName).Open();
-                var session = new AdapterSession(link, Log);
-                Log($"Comunicazione OK ({session.Ping()}).");
-                return session.ReadStored();
+                using var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), Log);
+                return conn.Session.ReadStored();
             });
         }
         catch (Exception ex) { error = ex.Message; }

@@ -131,6 +131,9 @@ public sealed class AdapterSession
     /// <summary>Non-JSON lines received during the last request (boot messages, menu text).</summary>
     public List<string> LastNoise { get; } = new();
 
+    /// <summary>True once boot messages were seen on this link (the adapter restarted after the port was opened).</summary>
+    public bool SawBoot { get; private set; }
+
     /// <summary>Lines printed by the ESP32 ROM bootloader or by the firmware banner while it starts.</summary>
     public static bool IsBootLine(string line) =>
         line.StartsWith("ESP-ROM", StringComparison.Ordinal) || line.StartsWith("rst:", StringComparison.Ordinal) ||
@@ -154,7 +157,7 @@ public sealed class AdapterSession
             line = line.Trim();
             if (line.Length == 0) continue;
             _log($"← {line}");
-            if (!line.StartsWith('{')) { LastNoise.Add(line); continue; }
+            if (!line.StartsWith('{')) { LastNoise.Add(line); if (IsBootLine(line)) SawBoot = true; continue; }
             try { return JsonDocument.Parse(line); }
             catch (JsonException) { /* not a reply: keep reading */ }
         }
@@ -195,6 +198,8 @@ public sealed class AdapterSession
                 _log("L'adattatore si sta riavviando: attendo la fine dell'avvio…");
                 WaitForBanner(TimeSpan.FromSeconds(8));
             }
+            if (_link.Lost)
+                throw new IOException("La porta si è chiusa durante il riavvio dell'adattatore.");
             Thread.Sleep(300);
             doc = RequestJson("{\"cmd\":\"get_info\"}", timeout ?? TimeSpan.FromSeconds(2));
         }
@@ -219,6 +224,7 @@ public sealed class AdapterSession
             line = line.Trim();
             if (line.Length == 0) continue;
             _log($"← {line}");
+            if (IsBootLine(line)) SawBoot = true;
             if (IsBannerEnd(line)) return;
         }
     }
@@ -245,6 +251,63 @@ public sealed class AdapterSession
         if (text.Length == 0) throw new TimeoutException("Nessuna risposta né a get_jm né a dumppad.");
         bool has = Regex.IsMatch(text, @"has_custom\s*:\s*TRUE");
         return new StoredProfile(DumppadParser.Parse(text), ReadMethod.Dumppad, has);
+    }
+}
+
+/// <summary>
+/// Opens the adapter port and checks the communication. Opening the port can restart the adapter, and at boot the
+/// firmware forces a USB reconnection (GPIO 19/20), so the first handle may die: in that case wait for the port to
+/// come back, let the firmware start, and open it again — like a serial terminal that reconnects.
+/// </summary>
+public sealed class AdapterConnection : IDisposable
+{
+    public IAdapterLink Link { get; }
+    public AdapterSession Session { get; }
+    public AdapterInfo Info { get; }
+
+    private AdapterConnection(IAdapterLink link, AdapterSession session, AdapterInfo info)
+    {
+        Link = link; Session = session; Info = info;
+    }
+
+    public void Dispose() => Link.Dispose();
+
+    public static AdapterConnection Connect(IAdapterPort port, Action<string>? log = null, Action<TimeSpan>? sleep = null,
+        int attempts = 3, TimeSpan? bootDelay = null)
+    {
+        log ??= _ => { };
+        sleep ??= Thread.Sleep;
+        Exception? last = null;
+        for (int a = 1; a <= attempts; a++)
+        {
+            IAdapterLink? link = null;
+            AdapterSession? session = null;
+            try
+            {
+                link = port.Open();
+                log($"Porta {link.Name} aperta{(a > 1 ? $" (tentativo {a} di {attempts})" : "")}.");
+                session = new AdapterSession(link, log);
+                var info = session.Ping();
+                log($"Comunicazione OK ({info}).");
+                return new AdapterConnection(link, session, info);
+            }
+            catch (Exception ex) when (ex is TimeoutException or IOException or InvalidOperationException or UnauthorizedAccessException)
+            {
+                last = ex;
+                bool restarted = link?.Lost == true || session?.SawBoot == true;
+                link?.Dispose();
+                if (!restarted || a == attempts) break; // genuinely silent, or out of attempts
+                log("L'adattatore si è riavviato all'apertura della porta: attendo che torni disponibile e riapro.");
+                var goneUntil = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+                while (DateTime.UtcNow < goneUntil && port.IsPresent()) sleep(TimeSpan.FromMilliseconds(100));
+                var backUntil = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+                while (DateTime.UtcNow < backUntil && !port.IsPresent()) sleep(TimeSpan.FromMilliseconds(200));
+                sleep(bootDelay ?? TimeSpan.FromSeconds(3));
+            }
+        }
+        throw last is TimeoutException or IOException
+            ? new TimeoutException(last.Message, last)
+            : last ?? new TimeoutException("Adattatore non raggiungibile.");
     }
 }
 
@@ -275,22 +338,17 @@ public sealed class AdapterWriter
 
         // 1) send and wait for the reply
         bool lostAfterSend = false;
-        IAdapterLink? link = null;
+        // 0) open + communication test before sending anything
+        AdapterConnection conn;
+        try { conn = AdapterConnection.Connect(_port, _log, _sleep, bootDelay: BootDelay); }
+        catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            return new WriteResult(false, false, null, new(), "Profilo NON inviato. " + ex.Message);
+        }
+        var link = conn.Link;
+        var session = conn.Session;
         try
         {
-            link = _port.Open();
-            _log($"Porta {link.Name} aperta.");
-            var session = new AdapterSession(link, _log);
-
-            // 0) communication test before sending anything
-            AdapterInfo info;
-            try { info = session.Ping(); }
-            catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or IOException)
-            {
-                return new WriteResult(false, false, null, new(), "Profilo NON inviato. " + ex.Message);
-            }
-            _log($"Comunicazione OK ({info}).");
-
             JsonDocument? reply;
             try
             {
@@ -325,7 +383,7 @@ public sealed class AdapterWriter
         }
         finally
         {
-            link?.Dispose();
+            conn.Dispose();
         }
         if (lostAfterSend)
             _log("Probabile riavvio dopo il salvataggio (la risposta non è arrivata in tempo). Verifico rileggendo.");
@@ -346,11 +404,9 @@ public sealed class AdapterWriter
         StoredProfile stored;
         try
         {
-            using var readLink = _port.Open();
-            _log($"Porta {readLink.Name} riaperta, rileggo il profilo…");
-            var readSession = new AdapterSession(readLink, _log);
-            _log($"Comunicazione OK ({readSession.Ping()}).");
-            stored = readSession.ReadStored();
+            _log("Rileggo il profilo…");
+            using var readConn = AdapterConnection.Connect(_port, _log, _sleep, bootDelay: BootDelay);
+            stored = readConn.Session.ReadStored();
         }
         catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException or UnauthorizedAccessException or FormatException)
         {

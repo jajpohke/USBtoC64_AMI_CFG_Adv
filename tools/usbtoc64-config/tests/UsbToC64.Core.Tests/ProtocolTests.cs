@@ -16,6 +16,7 @@ internal sealed class FakeAdapter : IAdapterPort
     public bool ThrowOnSend { get; init; }       // ... and the send itself fails with "device not functioning"
     public bool NoComm { get; init; }            // nothing answers (wrong port, connected to the C64, dev mode)
     public bool ResetOnOpen { get; init; }       // opening the port restarts the chip (seen on Windows)
+    public int ResetAndDropOnOpen { get; set; }  // ... and the USB reconnection at boot kills the handle (n times)
     public JmProfile? Stored { get; private set; }
     public int Opens { get; private set; }
     private int _absentPolls;
@@ -35,10 +36,18 @@ internal sealed class FakeAdapter : IAdapterPort
         private readonly FakeAdapter _a;
         private readonly Queue<string> _out = new();
         private readonly Queue<string> _boot = new();
+        private bool _dropAfterBoot;
         public Link(FakeAdapter a)
         {
             _a = a;
-            if (a.ResetOnOpen)
+            if (a.ResetAndDropOnOpen > 0)
+            {
+                a.ResetAndDropOnOpen--;
+                _dropAfterBoot = true;
+                foreach (var l in new[] { "load:0x403c8700,len:0xc2c", "load:0x403cb700,len:0x30c0", "entry 0x403c88b8" })
+                    _boot.Enqueue(l);
+            }
+            else if (a.ResetOnOpen)
                 foreach (var l in new[] { "ESP-ROM:esp32s3-20210327", "load:0x403c8700,len:0xc2c", "entry 0x403c88b8",
                                           "", "=================================", "  USB -> DB9 ADAPTER v1.2        ",
                                           "--- Booting: Configuration Mode ---", "=================================" })
@@ -49,10 +58,17 @@ internal sealed class FakeAdapter : IAdapterPort
         public void DiscardInput() => _out.Clear();
         public void Dispose() { }
         // Boot lines arrive over time: DiscardInput does not remove them, and commands are ignored until they are out.
-        public string? ReadLine(TimeSpan timeout) => _boot.Count > 0 ? _boot.Dequeue() : _out.Count > 0 ? _out.Dequeue() : null;
+        public string? ReadLine(TimeSpan timeout)
+        {
+            if (_boot.Count > 0) return _boot.Dequeue();
+            if (_dropAfterBoot && !Lost) { Lost = true; _a._absentPolls = 3; } // USB reconnection: handle dead
+            if (Lost) return null;
+            return _out.Count > 0 ? _out.Dequeue() : null;
+        }
 
         public void SendLine(string line)
         {
+            if (Lost) throw new IOException("The port is closed.");
             if (_a.NoComm || _boot.Count > 0) return;
             if (line == "{\"cmd\":\"get_info\"}")
             {
@@ -197,6 +213,27 @@ public class ProtocolTests
         var r = Writer(new FakeAdapter { ResetOnOpen = true }, log).WriteAndVerify(Sample());
         Assert.True(r.Verified, r.Message);
         Assert.Contains(log, l => l.Contains("Comunicazione OK"));
+    }
+
+    [Fact]
+    public void Write_ResetAndUsbReconnectOnOpen_ReopensLikeATerminal()
+    {
+        // Seen on the real adapter: ROM boot lines, then "The port is closed".
+        var a = new FakeAdapter { ResetAndDropOnOpen = 1 };
+        var log = new List<string>();
+        var r = Writer(a, log).WriteAndVerify(Sample());
+        Assert.True(r.Verified, r.Message);
+        Assert.Contains(log, l => l.Contains("riapro"));
+        Assert.Contains(log, l => l.Contains("tentativo 2"));
+    }
+
+    [Fact]
+    public void Ping_GivesUpAfterThreeRestarts()
+    {
+        var a = new FakeAdapter { ResetAndDropOnOpen = 99 };
+        Assert.Throws<TimeoutException>(() =>
+            AdapterConnection.Connect(a, null, _ => { }, bootDelay: TimeSpan.Zero));
+        Assert.Equal(3, a.Opens);
     }
 
     [Fact]

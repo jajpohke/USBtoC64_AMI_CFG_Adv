@@ -225,8 +225,8 @@ internal static class Program
     private static int Ping(string[] args)
     {
         var port = AdapterPorts.Find(Option(args, "--port"));
-        using var link = new SerialAdapterPort(port.PortName).Open();
-        var info = new AdapterSession(link, s => Console.WriteLine("  " + s)).Ping();
+        using var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), s => Console.WriteLine("  " + s));
+        var info = conn.Info;
         Console.WriteLine($"L'adattatore su {port.PortName} risponde: {info}.");
         return 0;
     }
@@ -235,10 +235,8 @@ internal static class Program
     {
         var port = AdapterPorts.Find(Option(args, "--port"));
         bool json = HasFlag(args, "--json");
-        using var link = new SerialAdapterPort(port.PortName).Open();
-        var session = new AdapterSession(link, json ? null : s => Console.WriteLine("  " + s));
-        session.Ping();
-        var stored = session.ReadStored();
+        using var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), json ? null : s => Console.WriteLine("  " + s));
+        var stored = conn.Session.ReadStored();
         if (stored.Profile == null)
         {
             Console.WriteLine("Nessun profilo pad (TIER 0) salvato sull'adattatore.");
