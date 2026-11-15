@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - "tools/usbtoc64-config/**"
-      - ".github/workflows/usbtoc64-config.yml"
     tags:
       - "config-tool-v*"
   workflow_dispatch:
