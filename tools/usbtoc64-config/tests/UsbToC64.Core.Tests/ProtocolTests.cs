@@ -15,6 +15,7 @@ internal sealed class FakeAdapter : IAdapterPort
     public bool RebootBeforeReply { get; init; } // saves, but the port vanishes before "ok" is read (seen on Windows)
     public bool ThrowOnSend { get; init; }       // ... and the send itself fails with "device not functioning"
     public bool NoComm { get; init; }            // nothing answers (wrong port, connected to the C64, dev mode)
+    public bool ResetOnOpen { get; init; }       // opening the port restarts the chip (seen on Windows)
     public JmProfile? Stored { get; private set; }
     public int Opens { get; private set; }
     private int _absentPolls;
@@ -33,16 +34,26 @@ internal sealed class FakeAdapter : IAdapterPort
     {
         private readonly FakeAdapter _a;
         private readonly Queue<string> _out = new();
-        public Link(FakeAdapter a) => _a = a;
+        private readonly Queue<string> _boot = new();
+        public Link(FakeAdapter a)
+        {
+            _a = a;
+            if (a.ResetOnOpen)
+                foreach (var l in new[] { "ESP-ROM:esp32s3-20210327", "load:0x403c8700,len:0xc2c", "entry 0x403c88b8",
+                                          "", "=================================", "  USB -> DB9 ADAPTER v1.2        ",
+                                          "--- Booting: Configuration Mode ---", "=================================" })
+                    _boot.Enqueue(l);
+        }
         public string Name => "FAKE";
         public bool Lost { get; private set; }
         public void DiscardInput() => _out.Clear();
         public void Dispose() { }
-        public string? ReadLine(TimeSpan timeout) => _out.Count > 0 ? _out.Dequeue() : null;
+        // Boot lines arrive over time: DiscardInput does not remove them, and commands are ignored until they are out.
+        public string? ReadLine(TimeSpan timeout) => _boot.Count > 0 ? _boot.Dequeue() : _out.Count > 0 ? _out.Dequeue() : null;
 
         public void SendLine(string line)
         {
-            if (_a.NoComm) return;
+            if (_a.NoComm || _boot.Count > 0) return;
             if (line == "{\"cmd\":\"get_info\"}")
             {
                 _out.Enqueue("{\"is_amiga\":false,\"dev_mode\":false,\"inv_switch\":false,\"dev_amiga\":false}");
@@ -177,6 +188,15 @@ public class ProtocolTests
         Assert.False(r.Saved);
         Assert.StartsWith("Profilo NON inviato", r.Message);
         Assert.DoesNotContain(log, l => l.Contains("save_jm"));
+    }
+
+    [Fact]
+    public void Write_AdapterRestartsOnOpen_WaitsForBootAndSucceeds()
+    {
+        var log = new List<string>();
+        var r = Writer(new FakeAdapter { ResetOnOpen = true }, log).WriteAndVerify(Sample());
+        Assert.True(r.Verified, r.Message);
+        Assert.Contains(log, l => l.Contains("Comunicazione OK"));
     }
 
     [Fact]

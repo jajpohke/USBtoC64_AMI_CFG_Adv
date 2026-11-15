@@ -128,9 +128,22 @@ public sealed class AdapterSession
         _log = log ?? (_ => { });
     }
 
+    /// <summary>Non-JSON lines received during the last request (boot messages, menu text).</summary>
+    public List<string> LastNoise { get; } = new();
+
+    /// <summary>Lines printed by the ESP32 ROM bootloader or by the firmware banner while it starts.</summary>
+    public static bool IsBootLine(string line) =>
+        line.StartsWith("ESP-ROM", StringComparison.Ordinal) || line.StartsWith("rst:", StringComparison.Ordinal) ||
+        line.StartsWith("load:0x", StringComparison.Ordinal) || line.StartsWith("entry 0x", StringComparison.Ordinal) ||
+        line.StartsWith("mode:", StringComparison.Ordinal) || line.StartsWith("SPIWP:", StringComparison.Ordinal) ||
+        line.Contains("Booting", StringComparison.Ordinal);
+
+    private static bool IsBannerEnd(string line) => line.Contains("Booting", StringComparison.Ordinal);
+
     public JsonDocument? RequestJson(string json, TimeSpan timeout)
     {
         _link.DiscardInput();
+        LastNoise.Clear();
         _log($"→ {json}");
         _link.SendLine(json);
         var until = DateTime.UtcNow + timeout;
@@ -141,7 +154,7 @@ public sealed class AdapterSession
             line = line.Trim();
             if (line.Length == 0) continue;
             _log($"← {line}");
-            if (!line.StartsWith('{')) continue;
+            if (!line.StartsWith('{')) { LastNoise.Add(line); continue; }
             try { return JsonDocument.Parse(line); }
             catch (JsonException) { /* not a reply: keep reading */ }
         }
@@ -172,15 +185,42 @@ public sealed class AdapterSession
     /// </summary>
     public AdapterInfo Ping(TimeSpan? timeout = null)
     {
-        using var doc = RequestJson("{\"cmd\":\"get_info\"}", timeout ?? TimeSpan.FromSeconds(2))
+        var doc = RequestJson("{\"cmd\":\"get_info\"}", timeout ?? TimeSpan.FromSeconds(2));
+        if (doc == null && LastNoise.Any(IsBootLine))
+        {
+            // The adapter restarted (typically when the port was opened): the command was lost.
+            // Wait for the firmware banner ("Booting: ..."), printed after its 2 s start-up delay, then retry.
+            if (!LastNoise.Any(IsBannerEnd))
+            {
+                _log("L'adattatore si sta riavviando: attendo la fine dell'avvio…");
+                WaitForBanner(TimeSpan.FromSeconds(8));
+            }
+            Thread.Sleep(300);
+            doc = RequestJson("{\"cmd\":\"get_info\"}", timeout ?? TimeSpan.FromSeconds(2));
+        }
+        using var reply = doc
             ?? throw new TimeoutException(
                 "L'adattatore non risponde al comando di prova (get_info). Controlla che sia collegato solo al PC " +
                 "(non al C64/Amiga), che la Developer Mode sia spenta e che la porta sia quella giusta.");
-        var r = doc.RootElement;
+        var r = reply.RootElement;
         bool B(string name) => r.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
         if (!r.TryGetProperty("is_amiga", out _))
             throw new InvalidOperationException($"Risposta inattesa al comando di prova: {r.GetRawText()}");
         return new AdapterInfo(B("is_amiga"), B("dev_mode"), B("inv_switch"), r.GetRawText());
+    }
+
+    private void WaitForBanner(TimeSpan max)
+    {
+        var until = DateTime.UtcNow + max;
+        while (DateTime.UtcNow < until)
+        {
+            var line = _link.ReadLine(until - DateTime.UtcNow);
+            if (line == null) return;
+            line = line.Trim();
+            if (line.Length == 0) continue;
+            _log($"← {line}");
+            if (IsBannerEnd(line)) return;
+        }
     }
 
     /// <summary>Reads the stored TIER 0 profile: get_jm (firmware proto 1) or, on older firmware, the dumppad text.</summary>
@@ -308,7 +348,9 @@ public sealed class AdapterWriter
         {
             using var readLink = _port.Open();
             _log($"Porta {readLink.Name} riaperta, rileggo il profilo…");
-            stored = new AdapterSession(readLink, _log).ReadStored();
+            var readSession = new AdapterSession(readLink, _log);
+            _log($"Comunicazione OK ({readSession.Ping()}).");
+            stored = readSession.ReadStored();
         }
         catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException or UnauthorizedAccessException or FormatException)
         {

@@ -88,11 +88,12 @@ public sealed class SerialAdapterPort : IAdapterPort
 
     public IAdapterLink Open()
     {
-        // Same signals as the web configurator (Web Serial asserts DTR and RTS on open).
+        // DTR and RTS stay off: on the ESP32-S3 native USB port they drive the chip reset
+        // (auto-reset for flashing), and asserting them restarted the adapter on open.
         var sp = new SerialPort(Name, 115200, Parity.None, 8, StopBits.One)
         {
-            DtrEnable = true,
-            RtsEnable = true,
+            DtrEnable = false,
+            RtsEnable = false,
             Encoding = Encoding.UTF8,
             NewLine = "\n",
             ReadTimeout = 50,
