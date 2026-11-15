@@ -206,6 +206,7 @@ tools/usbtoc64-config/
 │   │   ├── Rules/                 generatore regole, validatore (conflitti, limiti)
 │   │   ├── Emulation/             replica del motore dinamico firmware (anteprima)
 │   │   └── Formats/               JSON save_jm, .h (con WEB_META), import .h/.json
+│   ├── UsbToC64.Input/            lettura pad: HidSharp (HID, descrittore) e XInput
 │   ├── UsbToC64.Device/           (fase 2) seriale, ricerca porta, save/verify
 │   ├── UsbToC64.Gui/              WinForms: wizard, editor azioni, anteprima, console
 │   └── UsbToC64.Cli/              comandi da terminale
