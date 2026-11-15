@@ -1373,17 +1373,15 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
 
         // --- IMPORT LOGIC ---
         document.getElementById('importFileInput').addEventListener('change', function(e) {
-            const fileInput = e.target;
-            const file = fileInput.files[0]; 
+            const file = e.target.files[0]; 
             if (!file) return;
             const reader = new FileReader();
             
-            reader.onload = function(ev) {
-                const content = ev.target.result;
-                // [ \t]* (not \s*) so an empty WEB_META line does not swallow the next line
-                const metaMatch = content.match(/\/\/ WEB_META:[ \t]*(.*)/);
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const metaMatch = content.match(/\/\/ WEB_META:\s*(.+)/);
                 
-                if (metaMatch && metaMatch[1].trim() !== '') {
+                if (metaMatch) {
                     // Extract VID/PID from comments in the imported file
                     const vidMatch = content.match(/\/\/\s*Vendor ID:\s*(\d+)/);
                     const pidMatch = content.match(/\/\/\s*Product ID:\s*(\d+)/);
@@ -1454,10 +1452,9 @@ static inline void JM_AnalogToMouseSteps_A(const uint8_t*, int, int &xStepsSigne
                     });
                     alert("Profile loaded successfully!");
                 } else {
-                    alert("No valid WEB_META tag found in this file (empty profile?).");
+                    alert("No valid WEB_META tag found in this file.");
                 }
-                // Reset the <input>, so selecting the same file again fires 'change'
-                fileInput.value = ''; 
+                e.target.value = ''; 
             };
             reader.readAsText(file);
         });
