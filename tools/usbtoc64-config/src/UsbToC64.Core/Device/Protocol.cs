@@ -211,30 +211,51 @@ public sealed class AdapterWriter
         string json = SaveJmJson.Serialize(profile);
 
         // 1) send and wait for the reply
-        using (var link = _port.Open())
+        bool lostAfterSend = false;
+        IAdapterLink? link = null;
+        try
         {
+            link = _port.Open();
             _log($"Porta {link.Name} aperta.");
             var session = new AdapterSession(link, _log);
-            using var reply = session.RequestJson(json, ReplyTimeout);
-            if (reply == null)
+            JsonDocument? reply;
+            try
+            {
+                reply = session.RequestJson(json, ReplyTimeout);
+            }
+            catch (IOException ex) when (link.Lost || !_port.IsPresent())
             {
                 // The firmware answers "ok" and reboots 200 ms later: on Windows the port can vanish
-                // before the reply is read. The read-back after the reboot decides.
-                if (!link.Lost && _port.IsPresent())
-                    return new WriteResult(false, false, null, new(),
-                        "Nessuna risposta dall'adattatore. Controlla che sia collegato solo al PC (non al C64/Amiga), " +
-                        "che la Developer Mode sia spenta e che la porta sia quella giusta.");
-                _log("La porta è scomparsa subito dopo l'invio: probabile riavvio dopo il salvataggio. Verifico rileggendo.");
+                // while the line is still being sent or before the reply is read.
+                _log($"La porta è scomparsa durante l'invio ({ex.Message}).");
+                reply = null;
             }
-            else
+            using (reply)
             {
-                var root = reply.RootElement;
-                string status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "";
-                if (status != "ok")
-                    return new WriteResult(false, false, null, new(), $"L'adattatore ha rifiutato il profilo: {root.GetRawText()}");
-                _log("Profilo accettato. L'adattatore si riavvia…");
+                if (reply == null)
+                {
+                    if (!link.Lost && _port.IsPresent())
+                        return new WriteResult(false, false, null, new(),
+                            "Nessuna risposta dall'adattatore. Controlla che sia collegato solo al PC (non al C64/Amiga), " +
+                            "che la Developer Mode sia spenta e che la porta sia quella giusta.");
+                    lostAfterSend = true;
+                }
+                else
+                {
+                    var root = reply.RootElement;
+                    string status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "";
+                    if (status != "ok")
+                        return new WriteResult(false, false, null, new(), $"L'adattatore ha rifiutato il profilo: {root.GetRawText()}");
+                    _log("Profilo accettato. L'adattatore si riavvia…");
+                }
             }
         }
+        finally
+        {
+            link?.Dispose();
+        }
+        if (lostAfterSend)
+            _log("Probabile riavvio dopo il salvataggio (la risposta non è arrivata in tempo). Verifico rileggendo.");
 
         // 2) wait for the reboot: the port disappears and comes back
         var deadline = DateTime.UtcNow + RebootTimeout;
@@ -247,24 +268,29 @@ public sealed class AdapterWriter
         _sleep(BootDelay);
 
         // 3) read back and compare
+        // Without the "ok" reply the save is only presumed: the read-back is the proof.
+        bool confirmed = !lostAfterSend;
         StoredProfile stored;
         try
         {
-            using var link = _port.Open();
-            _log($"Porta {link.Name} riaperta, rileggo il profilo…");
-            stored = new AdapterSession(link, _log).ReadStored();
+            using var readLink = _port.Open();
+            _log($"Porta {readLink.Name} riaperta, rileggo il profilo…");
+            stored = new AdapterSession(readLink, _log).ReadStored();
         }
         catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException or UnauthorizedAccessException or FormatException)
         {
-            return new WriteResult(true, false, null, new(), $"Profilo salvato, ma la rilettura non è riuscita: {ex.Message}");
+            return new WriteResult(confirmed, false, null, new(),
+                (confirmed ? "Profilo salvato" : "Esito incerto") + $", ma la rilettura non è riuscita: {ex.Message}");
         }
         if (stored.Profile == null)
-            return new WriteResult(true, false, stored.Method, new(), "L'adattatore dice di non avere un profilo salvato dopo il riavvio.");
+            return new WriteResult(false, false, stored.Method, new(), "Dopo il riavvio l'adattatore non ha un profilo pad salvato: il salvataggio non è riuscito.");
 
         var diff = ProfileComparer.Compare(profile, stored.Profile);
         string via = stored.Method == ReadMethod.GetJm ? "get_jm" : "dumppad (firmware senza get_jm)";
-        return diff.Count == 0
-            ? new WriteResult(true, true, stored.Method, diff, $"Salvato e verificato ({via}): l'adattatore contiene esattamente il profilo inviato.")
-            : new WriteResult(true, false, stored.Method, diff, $"Salvato, ma il profilo riletto ({via}) è diverso da quello inviato.");
+        if (diff.Count == 0)
+            return new WriteResult(true, true, stored.Method, diff, $"Salvato e verificato ({via}): l'adattatore contiene esattamente il profilo inviato.");
+        return new WriteResult(confirmed, false, stored.Method, diff, confirmed
+            ? $"Salvato, ma il profilo riletto ({via}) è diverso da quello inviato."
+            : $"Il profilo sull'adattatore ({via}) è diverso da quello inviato: probabilmente il salvataggio non è avvenuto.");
     }
 }

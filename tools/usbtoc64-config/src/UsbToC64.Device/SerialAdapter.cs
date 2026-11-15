@@ -126,8 +126,13 @@ internal sealed class SerialLink : IAdapterLink
 
     public void SendLine(string line)
     {
-        _sp.Write(line + "\n");
-        _sp.BaseStream.Flush();
+        // No BaseStream.Flush(): on Windows it can block until the adapter reboots and then fail.
+        try { _sp.Write(line + "\n"); }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            Lost = true;
+            throw new IOException($"Invio non riuscito su {Name}: {ex.Message}", ex);
+        }
     }
 
     public string? ReadLine(TimeSpan timeout)

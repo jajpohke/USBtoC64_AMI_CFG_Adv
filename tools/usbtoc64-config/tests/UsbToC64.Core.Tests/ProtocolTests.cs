@@ -13,6 +13,7 @@ internal sealed class FakeAdapter : IAdapterPort
     public bool Silent { get; init; }            // old firmware with a bad JSON: no reply at all
     public bool CorruptOnSave { get; init; }     // store something different from what was sent
     public bool RebootBeforeReply { get; init; } // saves, but the port vanishes before "ok" is read (seen on Windows)
+    public bool ThrowOnSend { get; init; }       // ... and the send itself fails with "device not functioning"
     public JmProfile? Stored { get; private set; }
     public int Opens { get; private set; }
     private int _absentPolls;
@@ -49,7 +50,7 @@ internal sealed class FakeAdapter : IAdapterPort
                 if (_a.CorruptOnSave && p.Rules.Count > 0) p.Rules[0] = p.Rules[0] with { Value = 0x7F };
                 _a.Stored = p;
                 _a._absentPolls = 3; // reboot
-                if (_a.RebootBeforeReply) { Lost = true; return; }
+                if (_a.RebootBeforeReply) { Lost = true; if (_a.ThrowOnSend) throw new IOException("Un dispositivo collegato al sistema non è in funzione."); return; }
                 _out.Enqueue("{\"status\":\"ok\"}");
             }
             else if (line == "{\"cmd\":\"get_jm\"}")
@@ -148,7 +149,16 @@ public class ProtocolTests
         var log = new List<string>();
         var r = Writer(new FakeAdapter { RebootBeforeReply = true }, log).WriteAndVerify(Sample());
         Assert.True(r.Verified, r.Message);
-        Assert.Contains(log, l => l.Contains("probabile riavvio"));
+        Assert.Contains(log, l => l.Contains("Probabile riavvio"));
+    }
+
+    [Fact]
+    public void Write_SendFailsBecauseOfReboot_VerifiedByReadBack()
+    {
+        var log = new List<string>();
+        var r = Writer(new FakeAdapter { RebootBeforeReply = true, ThrowOnSend = true }, log).WriteAndVerify(Sample());
+        Assert.True(r.Verified, r.Message);
+        Assert.Contains(log, l => l.Contains("scomparsa durante l'invio"));
     }
 
     [Fact]
