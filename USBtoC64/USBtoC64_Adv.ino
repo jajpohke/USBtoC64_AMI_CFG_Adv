@@ -203,6 +203,11 @@ void start_sniff(uint8_t addr) {
     uint8_t temp_if_num = 0;
     uint8_t temp_in_ep = 0;
     uint16_t temp_in_mps = 0;
+    // Interface currently being parsed: the claimed interface must be the one that owns the endpoint.
+    // (Before: the LAST interface was claimed while reading the FIRST interrupt IN endpoint, which only
+    // works on single-interface pads; Xbox controllers have several interfaces, input on interface 0.)
+    uint8_t cur_if_num = 0;
+    uint8_t cur_alt = 0;
 
     while (next_desc) {
         if (next_desc->bDescriptorType == USB_B_DESCRIPTOR_TYPE_INTERFACE) {
@@ -210,16 +215,17 @@ void start_sniff(uint8_t addr) {
             if (intf->bInterfaceClass == 3 && intf->bInterfaceProtocol == 2) {
                 has_mouse = true;
             }
-            if (!has_mouse) {
-                temp_if_num = intf->bInterfaceNumber;
-            }
+            cur_if_num = intf->bInterfaceNumber;
+            cur_alt = intf->bAlternateSetting;
         }
         if (next_desc->bDescriptorType == USB_B_DESCRIPTOR_TYPE_ENDPOINT) {
             const usb_ep_desc_t *ep = (const usb_ep_desc_t *)next_desc;
-            if ((ep->bmAttributes & 0x03) == 0x03 && (ep->bEndpointAddress & 0x80)) {
+            // First interrupt IN endpoint of an alternate setting 0 (the one claimed below).
+            if ((ep->bmAttributes & 0x03) == 0x03 && (ep->bEndpointAddress & 0x80) && cur_alt == 0) {
                 if (temp_in_ep == 0) {
                     temp_in_ep = ep->bEndpointAddress;
                     temp_in_mps = ep->wMaxPacketSize;
+                    temp_if_num = cur_if_num;
                 }
             }
         }
@@ -300,7 +306,8 @@ void start_sniff(uint8_t addr) {
     };
     do_blink(active_driver == 1 ? C_BLUE : C_GREEN, 2);
 
-    dual_printf("\n*** CONNECTED: VID:%04x PID:%04x ***\n", connected_vid, connected_pid);
+    dual_printf("\n*** CONNECTED: VID:%04x PID:%04x (IF %u, EP 0x%02X, %u byte) ***\n",
+                connected_vid, connected_pid, s_if_num, s_in_ep, s_in_mps);
     if (use_html_configurator) {
         dual_println(">>> TIER 0 MATCH: HTML Configurator Rules Active");
     } else if (found_custom) {
@@ -312,13 +319,17 @@ void start_sniff(uint8_t addr) {
     }
 
     if (s_in_ep) {
-        usb_host_interface_claim(s_client, s_dev, s_if_num, 0);
+        esp_err_t claim_err = usb_host_interface_claim(s_client, s_dev, s_if_num, 0);
+        if (claim_err != ESP_OK)
+            dual_printf(">>> USB: claim of interface %u failed (%s)\n", s_if_num, esp_err_to_name(claim_err));
         usb_host_transfer_alloc(s_in_mps, 0, &s_in_xfer);
         s_in_xfer->device_handle = s_dev;
         s_in_xfer->callback = in_transfer_cb;
         s_in_xfer->bEndpointAddress = s_in_ep;
         s_in_xfer->num_bytes = s_in_mps;
-        usb_host_transfer_submit(s_in_xfer);
+        esp_err_t submit_err = usb_host_transfer_submit(s_in_xfer);
+        if (submit_err != ESP_OK)
+            dual_printf(">>> USB: reading endpoint 0x%02X failed (%s)\n", s_in_ep, esp_err_to_name(submit_err));
         device_connected = true;
     }
 }
