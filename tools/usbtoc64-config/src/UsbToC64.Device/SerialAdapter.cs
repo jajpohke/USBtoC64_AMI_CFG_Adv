@@ -86,17 +86,33 @@ public sealed class SerialAdapterPort : IAdapterPort
 
     public bool IsPresent() => SerialPort.GetPortNames().Contains(Name, StringComparer.OrdinalIgnoreCase);
 
+    private int _opens;
+
+    /// <summary>
+    /// DTR/RTS used for each open. ESP32-S3 native USB (USB-Serial-JTAG) resets the chip when RTS is active
+    /// while DTR is not ("rst:0x15 (USB_UART_CHIP_RESET)"); opening the port can trigger it depending on how
+    /// Windows applies the two lines. Like the Arduino IDE serial monitor, after a restart the port is reopened
+    /// with both lines active; the combinations alternate so a reopen never repeats the one that just reset it.
+    /// </summary>
+    private static readonly (bool Dtr, bool Rts)[] LineModes = { (true, false), (true, true), (false, false) };
+
+    public string LastLines { get; private set; } = "";
+
+    private int? _goodMode;
+    private int _lastMode;
+
+    public void ConnectionSucceeded() => _goodMode = _lastMode;
+
     public IAdapterLink Open()
     {
-        // ESP32-S3 native USB (USB-Serial-JTAG): the chip is reset when RTS is active while DTR is not
-        // (esptool auto-reset; the adapter reported "rst:0x15 (USB_UART_CHIP_RESET)" on open).
-        // Both on or both off made Windows pass through RTS=1/DTR=0 while applying them one at a time.
-        // DTR on + RTS off never does, whatever the order.
+        _lastMode = _goodMode ?? _opens++ % LineModes.Length;
+        var (dtr, rts) = LineModes[_lastMode];
+        LastLines = $"DTR={(dtr ? 1 : 0)} RTS={(rts ? 1 : 0)}";
         var sp = new SerialPort(Name, 115200, Parity.None, 8, StopBits.One)
         {
             Handshake = Handshake.None,
-            DtrEnable = true,
-            RtsEnable = false,
+            DtrEnable = dtr,
+            RtsEnable = rts,
             Encoding = Encoding.UTF8,
             NewLine = "\n",
             ReadTimeout = 50,
@@ -105,7 +121,7 @@ public sealed class SerialAdapterPort : IAdapterPort
         Exception? last = null;
         for (int attempt = 0; attempt < 5; attempt++)
         {
-            try { sp.Open(); return new SerialLink(sp); }
+            try { sp.Open(); return new SerialLink(sp, LastLines); }
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
                 last = ex;
@@ -124,8 +140,9 @@ internal sealed class SerialLink : IAdapterLink
     private readonly SerialPort _sp;
     private readonly StringBuilder _buf = new();
 
-    public SerialLink(SerialPort sp) => _sp = sp;
-    public string Name => _sp.PortName;
+    private readonly string _lines;
+    public SerialLink(SerialPort sp, string lines) { _sp = sp; _lines = lines; }
+    public string Name => $"{_sp.PortName} ({_lines})";
     public bool Lost { get; private set; }
 
     private const int ChunkSize = 32;

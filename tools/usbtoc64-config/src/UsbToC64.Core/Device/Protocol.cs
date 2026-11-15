@@ -24,6 +24,8 @@ public interface IAdapterPort
     string Name { get; }
     bool IsPresent();
     IAdapterLink Open();
+    /// <summary>Called when the last opened link answered: the port can keep using the same settings.</summary>
+    void ConnectionSucceeded() { }
 }
 
 public static class ProfileComparer
@@ -289,6 +291,7 @@ public sealed class AdapterConnection : IDisposable
                 session = new AdapterSession(link, log);
                 var info = session.Ping();
                 log($"Comunicazione OK ({info}).");
+                port.ConnectionSucceeded();
                 return new AdapterConnection(link, session, info);
             }
             catch (Exception ex) when (ex is TimeoutException or IOException or InvalidOperationException or UnauthorizedAccessException)
