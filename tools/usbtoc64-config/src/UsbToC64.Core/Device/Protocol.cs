@@ -14,6 +14,8 @@ public interface IAdapterLink : IDisposable
     /// <summary>Next complete line (without the newline), or null on timeout.</summary>
     string? ReadLine(TimeSpan timeout);
     void DiscardInput();
+    /// <summary>True once the port has gone away (e.g. the adapter rebooted while the link was open).</summary>
+    bool Lost { get; }
 }
 
 /// <summary>Opens links and tells whether the adapter port is currently present (it disappears while rebooting).</summary>
@@ -215,15 +217,24 @@ public sealed class AdapterWriter
             var session = new AdapterSession(link, _log);
             using var reply = session.RequestJson(json, ReplyTimeout);
             if (reply == null)
-                return new WriteResult(false, false, null, new(),
-                    "Nessuna risposta dall'adattatore. Controlla che sia collegato solo al PC (non al C64/Amiga), " +
-                    "che la Developer Mode sia spenta e che la porta sia quella giusta.");
-            var root = reply.RootElement;
-            string status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "";
-            if (status != "ok")
-                return new WriteResult(false, false, null, new(), $"L'adattatore ha rifiutato il profilo: {root.GetRawText()}");
+            {
+                // The firmware answers "ok" and reboots 200 ms later: on Windows the port can vanish
+                // before the reply is read. The read-back after the reboot decides.
+                if (!link.Lost && _port.IsPresent())
+                    return new WriteResult(false, false, null, new(),
+                        "Nessuna risposta dall'adattatore. Controlla che sia collegato solo al PC (non al C64/Amiga), " +
+                        "che la Developer Mode sia spenta e che la porta sia quella giusta.");
+                _log("La porta è scomparsa subito dopo l'invio: probabile riavvio dopo il salvataggio. Verifico rileggendo.");
+            }
+            else
+            {
+                var root = reply.RootElement;
+                string status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "";
+                if (status != "ok")
+                    return new WriteResult(false, false, null, new(), $"L'adattatore ha rifiutato il profilo: {root.GetRawText()}");
+                _log("Profilo accettato. L'adattatore si riavvia…");
+            }
         }
-        _log("Profilo accettato. L'adattatore si riavvia…");
 
         // 2) wait for the reboot: the port disappears and comes back
         var deadline = DateTime.UtcNow + RebootTimeout;

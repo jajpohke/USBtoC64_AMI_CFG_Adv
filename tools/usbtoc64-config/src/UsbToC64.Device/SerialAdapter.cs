@@ -122,6 +122,7 @@ internal sealed class SerialLink : IAdapterLink
 
     public SerialLink(SerialPort sp) => _sp = sp;
     public string Name => _sp.PortName;
+    public bool Lost { get; private set; }
 
     public void SendLine(string line)
     {
@@ -149,18 +150,26 @@ internal sealed class SerialLink : IAdapterLink
                 else Thread.Sleep(10);
             }
             catch (TimeoutException) { }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+            {
+                // The device went away (reboot, unplug): Windows reports "device not functioning".
+                Lost = true;
+                return null;
+            }
         }
     }
 
     public void DiscardInput()
     {
-        try { _sp.DiscardInBuffer(); } catch (IOException) { }
+        try { _sp.DiscardInBuffer(); }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException) { Lost = true; }
         _buf.Clear();
     }
 
     public void Dispose()
     {
-        try { if (_sp.IsOpen) _sp.Close(); } catch (IOException) { }
-        _sp.Dispose();
+        // Closing a port whose device has disappeared throws on Windows: ignore, it is gone anyway.
+        try { if (_sp.IsOpen) _sp.Close(); } catch (Exception) { }
+        try { _sp.Dispose(); } catch (Exception) { }
     }
 }
