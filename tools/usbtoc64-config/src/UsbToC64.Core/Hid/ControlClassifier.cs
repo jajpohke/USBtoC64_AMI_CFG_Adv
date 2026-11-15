@@ -146,14 +146,11 @@ public static class ControlClassifier
     {
         string? note = null;
         bool ok = true;
-        // The firmware compares one unsigned byte with 64 / 190: use the top 8 bits of the field.
+        bool signed = e.LogicalMin < 0;
+        // The firmware compares one byte: use the top 8 bits of the field
+        // (unsigned: analog thresholds 64/190; signed: S</S> rules, firmware 1.2.3+).
         int topBit = e.BitOffset + e.BitSize - 8;
-        if (e.LogicalMin < 0)
-        {
-            ok = false;
-            note = "Asse con valori signed: le soglie del firmware (64/190, unsigned) non funzionano.";
-        }
-        else if (e.BitSize < 8)
+        if (e.BitSize < 8)
         {
             ok = false;
             note = $"Asse da {e.BitSize} bit: troppo piccolo per le soglie del firmware.";
@@ -162,6 +159,10 @@ public static class ControlClassifier
         {
             ok = false;
             note = $"Asse da {e.BitSize} bit non allineato al byte: il firmware non può leggerlo.";
+        }
+        else if (signed)
+        {
+            note = $"Asse con segno: usa le regole S</S> (firmware {Model.FirmwareLimits.SignedOpsMinFirmware} o successivo).";
         }
         else
         {
@@ -177,6 +178,7 @@ public static class ControlClassifier
             ByteIndex = offset + Math.Max(topBit, e.BitOffset) / 8,
             Mask = 0xFF,
             AxisUsage = e.Usage,
+            Signed = signed,
             Supported = ok,
             Note = note,
         };

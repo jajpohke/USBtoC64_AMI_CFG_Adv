@@ -340,7 +340,7 @@ internal sealed class MainForm : Form
     private static string BitsLabel(PadControl c) => c.Kind switch
     {
         ControlKind.Hat => $"{c.HatBase}–{c.HatBase + c.HatPositions - 1}",
-        ControlKind.Axis => "0–255",
+        ControlKind.Axis => c.Signed ? "con segno" : "0–255",
         _ => $"0x{c.Mask:X2}",
     };
 
@@ -888,7 +888,7 @@ internal sealed class MainForm : Form
             {
                 ControlKind.Button or ControlKind.DpadButton => c.ReadValue(report) != 0 ? "premuto" : "",
                 ControlKind.Hat => c.IsActive(report) ? HatLabel(c.ReadValue(report) - c.HatBase, c.HatPositions) : "",
-                _ => c.ReadValue(report).ToString(),
+                _ => c.Signed ? ((sbyte)c.ReadValue(report)).ToString() : c.ReadValue(report).ToString(),
             };
             if (!Equals(row.Cells[ColState].Value, value)) row.Cells[ColState].Value = value;
         }

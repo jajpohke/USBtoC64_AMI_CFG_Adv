@@ -63,7 +63,10 @@ public static class DumppadParser
     private static readonly Dictionary<string, JmFunc> FuncByName =
         Enum.GetValues<JmFunc>().ToDictionary(f => Names.Func(f), f => f);
 
-    private static readonly Dictionary<string, JmOp> OpByName = new() { ["=="] = JmOp.Eq, ["BIT"] = JmOp.BitAny, ["HAT"] = JmOp.Hat };
+    private static readonly Dictionary<string, JmOp> OpByName = new()
+    {
+        ["=="] = JmOp.Eq, ["BIT"] = JmOp.BitAny, ["HAT"] = JmOp.Hat, ["S<"] = JmOp.SignedLess, ["S>"] = JmOp.SignedGreater,
+    };
 
     /// <returns>The stored profile, or null when the dump has no TIER 0 section.</returns>
     public static JmProfile? Parse(string text)
@@ -80,7 +83,7 @@ public static class DumppadParser
             Pid = (ushort)Hex(t, @"pid\s*:\s*0x([0-9A-Fa-f]+)"),
             DpadIndex = (sbyte)(Regex.Match(t, @"dpad_index\s*:\s*(-?\d+)") is { Success: true } m ? int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) : -1),
         };
-        foreach (Match r in Regex.Matches(t, @"Rule\s+\d+\s*:\s*Byte\[(\d+)\]\s*(==|BIT|HAT|\?\?\?)\s*(\d+)\s*->\s*Action:\s*([^\r\n]+)"))
+        foreach (Match r in Regex.Matches(t, @"Rule\s+\d+\s*:\s*Byte\[(\d+)\]\s*(==|BIT|HAT|S<|S>|\?\?\?)\s*(\d+)\s*->\s*Action:\s*([^\r\n]+)"))
         {
             string opName = r.Groups[2].Value, funcName = r.Groups[4].Value.Trim();
             if (!OpByName.TryGetValue(opName, out var op) || !FuncByName.TryGetValue(funcName, out var f))
@@ -360,6 +363,19 @@ public sealed class AdapterWriter
         }
         var link = conn.Link;
         var session = conn.Session;
+
+        // Signed rules need a firmware that knows them: an older one would treat them as "==".
+        if (profile.Rules.Any(r => FirmwareLimits.IsSigned(r.Op)))
+        {
+            var fw = session.GetFirmware();
+            if (fw.IsOriginal || fw.Version < FirmwareVersion.Parse(FirmwareLimits.SignedOpsMinFirmware))
+            {
+                conn.Dispose();
+                return new WriteResult(false, false, null, new(),
+                    $"Profilo NON inviato: usa gli stick analogici (regole S</S>), che richiedono il firmware " +
+                    $"{FirmwareLimits.SignedOpsMinFirmware} o successivo. Sull'adattatore c'è il {fw}: aggiorna prima il firmware.");
+            }
+        }
         try
         {
             JsonDocument? reply;

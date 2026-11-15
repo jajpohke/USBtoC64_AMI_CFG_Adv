@@ -1,6 +1,7 @@
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.Mapping;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Validation;
 using UsbToC64.Core.XInput;
 using Xunit;
 
@@ -74,12 +75,17 @@ public class ClassificationTests
     }
 
     [Fact]
-    public void SignedAxes_AreNotSupported_ButtonsAre()
+    public void SignedHidAxes_UseSignedRules_OnHighByte()
     {
         var pad = ControlClassifier.Classify(Descriptors.SignedAxes);
-        Assert.All(pad.Controls.Where(c => c.Kind == ControlKind.Axis), c => Assert.False(c.Supported));
+        Assert.All(pad.Controls.Where(c => c.Kind == ControlKind.Axis), c => Assert.True(c.Supported && c.Signed));
         var p = ProfileBuilder.Build(MappingProposer.Propose(pad), 1, 2);
-        Assert.False(p.UseAnalog);
+        Assert.False(p.UseAnalog); // no unsigned analog path
+        // X: bytes 0-1 -> high byte 1; Y: bytes 2-3 -> high byte 3 (HID: positive = down)
+        Assert.Contains(new JmRule(1, unchecked((byte)-51), JmOp.SignedLess, JmFunc.Left), p.Rules);
+        Assert.Contains(new JmRule(1, 51, JmOp.SignedGreater, JmFunc.Right), p.Rules);
+        Assert.Contains(new JmRule(3, unchecked((byte)-51), JmOp.SignedLess, JmFunc.Up), p.Rules);
+        Assert.Contains(new JmRule(3, 51, JmOp.SignedGreater, JmFunc.Down), p.Rules);
         Assert.Contains(new JmRule(4, 0x01, JmOp.BitAny, JmFunc.Fire1), p.Rules);
     }
 
@@ -114,8 +120,12 @@ public class ClassificationTests
         Assert.Contains(new JmRule(2, 0x08, JmOp.BitAny, JmFunc.Right), p.Rules);
         Assert.Contains(new JmRule(3, 0x10, JmOp.BitAny, JmFunc.Fire1), p.Rules); // A
         Assert.Contains(new JmRule(3, 0x20, JmOp.BitAny, JmFunc.Up), p.Rules);    // B
-        Assert.False(p.UseAnalog); // signed sticks are not usable
-        Assert.All(p.Rules, r => Assert.InRange(r.Index, 2, 5));
+        Assert.False(p.UseAnalog);
+        // Left stick: LX high byte 7, LY high byte 9 (XInput: Y positive = up)
+        Assert.Contains(new JmRule(7, unchecked((byte)-51), JmOp.SignedLess, JmFunc.Left), p.Rules);
+        Assert.Contains(new JmRule(9, 51, JmOp.SignedGreater, JmFunc.Up), p.Rules);
+        Assert.All(p.Rules.Where(r => !FirmwareLimits.IsSigned(r.Op)), r => Assert.InRange(r.Index, 2, 5));
+        Assert.DoesNotContain(ProfileValidator.Validate(p), i => i.Code == "XINPUT_SYNTHETIC_INDEXES");
     }
 
     [Fact]
@@ -136,7 +146,9 @@ public class GipTests
         var p = UsbToC64.Core.Mapping.ProfileBuilder.Build(UsbToC64.Core.Mapping.MappingProposer.Propose(pad), 0x045E, 0x0B12);
         Assert.Contains(new UsbToC64.Core.Model.JmRule(5, 0x01, UsbToC64.Core.Model.JmOp.BitAny, UsbToC64.Core.Model.JmFunc.Up), p.Rules);
         Assert.Contains(new UsbToC64.Core.Model.JmRule(4, 0x10, UsbToC64.Core.Model.JmOp.BitAny, UsbToC64.Core.Model.JmFunc.Fire1), p.Rules); // A
-        Assert.All(p.Rules, r => Assert.InRange(r.Index, 4, 9));
+        Assert.All(p.Rules.Where(r => !UsbToC64.Core.Model.FirmwareLimits.IsSigned(r.Op)), r => Assert.InRange(r.Index, 4, 9));
+        Assert.Contains(p.Rules, r => r.Index == 11 && r.Op == UsbToC64.Core.Model.JmOp.SignedLess);   // LX
+        Assert.Contains(p.Rules, r => r.Index == 13 && r.Op == UsbToC64.Core.Model.JmOp.SignedGreater && r.Func == UsbToC64.Core.Model.JmFunc.Up); // LY
         Assert.False(p.UseAnalog);
         var codes = UsbToC64.Core.Validation.ProfileValidator.Validate(p).Select(i => i.Code).ToList();
         Assert.Contains("GIP_FIRMWARE", codes);

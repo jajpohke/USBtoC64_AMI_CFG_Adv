@@ -139,6 +139,19 @@ public static class ProfileBuilder
                         p.Rules.Add(new JmRule(idx, (byte)(c.HatBase + k), JmOp.Hat, dirs[k]));
                     if (p.DpadIndex < 0) p.DpadIndex = (sbyte)idx;
                     break;
+                case ControlKind.Axis when c.Signed && (a == PadAction.AxisX || a == PadAction.AxisY):
+                {
+                    // Signed axis: two rules on the high byte (firmware 1.2.3+).
+                    byte neg = unchecked((byte)(sbyte)-FirmwareLimits.SignedStickThreshold);
+                    byte pos = (byte)FirmwareLimits.SignedStickThreshold;
+                    JmFunc low, high;
+                    if (a == PadAction.AxisX) { low = JmFunc.Left; high = JmFunc.Right; }
+                    else if (c.UpIsPositive) { low = JmFunc.Down; high = JmFunc.Up; }
+                    else { low = JmFunc.Up; high = JmFunc.Down; }
+                    p.Rules.Add(new JmRule(idx, neg, JmOp.SignedLess, low));
+                    p.Rules.Add(new JmRule(idx, pos, JmOp.SignedGreater, high));
+                    break;
+                }
                 case ControlKind.Axis when a == PadAction.AxisX:
                     if (!p.AnalogX.Contains(idx)) p.AnalogX.Add(idx);
                     break;

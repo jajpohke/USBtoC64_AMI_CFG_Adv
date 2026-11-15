@@ -173,6 +173,10 @@ inline void process_joystick(const uint8_t *raw_data, int len) {
 
             if (rule.op == JM_BITANY) { matched = ((raw_val & rule.value) != 0); }
             else if (rule.op == JM_HAT) { matched = ((raw_val & 0x0F) == rule.value); }
+            // Added in 1.2.3: signed comparisons for analog sticks with signed values (Xbox, HID signed axes),
+            // applied to the high byte of the axis. Value = threshold as int8.
+            else if ((uint8_t)rule.op == 3) { matched = ((int8_t)raw_val < (int8_t)rule.value); }  // S<
+            else if ((uint8_t)rule.op == 4) { matched = ((int8_t)raw_val > (int8_t)rule.value); }  // S>
             else { matched = (raw_val == rule.value); } // JM_EQ — always strict match for dynamic rules
 
             if (matched) {

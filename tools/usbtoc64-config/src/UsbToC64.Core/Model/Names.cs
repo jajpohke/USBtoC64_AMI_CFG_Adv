@@ -29,11 +29,15 @@ public static class Names
         JmOp.Eq => "==",
         JmOp.BitAny => "BIT",
         JmOp.Hat => "HAT",
+        JmOp.SignedLess => "S<",
+        JmOp.SignedGreater => "S>",
         _ => "???",
     };
 
-    public static string Rule(JmRule r) =>
-        r.Op == JmOp.BitAny
-            ? $"Byte[{r.Index}] BIT 0x{r.Value:X2} -> {Func(r.Func)}"
-            : $"Byte[{r.Index}] {Op(r.Op)} {r.Value,3} -> {Func(r.Func)}";
+    public static string Rule(JmRule r) => r.Op switch
+    {
+        JmOp.BitAny => $"Byte[{r.Index}] BIT 0x{r.Value:X2} -> {Func(r.Func)}",
+        JmOp.SignedLess or JmOp.SignedGreater => $"Byte[{r.Index}] {Op(r.Op)} {(sbyte)r.Value,4} -> {Func(r.Func)}",
+        _ => $"Byte[{r.Index}] {Op(r.Op)} {r.Value,3} -> {Func(r.Func)}",
+    };
 }

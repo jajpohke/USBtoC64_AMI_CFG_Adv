@@ -42,7 +42,11 @@ public static class ProfileValidator
             Add(Severity.Warning, "AUTOLR_UNSUPPORTED", $"{Names.Rule(r)}: AUTO L/R non è gestito dal motore dei profili salvati.");
         foreach (var r in p.Rules.Where(r => r.Op == JmOp.Hat && r.Value > 0x0F))
             Add(Severity.Error, "HAT_RANGE", $"{Names.Rule(r)}: l'op HAT confronta solo 4 bit, il valore {r.Value} non può mai scattare.");
-        foreach (var r in p.Rules.Where(r => (int)r.Func > 15 || (int)r.Op > 2))
+        if (p.Rules.Any(r => FirmwareLimits.IsSigned(r.Op)))
+            Add(Severity.Info, "SIGNED_OPS",
+                $"Il profilo usa le regole con segno (S</S>) per gli stick: serve il firmware {FirmwareLimits.SignedOpsMinFirmware} o successivo " +
+                "(un firmware più vecchio le interpreterebbe come \"==\" e farebbe scattare direzioni a caso).");
+        foreach (var r in p.Rules.Where(r => (int)r.Func > 15 || (int)r.Op > 4))
             Add(Severity.Error, "BAD_ENUM", $"Regola con codici non validi (op {(int)r.Op}, f {(int)r.Func}).");
 
         // --- Conflicts (P6) -------------------------------------------------------------------
@@ -92,7 +96,7 @@ public static class ProfileValidator
         else if (XInputLayout.IsKnownXboxOne(p.Vid, p.Pid))
         {
             Add(Severity.Info, "GIP_FIRMWARE", $"Controller Xbox One/Series (GIP): funziona solo con il firmware {XInputLayout.GipMinFirmware} o successivo.");
-            if (p.Rules.Any(r => r.Index < 4 || r.Index > 9) || p.UseAnalog)
+            if (p.Rules.Any(r => r.Index < 4 || r.Index > 17 || (r.Index > 9 && !FirmwareLimits.IsSigned(r.Op))) || p.UseAnalog)
                 Add(Severity.Error, "GIP_SYNTHETIC_INDEXES",
                     "Pad Xbox One/Series: gli indici non corrispondono al report GIP nativo (pulsanti ai byte 4-5, grilletti 6-9). " +
                     "Probabilmente vengono dal report HID sintetico di Windows: queste regole non funzionano sull'adattatore.");
@@ -101,7 +105,7 @@ public static class ProfileValidator
             Add(Severity.Error, "XBOX_RECEIVER_UNSUPPORTED", "Ricevitore wireless Xbox 360: formato dei report diverso, non supportato.");
         else if (XInputLayout.IsKnownXbox360Wired(p.Vid, p.Pid))
         {
-            bool synthetic = p.Rules.Any(r => r.Index >= 6) || p.UseAnalog;
+            bool synthetic = p.Rules.Any(r => r.Index >= 14 || (r.Index >= 6 && !FirmwareLimits.IsSigned(r.Op))) || p.UseAnalog;
             if (synthetic)
                 Add(Severity.Error, "XINPUT_SYNTHETIC_INDEXES",
                     "Pad Xbox 360: gli indici sembrano presi dal report HID sintetico di Windows (pulsanti al byte 10, hat al byte 11). " +

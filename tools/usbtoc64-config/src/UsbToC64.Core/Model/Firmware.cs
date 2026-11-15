@@ -9,6 +9,10 @@ public enum JmOp : byte
     BitAny = 1,
     /// <summary><c>(byte &amp; 0x0F) == value</c></summary>
     Hat = 2,
+    /// <summary><c>(int8)byte &lt; (int8)value</c> — signed axes (firmware 1.2.3+).</summary>
+    SignedLess = 3,
+    /// <summary><c>(int8)byte &gt; (int8)value</c> — signed axes (firmware 1.2.3+).</summary>
+    SignedGreater = 4,
 }
 
 /// <summary>Rule function. Numeric values match the firmware enum <c>JM_Func</c> (current firmware).</summary>
@@ -71,5 +75,11 @@ public static class FirmwareLimits
     /// <summary>USB vendor id of the ESP32-S3 native CDC port (Espressif).</summary>
     public const ushort EspressifVid = 0x303A;
 
+    /// <summary>First firmware that knows the signed operators (older ones treat them as "==").</summary>
+    public const string SignedOpsMinFirmware = "1.2.3";
+    /// <summary>Signed stick threshold on the high byte: 51/128 ≈ 40 % of the travel.</summary>
+    public const sbyte SignedStickThreshold = 51;
+
     public static bool IsDirection(JmFunc f) => f <= JmFunc.LeftUp;
+    public static bool IsSigned(JmOp op) => op is JmOp.SignedLess or JmOp.SignedGreater;
 }

@@ -38,6 +38,11 @@ public sealed record Control
 
     public DpadDirection? Dpad { get; init; }
 
+    /// <summary>Axis with signed values: mapped with the S&lt;/S&gt; operators on its high byte (firmware 1.2.3+).</summary>
+    public bool Signed { get; init; }
+    /// <summary>Signed vertical axis where positive values mean "up" (XInput); HID axes are positive downwards.</summary>
+    public bool UpIsPositive { get; init; }
+
     /// <summary>False when the firmware cannot use this control (see <see cref="Note"/>).</summary>
     public bool Supported { get; init; } = true;
     public string? Note { get; init; }
@@ -47,6 +52,8 @@ public sealed record Control
     {
         ControlKind.Button or ControlKind.DpadButton => ReadValue(report) != 0,
         ControlKind.Hat => ReadValue(report) is var v && v >= HatBase && v < HatBase + HatPositions,
+        ControlKind.Axis when Signed => Supported && (sbyte)ReadValue(report) is var sv
+                            && (sv < -Model.FirmwareLimits.SignedStickThreshold || sv > Model.FirmwareLimits.SignedStickThreshold),
         ControlKind.Axis => Supported && ReadValue(report) is var a
                             && (a < Model.FirmwareLimits.AnalogDeadLow || a > Model.FirmwareLimits.AnalogDeadHigh),
         _ => false,

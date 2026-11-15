@@ -183,10 +183,11 @@ public static class XInputLayout
     private static Control Btn(string id, string name, int b, byte mask) => new()
     { Id = id, Name = name, Kind = ControlKind.Button, ByteIndex = b, Mask = mask };
 
+    // XInput sticks: int16 little endian, Y positive = up. High byte used with the S</S> rules.
     private static Control Stick(string id, string name, int highByte, ushort usage) => new()
     {
         Id = id, Name = name, Kind = ControlKind.Axis, ByteIndex = highByte, Mask = 0xFF, AxisUsage = usage,
-        Supported = false,
-        Note = "Stick XInput signed (int16): le soglie del firmware (64/190, unsigned) non funzionano.",
+        Signed = true, UpIsPositive = usage is 0x31 or 0x34,
+        Note = $"Stick con segno: regole S</S> (firmware {Model.FirmwareLimits.SignedOpsMinFirmware} o successivo).",
     };
 }

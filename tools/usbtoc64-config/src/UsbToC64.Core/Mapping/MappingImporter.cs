@@ -32,6 +32,15 @@ public static class MappingImporter
 
         foreach (var r in profile.Rules)
         {
+            if (FirmwareLimits.IsSigned(r.Op))
+            {
+                var axis = usable.FirstOrDefault(c => c.Kind == ControlKind.Axis && c.Signed && c.ByteIndex == r.Index);
+                var act = r.Func is JmFunc.Left or JmFunc.Right ? PadAction.AxisX
+                        : r.Func is JmFunc.Up or JmFunc.Down ? PadAction.AxisY : PadAction.None;
+                if (axis != null && act != PadAction.None) m.Set(axis, act);
+                else unmatched.Add(r);
+                continue;
+            }
             if (r.Op == JmOp.Hat)
             {
                 var hat = usable.FirstOrDefault(c => c.Kind == ControlKind.Hat && c.ByteIndex == r.Index

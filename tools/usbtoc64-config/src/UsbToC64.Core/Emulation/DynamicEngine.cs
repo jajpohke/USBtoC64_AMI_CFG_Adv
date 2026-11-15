@@ -46,6 +46,8 @@ public sealed class DynamicEngine
             {
                 JmOp.BitAny => (v & rule.Value) != 0,
                 JmOp.Hat => (v & 0x0F) == rule.Value,
+                JmOp.SignedLess => (sbyte)v < (sbyte)rule.Value,
+                JmOp.SignedGreater => (sbyte)v > (sbyte)rule.Value,
                 _ => v == rule.Value,
             };
             if (!matched) continue;

@@ -334,7 +334,13 @@ Implementate in `USBtoC64/USBtoC64_Adv.ino`, solo sul branch di sviluppo. Sono *
 ricompare per il riavvio (max 20 s) → attesa del boot (3 s) → `get_jm` (o `dumppad`) → confronto campo per campo
 con quanto inviato (VID/PID, `dpad_idx`, regole nell'ordine, assi; tenendo conto del limite di 32 regole).
 
-Ancora da valutare (futuro): supporto degli stick XInput signed (nuovo op o soglie signed).
+### 7.1 Firmware 1.2.3: operatori con segno per gli stick
+
+Nuovi op nel motore dinamico: `3` = `S<` (`(int8)byte < (int8)valore`), `4` = `S>`. Applicati al byte alto
+di un asse con segno (stick Xbox int16, assi HID con logical min < 0). Il tool genera due regole per asse
+con soglia ±51 (~40 % della corsa): X → LEFT/RIGHT; Y → UP/DOWN (XInput: positivo = su; HID: positivo = giù).
+Il firmware precedente tratterebbe op 3/4 come `==`: il tool **rifiuta di scrivere** questi profili se
+`get_version` non riporta almeno 1.2.3. `dumppad` stampa `S<`/`S>`; il formato del blob non cambia.
 
 ---
 

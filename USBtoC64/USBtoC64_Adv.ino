@@ -18,7 +18,7 @@
 
 // Firmware version, reported by {"cmd":"get_version"} and shown in the boot banner.
 // FW_BUILD is set by the GitHub Actions build (commit id); local builds report "local".
-#define FW_VERSION "1.2.2"
+#define FW_VERSION "1.2.3"
 #ifndef FW_BUILD
 #define FW_BUILD "local"
 #endif
