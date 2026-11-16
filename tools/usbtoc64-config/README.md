@@ -57,7 +57,7 @@ Durante scrittura, lettura e aggiornamento un pannello mostra lo scambio seriale
 ## Scaricare l'exe
 
 L'exe viene compilato da GitHub Actions (workflow *USBtoC64 Config Tool*):
-aprire la run più recente → sezione **Artifacts** → `usbtoc64-config-win-x64`
+aprire la run più recente → sezione **Artifacts** → `USBtoC64_Adv_Win_x64` (Windows 64 bit)
 (zip con i due exe). Sono file singoli, non serve installare .NET. Al primo avvio Windows SmartScreen
 può mostrare un avviso (exe non firmato): *Ulteriori informazioni → Esegui comunque*.
 

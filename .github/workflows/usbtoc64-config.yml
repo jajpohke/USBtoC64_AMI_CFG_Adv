@@ -129,9 +129,10 @@ jobs:
           $exe = Get-ChildItem esptool-x -Recurse -Filter esptool.exe | Select-Object -First 1
           Copy-Item $exe.FullName publish/esptool.exe
 
+      # Downloaded as USBtoC64_Adv_Win_x64.zip (64-bit Windows).
       - uses: actions/upload-artifact@v4
         with:
-          name: usbtoc64-config-win-x64
+          name: USBtoC64_Adv_Win_x64
           path: |
             tools/usbtoc64-config/publish/USBtoC64Config.exe
             tools/usbtoc64-config/publish/usbtoc64.exe
@@ -149,12 +150,15 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: usbtoc64-config-win-x64
+          name: USBtoC64_Adv_Win_x64
+          path: USBtoC64_Adv_Win_x64
+      # One zip with a fixed name, so that
+      # https://github.com/<owner>/<repo>/releases/latest/download/USBtoC64_Adv_Win_x64.zip always works.
+      - name: Zip
+        run: cd USBtoC64_Adv_Win_x64 && zip -9 ../USBtoC64_Adv_Win_x64.zip *
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            USBtoC64Config.exe
-            usbtoc64.exe
-            esptool.exe
-            USBtoC64_Adv.bin
-            firmware.json
+          name: USBtoC64 Config for Windows ${{ github.ref_name }}
+          make_latest: true
+          generate_release_notes: true
+          files: USBtoC64_Adv_Win_x64.zip
