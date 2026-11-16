@@ -361,12 +361,14 @@
         .btn-mouse { background: var(--teal);    margin-left: 50px; }
         .btn-led   { background: var(--mauve);   margin-left: 100px; }
         .btn-mem   { background: var(--amber);   margin-left: 150px; }
+        .btn-win   { background: var(--peach);   margin-left: 200px; }
 
         /* Entry animations staggered */
         .btn-pad   { animation: slideIn 0.5s 0.3s ease both; }
         .btn-mouse { animation: slideIn 0.5s 0.4s ease both; }
         .btn-led   { animation: slideIn 0.5s 0.5s ease both; }
         .btn-mem   { animation: slideIn 0.5s 0.6s ease both; }
+        .btn-win   { animation: slideIn 0.5s 0.7s ease both; }
 
         @keyframes slideIn {
             from { opacity: 0; transform: translateX(-30px); }
@@ -572,6 +574,12 @@
                     <a href="memory.html" class="lcars-btn btn-mem">
                         <div class="lcars-btn-icon">💾</div>
                         <div class="lcars-btn-text">SYSTEM SETTINGS &amp; MEMORY</div>
+                        <div class="lcars-btn-arrow">▶</div>
+                    </a>
+                    <a href="https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/blob/main/WINDOWSTOOL.md" target="_blank" rel="noopener"
+                       class="lcars-btn btn-win" title="USBtoC64 Config for Windows: guide and download">
+                        <div class="lcars-btn-icon">🪟</div>
+                        <div class="lcars-btn-text">WINDOWS CONFIG TOOL</div>
                         <div class="lcars-btn-arrow">▶</div>
                     </a>
                 </div>
