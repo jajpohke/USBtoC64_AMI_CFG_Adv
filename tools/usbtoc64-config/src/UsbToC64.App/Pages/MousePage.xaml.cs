@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using UsbToC64.App.Services;
 using UsbToC64.Core.Device;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.App.Pages;
 
@@ -43,18 +44,18 @@ public partial class MousePage : UserControl
     private async Task LoadAsync()
     {
         if (Hub.IsBusy) return;
-        OpPanel.Begin("Lettura delle impostazioni del mouse");
+        OpPanel.Begin(L.T("mouse.op.read"));
         try
         {
-            var m = await Hub.SessionAsync("Lettura impostazioni mouse", s => s.GetMouse());
+            var m = await Hub.SessionAsync(L.T("mouse.session.read"), s => s.GetMouse());
             Show(m);
             _loadedOnce = true;
-            OpPanel.End("Impostazioni lette");
-            Result.Text = $"Lette dall'adattatore alle {DateTime.Now:HH:mm}.";
+            OpPanel.End(L.T("mouse.read.done"));
+            Result.Text = L.F("mouse.readAt", DateTime.Now.ToString("HH:mm"));
         }
         catch (Exception ex)
         {
-            OpPanel.End("Lettura non riuscita");
+            OpPanel.End(L.T("mouse.read.failed"));
             Result.Text = ex.Message;
         }
     }
@@ -64,23 +65,23 @@ public partial class MousePage : UserControl
     private void Default_Click(object sender, RoutedEventArgs e)
     {
         Show(MouseSettings.Default);
-        Result.Text = "Valori predefiniti impostati: premi «Salva sull'adattatore» per applicarli.";
+        Result.Text = L.T("mouse.default.result");
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
         if (Hub.IsBusy) return;
         var m = Current();
-        OpPanel.Begin("Salvataggio delle impostazioni del mouse");
+        OpPanel.Begin(L.T("mouse.op.save"));
         try
         {
-            await Hub.SessionAsync("Salvataggio impostazioni mouse", s => { s.SaveMouse(m); return true; });
-            OpPanel.End("Impostazioni salvate");
-            Result.Text = $"Salvate sull'adattatore alle {DateTime.Now:HH:mm}: valgono subito, senza riavvio.";
+            await Hub.SessionAsync(L.T("mouse.session.save"), s => { s.SaveMouse(m); return true; });
+            OpPanel.End(L.T("mouse.save.done"));
+            Result.Text = L.F("mouse.savedAt", DateTime.Now.ToString("HH:mm"));
         }
         catch (Exception ex)
         {
-            OpPanel.End("Salvataggio non riuscito");
+            OpPanel.End(L.T("mouse.save.failed"));
             Result.Text = ex.Message;
         }
     }

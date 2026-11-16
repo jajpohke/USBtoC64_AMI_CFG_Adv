@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using Microsoft.Win32;
 using UsbToC64.App.Services;
 using UsbToC64.Core.Device;
+using UsbToC64.Core.Text;
 using Wpf.Ui.Controls;
 using MessageBox = System.Windows.MessageBox;
 using MessageBoxButton = System.Windows.MessageBoxButton;
@@ -21,6 +22,7 @@ public partial class FirmwarePage : UserControl
         _w = w;
         OpPanel.Attach(Hub);
         Hub.StatusChanged += () => Dispatcher.BeginInvoke(Refresh);
+        L.Changed += () => Dispatcher.BeginInvoke(Refresh);
         Hub.BusyChanged += busy => Dispatcher.BeginInvoke(() => { CheckBtn.IsEnabled = FileBtn.IsEnabled = !busy; Refresh(); });
         Refresh();
     }
@@ -28,45 +30,44 @@ public partial class FirmwarePage : UserControl
     private void Refresh()
     {
         var m = Hub.Manifest;
-        Included.Text = m == null ? "nessuno" : m.Version.ToString();
-        IncludedDetail.Text = m == null ? "Questo programma è stato compilato senza firmware (manca firmware.json)." : $"Build {m.Build} · {m.File}";
+        Included.Text = m == null ? L.T("fwp.none") : m.Version.ToString();
+        IncludedDetail.Text = m == null ? L.T("fwp.noManifest") : L.F("fwp.buildFile", m.Build, m.File);
 
         var s = Hub.Status;
         var fw = s.Firmware;
-        OnBoard.Text = fw == null ? "—" : fw.IsOriginal ? "originale" : fw.Version.ToString();
+        OnBoard.Text = fw == null ? "—" : fw.IsOriginal ? L.T("fwp.original") : fw.Version.ToString();
         OnBoardDetail.Text = fw == null
-            ? (s.Error ?? "Premi «Controlla» con l'adattatore collegato al PC.")
-            : fw.IsOriginal ? "Firmware 1.2 senza numero di versione (non risponde a get_version)."
-            : $"Build {fw.Build} · porta {s.Port}";
+            ? (s.Error ?? L.T("fwp.pressCheck"))
+            : fw.IsOriginal ? L.T("fwp.originalDetail")
+            : L.F("fwp.buildPort", fw.Build, s.Port);
 
         bool canUpdate = false;
-        if (fw == null) { StatusBar.Severity = InfoBarSeverity.Informational; StatusBar.Title = "Adattatore non verificato"; StatusBar.Message = "Collega l'adattatore al PC e premi «Controlla»."; }
-        else if (m == null) { StatusBar.Severity = InfoBarSeverity.Informational; StatusBar.Title = "Nessun firmware incluso"; StatusBar.Message = "Usa lo zip completo della build per avere il firmware."; }
+        if (fw == null) { StatusBar.Severity = InfoBarSeverity.Informational; StatusBar.Title = L.T("fwp.st.unchecked.title"); StatusBar.Message = L.T("fwp.st.unchecked.msg"); }
+        else if (m == null) { StatusBar.Severity = InfoBarSeverity.Informational; StatusBar.Title = L.T("fwp.st.noFw.title"); StatusBar.Message = L.T("fwp.st.noFw.msg"); }
         else
         {
             switch (FirmwareCheck.Compare(fw, m))
             {
                 case FirmwareStatus.UpdateAvailable:
                     StatusBar.Severity = InfoBarSeverity.Warning;
-                    StatusBar.Title = "Aggiornamento disponibile";
-                    StatusBar.Message = $"Puoi installare il firmware {m.Version} (build {m.Build}).";
+                    StatusBar.Title = L.T("fwp.st.update.title");
+                    StatusBar.Message = L.F("fwp.st.update.msg", m.Version, m.Build);
                     canUpdate = true;
                     break;
                 case FirmwareStatus.OtherBuild:
                     StatusBar.Severity = InfoBarSeverity.Informational;
-                    StatusBar.Title = "Stessa versione, build diversa";
-                    StatusBar.Message = $"Sull'adattatore c'è il firmware {fw.Version} build {fw.Build}; il programma include la build {m.Build}. " +
-                                        "Non è necessario aggiornare, ma puoi installarla.";
+                    StatusBar.Title = L.T("fwp.st.otherBuild.title");
+                    StatusBar.Message = L.F("fwp.st.otherBuild.msg", fw.Version, fw.Build, m.Build);
                     break;
                 case FirmwareStatus.UpToDate:
                     StatusBar.Severity = InfoBarSeverity.Success;
-                    StatusBar.Title = "Firmware aggiornato";
-                    StatusBar.Message = "Sull'adattatore c'è già il firmware incluso nel programma.";
+                    StatusBar.Title = L.T("fwp.st.upToDate.title");
+                    StatusBar.Message = L.T("fwp.st.upToDate.msg");
                     break;
                 default:
                     StatusBar.Severity = InfoBarSeverity.Informational;
-                    StatusBar.Title = "Firmware più recente";
-                    StatusBar.Message = "Sull'adattatore c'è un firmware più recente di quello incluso.";
+                    StatusBar.Title = L.T("fwp.st.newer.title");
+                    StatusBar.Message = L.T("fwp.st.newer.msg");
                     break;
             }
         }
@@ -75,9 +76,8 @@ public partial class FirmwarePage : UserControl
         if (fw == null && s.NoAnswer)
         {
             StatusBar.Severity = InfoBarSeverity.Warning;
-            StatusBar.Title = "L'adattatore non risponde";
-            StatusBar.Message = $"C'è un ESP32 su {s.Port}, ma non risponde ai comandi: può essere vergine, in modalità download " +
-                                "(BOOT premuto) o con un firmware diverso. Puoi installare il firmware incluso o un file.";
+            StatusBar.Title = L.T("fwp.st.noAnswer.title");
+            StatusBar.Message = L.F("fwp.st.noAnswer.msg", s.Port);
             canUpdate = m != null;
             UpdateBtn.Appearance = canUpdate ? ControlAppearance.Primary : ControlAppearance.Secondary;
         }
@@ -86,9 +86,9 @@ public partial class FirmwarePage : UserControl
 
     private async void Check_Click(object sender, RoutedEventArgs e)
     {
-        OpPanel.Begin("Controllo dell'adattatore");
+        OpPanel.Begin(L.T("fwp.op.check"));
         await _w.CheckAdapterAsync(probeIfSilent: true);
-        OpPanel.End(Hub.Status.Error == null ? "Controllo completato" : "Adattatore non raggiungibile");
+        OpPanel.End(L.T(Hub.Status.Error == null ? "fwp.op.checkDone" : "fwp.op.unreachable"));
     }
 
     private async void File_Click(object sender, RoutedEventArgs e) => await InstallFromFileAsync();
@@ -97,21 +97,18 @@ public partial class FirmwarePage : UserControl
     public async Task InstallFromFileAsync()
     {
         if (Hub.IsBusy) return;
-        var dlg = new OpenFileDialog { Title = "Scegli il firmware da installare (immagine completa, indirizzo 0x0)", Filter = "Firmware (*.bin)|*.bin|Tutti i file (*.*)|*.*" };
+        var dlg = new OpenFileDialog { Title = L.T("fwp.file.dialogTitle"), Filter = L.T("fwp.file.filter") };
         if (dlg.ShowDialog(_w) != true) return;
         var answer = MessageBox.Show(_w,
-            $"Installare {Path.GetFileName(dlg.FileName)} sull'adattatore, all'indirizzo 0x0?\n\n" +
-            "⚠ Tutta la memoria dell'adattatore viene cancellata: le impostazioni tornano ai valori predefiniti.\n\n" +
-            "Un firmware diverso da questo progetto può non rispondere ai comandi del programma: in quel caso le sezioni " +
-            "Gamepad, Mouse, LED e Impostazioni non potranno comunicare con l'adattatore.",
-            "Installa firmware da file", MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel);
+            L.F("fwp.file.confirm", Path.GetFileName(dlg.FileName)),
+            L.T("fwp.file.confirmTitle"), MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel);
         if (answer != MessageBoxResult.OK) return;
-        OpPanel.Begin($"Installazione di {Path.GetFileName(dlg.FileName)}");
+        OpPanel.Begin(L.F("fwp.op.installing", Path.GetFileName(dlg.FileName)));
         var r = await Hub.FlashFileAsync(dlg.FileName);
-        OpPanel.End(r.Success ? "Firmware installato" : "Installazione non riuscita");
+        OpPanel.End(L.T(r.Success ? "fwp.installed" : "fwp.installFailed"));
         await _w.CheckAdapterAsync(probeIfSilent: false);
         _w.RefreshFirmwareBar();
-        MessageBox.Show(_w, r.Message, r.Success ? "Firmware installato" : "Installazione firmware",
+        MessageBox.Show(_w, r.Message, L.T(r.Success ? "fwp.installed" : "fwp.installTitle"),
             MessageBoxButton.OK, r.Success ? System.Windows.MessageBoxImage.Information : System.Windows.MessageBoxImage.Error);
     }
 
@@ -121,14 +118,14 @@ public partial class FirmwarePage : UserControl
         var m = Hub.Manifest;
         if (m == null || Hub.IsBusy) return;
         if (confirm && MessageBox.Show(_w,
-                $"Installare il firmware {m.Version} sull'adattatore?\n\n⚠ Tutta la memoria dell'adattatore viene cancellata.",
-                "Installa firmware", MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
-        OpPanel.Begin("Installazione del firmware");
+                L.F("fwp.included.confirm", m.Version),
+                L.T("fwp.included.confirmTitle"), MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
+        OpPanel.Begin(L.T("fwp.op.installIncluded"));
         var r = await Hub.FlashAsync();
-        OpPanel.End(r.Success ? "Firmware installato" : "Installazione non riuscita");
+        OpPanel.End(L.T(r.Success ? "fwp.installed" : "fwp.installFailed"));
         await _w.CheckAdapterAsync(probeIfSilent: false);
         _w.RefreshFirmwareBar();
-        MessageBox.Show(_w, r.Message, r.Success ? "Firmware installato" : "Installazione firmware",
+        MessageBox.Show(_w, r.Message, L.T(r.Success ? "fwp.installed" : "fwp.installTitle"),
             MessageBoxButton.OK, r.Success ? System.Windows.MessageBoxImage.Information : System.Windows.MessageBoxImage.Error);
     }
 
@@ -137,19 +134,16 @@ public partial class FirmwarePage : UserControl
         var m = Hub.Manifest;
         if (m == null || Hub.IsBusy) return;
         var answer = MessageBox.Show(_w,
-            $"Installare il firmware {m.Version} sull'adattatore?\n\n" +
-            "⚠ L'aggiornamento cancella TUTTE le impostazioni salvate sull'adattatore e lo riporta ai valori predefiniti, " +
-            "come «erase all» dalla pagina web: profilo pad, impostazioni mouse e LED, Developer Mode, inversione dello switch.\n\n" +
-            "Non scollegare l'adattatore durante l'aggiornamento. Deve essere collegato solo al PC, non al C64/Amiga.",
-            "Aggiorna firmware", MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel);
+            L.F("fwp.update.confirm", m.Version),
+            L.T("fwp.update.title"), MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel);
         if (answer != MessageBoxResult.OK) return;
 
-        OpPanel.Begin("Aggiornamento del firmware");
+        OpPanel.Begin(L.T("fwp.op.update"));
         var r = await Hub.FlashAsync();
-        OpPanel.End(r.Success ? "Firmware aggiornato" : "Aggiornamento non riuscito");
+        OpPanel.End(L.T(r.Success ? "fwp.updated" : "fwp.updateFailed"));
         await _w.CheckAdapterAsync(probeIfSilent: false);
         _w.RefreshFirmwareBar();
-        MessageBox.Show(_w, r.Message, r.Success ? "Firmware aggiornato" : "Aggiornamento firmware",
+        MessageBox.Show(_w, r.Message, L.T(r.Success ? "fwp.updated" : "fwp.updateTitle"),
             MessageBoxButton.OK, r.Success ? System.Windows.MessageBoxImage.Information : System.Windows.MessageBoxImage.Error);
     }
 }
