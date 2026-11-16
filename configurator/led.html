@@ -341,6 +341,7 @@
     </div>
 </div>
 
+<script src="serial-confirm.js"></script>
 <script>
     // ── SERIAL STATE ──
     let serialPort = null;
@@ -489,33 +490,26 @@
             led_fmt:     parseInt(document.getElementById('sel-format').value),
             multicolor:  document.getElementById('chk-mono').checked ? 0 : 1,
         };
-        const ok = await sendCommandOnly(payload);
-        if (ok) {
-            document.body.innerHTML = `
-                <div style="
-                    display:flex; flex-direction:column; align-items:center; justify-content:center;
-                    min-height:100vh; background:#000; font-family:'Oswald',sans-serif;
-                    text-transform:uppercase; text-align:center; padding:40px; box-sizing:border-box;">
-                    <div style="color:var(--lcars-cyan,#00BCD4); font-size:2.2em; font-weight:700; letter-spacing:0.1em; margin-bottom:16px;">
-                        💾 LED SETTINGS SAVED
-                    </div>
-                    <div style="color:#aaa; font-size:1em; margin-bottom:12px; font-family:sans-serif; text-transform:none;">
-                        Color and format changes are now active on the adapter.
-                    </div>
-                    <div style="color:var(--lcars-amber,#FFC107); font-size:0.95em; margin-bottom:40px; font-family:sans-serif; text-transform:none;">
-                        If you changed the LED format (GRB ↔ RGB), refresh this page to verify the new state.
-                    </div>
-                    <button onclick="location.reload()" style="
-                        background:var(--lcars-cyan,#00BCD4); color:#000; border:none;
-                        border-radius:25px; padding:14px 48px; font-family:'Oswald',sans-serif;
-                        font-size:1.2em; font-weight:700; cursor:pointer; letter-spacing:0.08em;
-                        text-transform:uppercase;">
-                        🔄 REFRESH PAGE
-                    </button>
-                </div>`;
-        } else {
+        let r;
+        try {
+            if (!serialPort || !serialPort.writable) throw new Error("No port");
+            r = await USB2C64.sendAndConfirm(serialPort, payload, 3000);
+        } catch (e) {
             btn.textContent = '❌ SAVE FAILED — RETRY';
             btn.disabled = false;
+            return;
+        }
+        if (r.result === "ok") {
+            USB2C64.resultScreen("ok", "💾 LED SETTINGS SAVED", [
+                "Color and format changes are now active on the adapter (confirmed).",
+                "If you changed the LED format (GRB ↔ RGB), refresh this page to verify the new state."]);
+        } else if (r.result === "error") {
+            USB2C64.resultScreen("error", "❌ LED SETTINGS NOT SAVED", [USB2C64.errorText(r)]);
+        } else {
+            USB2C64.resultScreen("none", "⚠️ SAVE NOT CONFIRMED", [
+                "The adapter did not confirm the save, so the LED settings were probably <b>not</b> stored.",
+                "Refresh the page to check the current colors and try again.",
+                USB2C64.UPDATE_HINT]);
         }
     });
 
