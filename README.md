@@ -8,6 +8,10 @@ This fork was born with a few specific goals: improving compatibility with stubb
 
 For a full setup walkthrough, see the [Getting Started guide](GETSTARTED.md).
 
+> 🪟 **New: [USBtoC64 Config for Windows](WINDOWSTOOL.md)** — set up the adapter for your controller in three clicks
+> (adapter check, automatic controller recognition, save and verify). Includes firmware 1.2.3 with Xbox 360 /
+> Xbox One / Series and analog stick support. [⬇️ Download](https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/releases/latest/download/USBtoC64_Adv_Win_x64.zip)
+
 ### ⚠️ Features not implemented in this fork
 
 The following features from the original project are **not** available in this fork:
@@ -31,6 +35,7 @@ If you need any of the above features, or run into mouse-related issues, we reco
 
 ## 📖 Documentation
 
+- [🪟 Windows Config Tool](WINDOWSTOOL.md) — set up the adapter from a Windows PC in three clicks
 - [🚀 Getting Started](GETSTARTED.md) — flash the firmware, verify the connection, configure your first controller
 - [🎮 Controller Support](JOYSTICKGUIDE.md) — supported pads, plug & play profiles, mapping guide
 - [🚥 LED Guide](LEDGUIDE.md) — status colors, behaviour, customisation
