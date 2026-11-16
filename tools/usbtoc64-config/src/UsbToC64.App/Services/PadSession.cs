@@ -3,6 +3,7 @@ using UsbToC64.Core.Formats;
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.Mapping;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Text;
 using UsbToC64.Core.Validation;
 using UsbToC64.Input;
 using PadControl = UsbToC64.Core.Hid.Control;
@@ -33,10 +34,44 @@ public sealed class PadSession : IDisposable
     public bool ViewOnly { get; private set; }
     public ImportedHeader? ViewHeader { get; private set; }
     public List<string> ExtraNotes { get; } = new();
+    /// <summary>Recipes of <see cref="ExtraNotes"/>, so the notes can be rewritten in a new language.</summary>
+    private readonly List<Func<string>> _extraNoteMakers = new();
     public List<Issue> Issues { get; private set; } = new();
 
     /// <summary>Structure changed (pad, mapping, profile): rebuild the views.</summary>
     public event Action? Changed;
+
+    public PadSession()
+    {
+        L.Changed += OnLanguageChanged;
+    }
+
+    /// <summary>
+    /// Language changed: rewrite the texts held here (validator messages, import notes) and tell the views.
+    /// Mapping, profile and live reading are left untouched.
+    /// </summary>
+    private void OnLanguageChanged()
+    {
+        ExtraNotes.Clear();
+        foreach (var make in _extraNoteMakers) ExtraNotes.Add(make());
+        Validate();
+        Changed?.Invoke();
+    }
+
+    private void Validate() =>
+        Issues = Profile == null ? new() : ProfileValidator.Validate(Profile, ViewHeader);
+
+    private void ClearNotes()
+    {
+        ExtraNotes.Clear();
+        _extraNoteMakers.Clear();
+    }
+
+    private void AddNote(Func<string> make)
+    {
+        _extraNoteMakers.Add(make);
+        ExtraNotes.Add(make());
+    }
 
     // ------------------------------------------------------------------ devices
 
@@ -56,7 +91,7 @@ public sealed class PadSession : IDisposable
         StopReader();
         if (index < 0 || index >= Devices.Count) { Clear(); return null; }
         Device = Devices[index];
-        ViewOnly = false; ViewHeader = null; ExtraNotes.Clear();
+        ViewOnly = false; ViewHeader = null; ClearNotes();
         try { Pad = Device.Describe(); }
         catch (Exception ex)
         {
@@ -83,7 +118,7 @@ public sealed class PadSession : IDisposable
     {
         if (Pad == null) return;
         Mapping = MappingProposer.Propose(Pad);
-        ViewOnly = false; ViewHeader = null; ExtraNotes.Clear();
+        ViewOnly = false; ViewHeader = null; ClearNotes();
         Rebuild();
     }
 
@@ -103,7 +138,7 @@ public sealed class PadSession : IDisposable
             _engine = Profile != null && Device != null ? new DynamicEngine(Profile) : null;
             _lastState = null;
         }
-        Issues = Profile == null ? new() : ProfileValidator.Validate(Profile, ViewHeader);
+        Validate();
         Changed?.Invoke();
     }
 
@@ -132,12 +167,12 @@ public sealed class PadSession : IDisposable
             ViewOnly = true;
             ViewHeader = header ?? new ImportedHeader { Profile = imported, Generator = HeaderGenerator.Unknown };
             Profile = imported;
-            ExtraNotes.Clear();
+            ClearNotes();
             Rebuild();
         }
 
         if (Pad == null || Device == null)
-            return new ImportOutcome(false, "", ReadOnly, ReadOnly, $"{name} aperto in sola lettura (nessun pad collegato).");
+            return new ImportOutcome(false, "", ReadOnly, ReadOnly, L.F("pad.import.readOnlyNoPad", name));
 
         var res = MappingImporter.FromProfile(Pad, imported);
         int total = imported.Rules.Count + imported.AnalogX.Count + imported.AnalogY.Count;
@@ -149,18 +184,18 @@ public sealed class PadSession : IDisposable
         {
             ViewOnly = false; ViewHeader = null;
             Mapping = res.Mapping;
-            ExtraNotes.Clear();
+            ClearNotes();
             foreach (var r in res.UnmatchedRules)
-                ExtraNotes.Add($"Regola importata senza un controllo corrispondente, scartata: {Names.Rule(r)}");
+                AddNote(() => L.F("pad.note.rule", Names.Rule(r)));
             foreach (var a in res.UnmatchedAxes)
-                ExtraNotes.Add($"Asse importato (byte {a}) senza un asse corrispondente, scartato.");
+                AddNote(() => L.F("pad.note.axis", a));
             Rebuild();
         }
 
-        string q = (sameDevice ? "" : $"Il profilo è per VID {imported.Vid:X4} PID {imported.Pid:X4}, il pad collegato è {Device.Vid:X4}:{Device.Pid:X4}.\n") +
-                   (total == 0 ? "Il profilo è vuoto." : $"{total - unmatched} elementi su {total} corrispondono ai controlli di questo pad.") +
-                   "\n\nSì = apri in sola lettura\nNo = applica ai controlli di questo pad (gli elementi senza corrispondenza vengono scartati)";
-        string summary = unmatched == 0 ? $"{name}: tutte le regole associate ai controlli." : $"{name}: {unmatched} elementi non associati (vedi Controlli del profilo).";
+        string q = (sameDevice ? "" : L.F("pad.q.otherDevice", imported.Vid, imported.Pid, Device.Vid, Device.Pid)) +
+                   (total == 0 ? L.T("pad.q.empty") : L.F("pad.q.matches", total - unmatched, total)) +
+                   L.T("pad.q.choice");
+        string summary = unmatched == 0 ? L.F("pad.sum.all", name) : L.F("pad.sum.unmatched", name, unmatched);
         return new ImportOutcome(!sameDevice || poor, q, Apply, ReadOnly, summary);
     }
 

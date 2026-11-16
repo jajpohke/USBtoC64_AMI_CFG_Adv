@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.Mapping;
+using UsbToC64.Core.Text;
 using PadControl = UsbToC64.Core.Hid.Control;
 
 namespace UsbToC64.App.Pages;
@@ -26,7 +27,7 @@ public sealed class ControlRow : INotifyPropertyChanged
         _onChange = onChange;
         Actions = c.Supported
             ? PadActions.AllowedFor(c.Kind).Select(a => new ActionOption(a, PadActions.Label(a))).ToList()
-            : new List<ActionOption> { new(PadAction.None, "non supportato dal firmware") };
+            : new List<ActionOption> { new(PadAction.None, L.T("row.unsupported")) };
         _selected = Actions.FirstOrDefault(a => a.Action == current) ?? Actions[0];
         CanEdit = editable && c.Supported;
     }
@@ -35,10 +36,10 @@ public sealed class ControlRow : INotifyPropertyChanged
     public string Name => Control.Name;
     public string Kind => Control.Kind switch
     {
-        ControlKind.Button => "pulsante",
+        ControlKind.Button => L.T("row.kind.button"),
         ControlKind.DpadButton => "D-pad",
-        ControlKind.Hat => "hat",
-        ControlKind.Axis => "asse",
+        ControlKind.Hat => L.T("row.kind.hat"),
+        ControlKind.Axis => L.T("row.kind.axis"),
         _ => "",
     };
     public string Glyph => Control.Kind switch
@@ -52,7 +53,7 @@ public sealed class ControlRow : INotifyPropertyChanged
     public string Bits => Control.Kind switch
     {
         ControlKind.Hat => $"{Control.HatBase}–{Control.HatBase + Control.HatPositions - 1}",
-        ControlKind.Axis => Control.Signed ? "con segno" : "0–255",
+        ControlKind.Axis => Control.Signed ? L.T("row.signed") : "0–255",
         _ => $"0x{Control.Mask:X2}",
     };
     public string Note => Control.Note ?? "";

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using UsbToC64.Core.Emulation;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.App.Controls;
 
@@ -16,8 +17,19 @@ public partial class Db9Preview : UserControl
 
     private C64State? _last;
     private bool _lastLive;
+    private bool? _amiga;
 
-    public Db9Preview() => InitializeComponent();
+    public Db9Preview()
+    {
+        InitializeComponent();
+        L.Changed += () => Dispatcher.BeginInvoke(() =>
+        {
+            SetMode(_amiga);
+            AutoText.Text = AutofireText(_lastLive && (_last ?? default).Autofire);
+        });
+    }
+
+    private static string AutofireText(bool on) => on ? L.T("db9.autofireOn") : "AUTOFIRE";
 
     public void Update(C64State? state, bool live)
     {
@@ -27,17 +39,21 @@ public partial class Db9Preview : UserControl
         Set(Up, s.Up, DirOn); Set(Down, s.Down, DirOn); Set(Left, s.Left, DirOn); Set(Right, s.Right, DirOn);
         Set(F1, s.Fire1, Fire1On); Set(F2, s.Fire2, Fire2On); Set(F3, s.Fire3, Fire3On);
         Set(Auto, s.Autofire, AutoOn);
-        AutoText.Text = s.Autofire ? "AUTOFIRE ATTIVO" : "AUTOFIRE";
+        AutoText.Text = AutofireText(s.Autofire);
         Opacity = live ? 1.0 : 0.55;
     }
 
     /// <summary>Fire 2/3 travel on different lines depending on the mode detected by the adapter.</summary>
-    public void SetMode(bool? amiga) => ModeNote.Text = amiga switch
+    public void SetMode(bool? amiga)
     {
-        true => "Modalità Amiga: Fire 2 e Fire 3 sono i pulsanti 2 e 3 (pin 9 e 5).",
-        false => "Modalità C64: Fire 2 e Fire 3 passano dalle linee dei paddle (POT X/POT Y).",
-        null => "",
-    };
+        _amiga = amiga;
+        ModeNote.Text = amiga switch
+        {
+            true => L.T("db9.mode.amiga"),
+            false => L.T("db9.mode.c64"),
+            null => "",
+        };
+    }
 
     private void Set(Border b, bool on, Brush onBrush)
     {
