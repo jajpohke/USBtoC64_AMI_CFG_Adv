@@ -4,6 +4,9 @@ This guide walks you through flashing the firmware, verifying the connection, an
 For troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).  
 For advanced diagnostics and developer tools, see [DEVELOPER.md](DEVELOPER.md).
 
+> 🪟 **On Windows?** The [USBtoC64 Config for Windows](WINDOWSTOOL.md) program installs the firmware and sets up
+> your controller by itself — you can skip this guide.
+
 ---
 
 ## 1. Flashing the Firmware

@@ -645,12 +645,12 @@ else if (command == "dumppad") {
                 dual_printf("dpad_index   : %d\n", jm_data.dpad_index);
                 dual_printf("rule_count   : %d\n", jm_data.rule_count);
                 
-                const char* op_names[] = { "==", "BIT", "HAT" };
+                const char* op_names[] = { "==", "BIT", "HAT", "S<", "S>" };
                 const char* func_names[] = { "UP", "UP_RIGHT", "RIGHT", "RIGHT_DOWN", "DOWN", "DOWN_LEFT", "LEFT", "LEFT_UP", "FIRE 1", "FIRE 2", "FIRE 3", "AUTO ON", "AUTO OFF", "AUTO HOLD", "AUTO L/R ON", "AUTO L/R OFF" };
                 
                 for (int i = 0; i < jm_data.rule_count && i < JM_DYN_MAX_RULES; i++) {
                     JM_Rule r = jm_data.rules[i];
-                    const char* op_str = (r.op <= 2) ? op_names[r.op] : "???";
+                    const char* op_str = ((uint8_t)r.op <= 4) ? op_names[r.op] : "???";
                     const char* func_str = (r.func <= 15) ? func_names[r.func] : "???";
                     dual_printf("  Rule %02d    : Byte[%d] %-3s %3d  ->  Action: %s\n", i+1, r.index, op_str, r.value, func_str);
                 }
