@@ -191,6 +191,7 @@
     </div><!-- lcars-content -->
 </div><!-- lcars-frame -->
 
+    <script src="serial-confirm.js"></script>
     <script>
         const aSpeed = document.getElementById('amigaSpeed');
         const aSpeedVal = document.getElementById('amigaSpeedVal');
@@ -414,19 +415,27 @@
             btn.disabled = true;
             
             try {
-                const writer = serialPort.writable.getWriter();
-                const encoder = new TextEncoder();
-                await writer.write(encoder.encode(JSON.stringify(payload) + '\n'));
-                writer.releaseLock();
-                
-                btn.innerText = "✅ Commit OK";
-                btn.style.backgroundColor = "var(--lcars-green)"; 
-                
-                setTimeout(() => {
-                    btn.innerText = "💾 Commit to Memory";
-                    btn.style.backgroundColor = ""; 
-                }, 2000);
-                
+                // Wait for the adapter to confirm that the settings are stored.
+                const r = await USB2C64.sendAndConfirm(serialPort, payload, 3000);
+                if (r.result === "ok") {
+                    btn.innerText = "✅ Commit OK";
+                    btn.style.backgroundColor = "var(--lcars-green)";
+                    setTimeout(() => {
+                        btn.innerText = "💾 Commit to Memory";
+                        btn.style.backgroundColor = "";
+                    }, 2000);
+                } else {
+                    btn.innerText = r.result === "error" ? "❌ Not saved" : "⚠️ Not confirmed";
+                    btn.style.backgroundColor = r.result === "error" ? "var(--lcars-red)" : "var(--lcars-amber)";
+                    alert(r.result === "error"
+                        ? "❌ The adapter rejected the mouse settings. Nothing was changed: please try again."
+                        : "⚠️ The adapter did not confirm the save: the mouse settings were probably NOT stored.\n\n" +
+                          "Refresh the page to check the current values and try again.");
+                    setTimeout(() => {
+                        btn.innerText = "💾 Commit to Memory";
+                        btn.style.backgroundColor = "";
+                    }, 4000);
+                }
             } catch (error) {
                 console.error("Save error:", error);
                 alert("❌ Error saving configuration.");
