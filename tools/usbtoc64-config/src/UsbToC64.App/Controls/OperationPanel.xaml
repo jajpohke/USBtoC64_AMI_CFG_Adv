@@ -1,0 +1,14 @@
+<UserControl x:Class="UsbToC64.App.Controls.OperationPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Expander x:Name="Exp" IsExpanded="False">
+        <Expander.Header>
+            <StackPanel Orientation="Horizontal">
+                <ui:ProgressRing x:Name="Ring" IsIndeterminate="True" Width="16" Height="16" Margin="0,0,10,0" Visibility="Collapsed" />
+                <TextBlock x:Name="HeaderText" Text="Dettagli dell'ultima operazione" VerticalAlignment="Center" />
+            </StackPanel>
+        </Expander.Header>
+        <TextBox x:Name="Box" Style="{StaticResource Mono}" Height="170" />
+    </Expander>
+</UserControl>

@@ -14,20 +14,20 @@ Due programmi:
 
 ## Interfaccia grafica
 
-1. Collega il pad al PC e avvia `USBtoC64Config.exe`: il pad viene scelto e analizzato in automatico.
-2. La tabella elenca i controlli trovati (pulsanti, D-pad/hat, assi) con byte e bit che userà l'adattatore.
-   Premendo un tasto la riga si evidenzia in verde.
-3. Nella colonna **Azione** si sceglie cosa fa ogni controllo. **Proposta automatica** ripristina i valori iniziali.
-4. A destra si vede dal vivo cosa riceve il C64/Amiga su porta DB9 (direzioni, F1–F3, autofire).
-5. In basso: **Avvisi** (problemi del profilo), **Regole per il firmware**, **JSON save_jm**.
-6. **Test connessione** verifica che l'adattatore risponda (comando `get_info`, presente anche nel firmware
-   originale). Lo stesso test viene fatto in automatico prima di ogni scrittura e lettura.
-   **Scrivi sull'adattatore e verifica**: trova da solo la porta dell'ESP32, invia il profilo, attende il
-   riavvio e lo rilegge confrontandolo con quello inviato. **Leggi dall'adattatore** mostra il profilo salvato.
-   L'adattatore va collegato al PC con la USB-C, senza C64/Amiga, Developer Mode spenta. Chiudere il
-   configuratore web o terminali seriali che tengono occupata la porta.
-7. **Salva JSON…** / **Copia JSON** esportano il profilo. **Importa profilo…** apre un `JoystickMapping.h`
-   o un `.json` e lo applica ai controlli del pad collegato (senza pad: sola lettura con i controlli).
+Stile Windows 11 (tema chiaro/scuro come quello di Windows), menu laterale:
+
+- **Gamepad**: il pad viene analizzato in automatico; tabella dei controlli (byte, bit, azione) con la riga
+  del tasto premuto evidenziata; a destra cosa riceve il **C64/Amiga su porta DB9** e i controlli del profilo;
+  in basso le viste *Anteprima / Regole per il firmware / JSON*, **Leggi dall'adattatore** e
+  **Scrivi sull'adattatore e verifica**. Importa/Esporta profili `.h`/`.json`.
+- **Firmware**: versione sull'adattatore e versione inclusa, aggiornamento (cancella tutte le impostazioni).
+- **Terminale**: menu di servizio del firmware (`service`, `info`, `dumppad`…) e comandi JSON, con comandi
+  rapidi, cronologia, conferma per i comandi che cambiano lo stato, riconnessione automatica dopo un riavvio.
+- **Registro**: tutto lo scambio con l'adattatore della sessione, salvabile su file.
+- **Mouse, LED, Impostazioni**: in arrivo (per ora dalle pagine del configuratore web).
+
+Il riquadro in basso a sinistra mostra porta, firmware, modalità (C64 o Amiga, come rilevata) e profilo salvato.
+Durante scrittura, lettura e aggiornamento un pannello mostra lo scambio seriale in corso.
 
 ## Scaricare l'exe
 
@@ -77,5 +77,5 @@ dotnet run --project src/UsbToC64.Cli -- check tests/UsbToC64.Core.Tests/Fixture
 | `src/UsbToC64.Input` | lettura pad: HidSharp (HID) e XInput |
 | `src/UsbToC64.Device` | porta seriale dell'adattatore (ricerca per VID Espressif, apertura) |
 | `src/UsbToC64.Cli` | comandi da terminale (`usbtoc64.exe`) |
-| `src/UsbToC64.Gui` | interfaccia grafica WinForms (`USBtoC64Config.exe`) |
+| `src/UsbToC64.App` | interfaccia grafica WPF + WPF-UI (`USBtoC64Config.exe`) |
 | `tests/UsbToC64.Core.Tests` | test xUnit, con profili reali in `Fixtures/` |
