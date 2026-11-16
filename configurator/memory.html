@@ -297,6 +297,7 @@
     <button id="btn-apply" class="btn-apply" onclick="applyAndReboot()" disabled>🔄 APPLY CHANGES & REBOOT ADAPTER</button>
 </div>
 
+<script src="serial-confirm.js"></script>
 <script>
     let serialPort = null;
     let isSyncing  = false;
@@ -470,20 +471,40 @@
         if (confirm("Apply changes and reboot the adapter?")) {
             document.getElementById('btn-apply').innerText = "⏳ APPLYING...";
             document.getElementById('btn-apply').disabled = true;
-            if (invChanged) { await sendCommandOnly({cmd: "invert_toggle"}); await new Promise(r => setTimeout(r, 200)); }
-            if (ovrChanged) { await sendCommandOnly({cmd: "override_toggle"}); await new Promise(r => setTimeout(r, 200)); }
-            if (devChanged) { await sendCommandOnly({cmd: "devmode_toggle"}); await new Promise(r => setTimeout(r, 200)); }
-            for (let t of targets) { await sendCommandOnly({cmd: "clear_mem", target: t}); await new Promise(r => setTimeout(r, 100)); }
-            sendCommandOnly({cmd: "reboot_cmd"}).then(success => {
-                if (success) document.body.innerHTML = "<div style='color:var(--lcars-green);margin-top:50px;text-align:center;font-family:Oswald,sans-serif;font-size:1.5em;text-transform:uppercase;'>REBOOTING...<br>Please wait a few seconds and refresh this page.</div>";
-            });
+            // Each command must be confirmed by the adapter; the reboot is sent only if all of them were.
+            const steps = [];
+            if (invChanged) steps.push({ label: "Invert switch", cmd: {cmd: "invert_toggle"} });
+            if (ovrChanged) steps.push({ label: "Override", cmd: {cmd: "override_toggle"} });
+            if (devChanged) steps.push({ label: "Developer mode", cmd: {cmd: "devmode_toggle"} });
+            for (let t of targets) steps.push({ label: "Clear " + t.toUpperCase(), cmd: {cmd: "clear_mem", target: t} });
+            const failed = [];
+            for (const s of steps) {
+                let r;
+                try { r = await USB2C64.sendAndConfirm(serialPort, s.cmd, 2000); } catch (e) { r = { result: "none" }; }
+                if (r.result !== "ok") failed.push(s.label);
+            }
+            if (failed.length > 0) {
+                alert("⚠️ The adapter did not confirm: " + failed.join(", ") + ".\n\n" +
+                      "The adapter was NOT rebooted. Refresh the page to check the current state and try again.");
+                // Toggles already applied must not be sent again: the page has to be refreshed first.
+                document.getElementById('btn-apply').innerText = "⚠️ REFRESH THE PAGE BEFORE TRYING AGAIN";
+                return;
+            }
+            let rb;
+            try { rb = await USB2C64.sendAndConfirm(serialPort, {cmd: "reboot_cmd"}, 2000); } catch (e) { rb = { result: "none" }; }
+            document.body.innerHTML = rb.result === "ok"
+                ? "<div style='color:var(--lcars-green);margin-top:50px;text-align:center;font-family:Oswald,sans-serif;font-size:1.5em;text-transform:uppercase;'>CHANGES CONFIRMED · REBOOTING...<br>Please wait a few seconds and refresh this page.</div>"
+                : "<div style='color:var(--lcars-amber,#FFC107);margin-top:50px;text-align:center;font-family:Oswald,sans-serif;font-size:1.5em;text-transform:uppercase;'>CHANGES CONFIRMED · REBOOT NOT CONFIRMED<br>Unplug and reconnect the adapter, then refresh this page.</div>";
         }
     }
 
     function factoryReset() {
         if (confirm("WARNING!\n\nYou are about to erase ALL saved settings.\nThis action cannot be undone.\n\nAre you absolutely sure?")) {
-            sendCommandOnly({cmd: "factory_reset"}).then(success => {
-                if (success) document.body.innerHTML = "<div style='color:var(--lcars-red);margin-top:50px;text-align:center;font-family:Oswald,sans-serif;font-size:1.5em;text-transform:uppercase;'>FACTORY RESET COMPLETE.<br>Device is rebooting.</div>";
+            if (!serialPort || !serialPort.writable) return;
+            USB2C64.sendAndConfirm(serialPort, {cmd: "factory_reset"}, 3000).catch(() => ({ result: "none" })).then(r => {
+                document.body.innerHTML = r.result === "ok"
+                    ? "<div style='color:var(--lcars-red);margin-top:50px;text-align:center;font-family:Oswald,sans-serif;font-size:1.5em;text-transform:uppercase;'>FACTORY RESET COMPLETE.<br>Device is rebooting.</div>"
+                    : "<div style='color:var(--lcars-amber,#FFC107);margin-top:50px;text-align:center;font-family:Oswald,sans-serif;font-size:1.5em;text-transform:uppercase;'>FACTORY RESET NOT CONFIRMED<br>Refresh this page to check the memory status and try again.</div>";
             });
         }
     }
