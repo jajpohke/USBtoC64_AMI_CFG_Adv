@@ -1,4 +1,5 @@
 using System.Text.Json;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Core.Device;
 
@@ -15,24 +16,26 @@ public sealed record LedSlot(string Key, string Label);
 /// <summary>LED settings (led_get / led_save), same fields as the web page led.html.</summary>
 public sealed record LedSettings(IReadOnlyDictionary<string, string> Colors, int Format, bool Multicolor)
 {
-    public static readonly LedSlot[] Slots =
+    /// <summary>Built on each call so that the labels follow the current language.</summary>
+    public static LedSlot[] Slots => new LedSlot[]
     {
-        new("idle_c64", "Riposo (modalità C64)"),
-        new("idle_amiga", "Riposo (modalità Amiga)"),
-        new("dir_glowing", "Direzioni"),
+        new("idle_c64", L.T("dev.led.idlec64")),
+        new("idle_amiga", L.T("dev.led.idleamiga")),
+        new("dir_glowing", L.T("dev.led.dir")),
         new("btn_fire1", "Fire 1"),
         new("btn_fire2", "Fire 2"),
         new("btn_fire3", "Fire 3"),
-        new("btn_alt", "Su / salto"),
+        new("btn_alt", L.T("dev.led.alt")),
         new("btn_auto", "Autofire"),
     };
 
-    /// <summary>The only colours the firmware stores (anything else becomes black).</summary>
-    public static readonly (string Hex, string Name)[] Palette =
+    /// <summary>The only colours the firmware stores (anything else becomes black). Names in the current language.</summary>
+    public static (string Hex, string Name)[] Palette => new[]
     {
-        ("#FFFFFF", "Bianco"), ("#FF0000", "Rosso"), ("#FF9900", "Arancione"), ("#FFFF00", "Giallo"),
-        ("#00FF00", "Verde"), ("#0000FF", "Blu"), ("#00FFFF", "Ciano"), ("#FF00FF", "Viola"),
-        ("#FF99CC", "Rosa"), ("#000000", "Spento"),
+        ("#FFFFFF", L.T("dev.color.white")), ("#FF0000", L.T("dev.color.red")), ("#FF9900", L.T("dev.color.orange")),
+        ("#FFFF00", L.T("dev.color.yellow")), ("#00FF00", L.T("dev.color.green")), ("#0000FF", L.T("dev.color.blue")),
+        ("#00FFFF", L.T("dev.color.cyan")), ("#FF00FF", L.T("dev.color.purple")), ("#FF99CC", L.T("dev.color.pink")),
+        ("#000000", L.T("dev.color.off")),
     };
 
     /// <summary>Firmware defaults (as shown by the web page).</summary>
@@ -51,13 +54,13 @@ public static class AdapterSettingsCommands
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(2);
 
     private static JsonDocument Require(AdapterSession s, string json) =>
-        s.RequestJson(json, Timeout) ?? throw new TimeoutException($"Nessuna risposta dall'adattatore a {json}");
+        s.RequestJson(json, Timeout) ?? throw new TimeoutException(L.F("dev.noreply", json));
 
     private static void RequireOk(AdapterSession s, string json)
     {
         using var doc = Require(s, json);
         var st = doc.RootElement.TryGetProperty("status", out var v) ? v.GetString() : null;
-        if (st != "ok") throw new InvalidOperationException($"L'adattatore ha risposto: {doc.RootElement.GetRawText()}");
+        if (st != "ok") throw new InvalidOperationException(L.F("dev.replied", doc.RootElement.GetRawText()));
     }
 
     private static int Int(JsonElement r, string name, int def) =>

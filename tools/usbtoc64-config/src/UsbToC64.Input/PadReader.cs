@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using HidSharp;
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.XInput;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Input;
 
@@ -22,7 +23,7 @@ public sealed class PadReader : IDisposable
     {
         if (device.IsXInput)
         {
-            if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("XInput è disponibile solo su Windows.");
+            if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException(L.T("input.xinputwindows"));
             _xinputSlot = xinputSlot;
             _kind = device.XInputKind;
             return;

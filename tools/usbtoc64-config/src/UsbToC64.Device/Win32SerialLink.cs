@@ -4,6 +4,7 @@ using System.Runtime.Versioning;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 using UsbToC64.Core.Device;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Device;
 
@@ -43,8 +44,8 @@ internal sealed class Win32SerialLink : IAdapterLink
             int err = Marshal.GetLastWin32Error();
             h.Dispose();
             throw err == 5 // ERROR_ACCESS_DENIED
-                ? new UnauthorizedAccessException($"La porta {port} è occupata da un altro programma (IDE di Arduino, terminale, browser con il configuratore web…).")
-                : new IOException($"Impossibile aprire {port}: {new Win32Exception(err).Message}");
+                ? new UnauthorizedAccessException(L.F("serial.busyw32", port))
+                : new IOException(L.F("serial.cannotopen", port, new Win32Exception(err).Message));
         }
         try
         {
@@ -75,7 +76,7 @@ internal sealed class Win32SerialLink : IAdapterLink
     }
 
     private static IOException LastError(string what, string port) =>
-        new($"{what} su {port}: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
+        new(L.F("serial.lasterror", what, port, new Win32Exception(Marshal.GetLastWin32Error()).Message));
 
     public void SendLine(string line)
     {
@@ -89,7 +90,7 @@ internal sealed class Win32SerialLink : IAdapterLink
             if (!Native.WriteFile(_h, chunk, n, out int written, IntPtr.Zero) || written != n)
             {
                 Lost = true;
-                throw new IOException($"Invio non riuscito su {_port}: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
+                throw new IOException(L.F("serial.sendfailed", _port, new Win32Exception(Marshal.GetLastWin32Error()).Message));
             }
             if (i + ChunkSize < data.Length) Thread.Sleep(ChunkDelayMs);
         }

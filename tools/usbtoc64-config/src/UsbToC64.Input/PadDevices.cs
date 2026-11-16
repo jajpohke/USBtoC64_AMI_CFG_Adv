@@ -1,6 +1,7 @@
 using HidSharp;
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.XInput;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Input;
 
@@ -39,7 +40,7 @@ public sealed class PadDevice
             return x;
         }
         if (RawDescriptor == null)
-            throw new InvalidOperationException($"Descrittore HID non disponibile: {DescriptorError}");
+            throw new InvalidOperationException(L.F("input.nodescriptor", DescriptorError));
         return ControlClassifier.Classify(RawDescriptor);
     }
 
@@ -79,7 +80,7 @@ public static class PadDevices
 
             string name;
             try { name = d.GetProductName()?.Trim() ?? ""; } catch { name = ""; }
-            if (name.Length == 0) name = "(senza nome)";
+            if (name.Length == 0) name = L.T("input.noname");
             ushort vid = (ushort)d.VendorID, pid = (ushort)d.ProductID;
             var kind = XInputKind.Xbox360;
             string? note = null;
@@ -120,20 +121,16 @@ public static class PadDevices
         if (gip.Count > 0 && (virtualGip || same.Count == 0))
         {
             var (rv, rp) = gip[0];
-            string note = $"Windows mostra il controller come {vid:X4}:{pid:X4} (dispositivo virtuale del driver Xbox): " +
-                          $"il profilo usa il VID/PID USB reale {rv:X4}:{rp:X4}, quello che vede l'adattatore.";
+            string note = L.F("input.virtualid", vid, pid, rv, rp);
             if (gip.Count > 1)
-                note += $" Attenzione: ci sono {gip.Count} controller Xbox One/Series collegati ({string.Join(", ", gip.Select(g => $"{g.Vid:X4}:{g.Pid:X4}"))}): " +
-                        "lasciane collegato uno solo.";
+                note += " " + L.F("input.multigip", gip.Count, string.Join(", ", gip.Select(g => $"{g.Vid:X4}:{g.Pid:X4}")));
             return (XInputKind.Gip, rv, rp, note);
         }
         if (virtualGip)
         {
             var ms = usb.Where(u => u.Vid == 0x045E).Select(u => $"{u.Vid:X4}:{u.Pid:X4} (driver \"{u.Service}\")").Distinct().ToList();
             return (XInputKind.Gip, vid, pid,
-                "Controller Xbox One/Series, ma il dispositivo USB reale non è stato trovato: il VID/PID del profilo (045E:02FF) " +
-                "non corrisponderà a quello che vede l'adattatore. Dispositivi USB Microsoft collegati: " +
-                (ms.Count == 0 ? "nessuno" : string.Join(", ", ms)) + ".");
+                L.F("input.norealdevice", ms.Count == 0 ? L.T("input.nonedevices") : string.Join(", ", ms)));
         }
         return (XInputLayout.IsKnownXboxOne(vid, pid) ? XInputKind.Gip : XInputKind.Xbox360, vid, pid, null);
     }

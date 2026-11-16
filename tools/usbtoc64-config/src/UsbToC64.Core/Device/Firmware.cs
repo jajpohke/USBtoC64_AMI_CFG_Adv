@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Core.Device;
 
@@ -13,7 +14,7 @@ public sealed record FirmwareVersion(int Major, int Minor, int Patch) : ICompara
     public static FirmwareVersion Parse(string s)
     {
         var parts = s.Trim().TrimStart('v', 'V').Split('.');
-        if (parts.Length is < 2 or > 3) throw new FormatException($"Versione non valida: {s}");
+        if (parts.Length is < 2 or > 3) throw new FormatException(L.F("fw.badversion", s));
         int P(int i) => i < parts.Length ? int.Parse(parts[i], CultureInfo.InvariantCulture) : 0;
         return new FirmwareVersion(P(0), P(1), P(2));
     }
@@ -31,8 +32,8 @@ public sealed record FirmwareVersion(int Major, int Minor, int Patch) : ICompara
 public sealed record AdapterFirmware(FirmwareVersion Version, string? Build, bool IsOriginal)
 {
     public override string ToString() => IsOriginal
-        ? "firmware originale (1.2, senza numero di versione)"
-        : $"firmware {Version}{(string.IsNullOrEmpty(Build) ? "" : $" (build {Build})")}";
+        ? L.T("fw.original")
+        : string.IsNullOrEmpty(Build) ? L.F("fw.version", Version) : L.F("fw.versionbuild", Version, Build);
 }
 
 /// <summary>firmware.json, written by the GitHub Actions build next to the .bin.</summary>
@@ -80,11 +81,11 @@ public sealed class FirmwareManifest
     /// <summary>Checks that the .bin exists and matches the SHA-256 in the manifest.</summary>
     public void VerifyBin()
     {
-        if (!System.IO.File.Exists(BinPath)) throw new FileNotFoundException($"Firmware non trovato: {BinPath}");
+        if (!System.IO.File.Exists(BinPath)) throw new FileNotFoundException(L.F("fw.binnotfound", BinPath));
         using var f = System.IO.File.OpenRead(BinPath);
         var hash = Convert.ToHexString(SHA256.HashData(f)).ToLowerInvariant();
         if (hash != Sha256)
-            throw new InvalidDataException($"Il file {File} è danneggiato o diverso da quello della build (SHA-256 non corrisponde).");
+            throw new InvalidDataException(L.F("fw.bincorrupt", File));
     }
 }
 

@@ -1,6 +1,7 @@
 using UsbToC64.Core.Formats;
 using UsbToC64.Core.Model;
 using UsbToC64.Core.XInput;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Core.Validation;
 
@@ -8,7 +9,7 @@ public enum Severity { Info, Warning, Error }
 
 public sealed record Issue(Severity Severity, string Code, string Message)
 {
-    public override string ToString() => $"[{Severity switch { Severity.Error => "ERRORE", Severity.Warning => "AVVISO", _ => "INFO" }}] {Code}: {Message}";
+    public override string ToString() => $"[{L.T(Severity switch { Severity.Error => "val.sev.error", Severity.Warning => "val.sev.warning", _ => "val.sev.info" })}] {Code}: {Message}";
 }
 
 /// <summary>
@@ -24,38 +25,36 @@ public static class ProfileValidator
 
         // --- Firmware contract -------------------------------------------------------------
         if (p.IsEmpty)
-            Add(Severity.Error, "EMPTY", "Profilo vuoto: nessuna regola e nessun asse. Il pad non risponderebbe.");
+            Add(Severity.Error, "EMPTY", L.T("val.empty"));
         if (p.Vid == 0 || p.Pid == 0)
-            Add(Severity.Error, "NO_VIDPID", $"VID/PID mancanti ({p.Vid:X4}:{p.Pid:X4}): il firmware attiva il profilo solo se coincidono con il pad collegato.");
+            Add(Severity.Error, "NO_VIDPID", L.F("val.novidpid", p.Vid, p.Pid));
         if (p.Rules.Count > FirmwareLimits.MaxRules)
-            Add(Severity.Error, "TOO_MANY_RULES", $"{p.Rules.Count} regole: il firmware ne salva al massimo {FirmwareLimits.MaxRules}, le altre vengono scartate.");
+            Add(Severity.Error, "TOO_MANY_RULES", L.F("val.toomanyrules", p.Rules.Count, FirmwareLimits.MaxRules));
         if (p.AnalogX.Count > FirmwareLimits.MaxAnalogPerAxis || p.AnalogY.Count > FirmwareLimits.MaxAnalogPerAxis)
-            Add(Severity.Error, "TOO_MANY_AXES", $"Al massimo {FirmwareLimits.MaxAnalogPerAxis} assi per direzione.");
+            Add(Severity.Error, "TOO_MANY_AXES", L.F("val.toomanyaxes", FirmwareLimits.MaxAnalogPerAxis));
 
         int est = SaveJmJson.EstimateArduinoJsonBytes(p);
         if (est > FirmwareLimits.JsonDocumentCapacity)
-            Add(Severity.Error, "JSON_TOO_BIG", $"JSON stimato ~{est} byte oltre il buffer del firmware ({FirmwareLimits.JsonDocumentCapacity}): il salvataggio fallirebbe senza risposta.");
+            Add(Severity.Error, "JSON_TOO_BIG", L.F("val.jsontoobig", est, FirmwareLimits.JsonDocumentCapacity));
         else if (est > FirmwareLimits.JsonDocumentCapacity * 9 / 10)
-            Add(Severity.Warning, "JSON_NEAR_LIMIT", $"JSON stimato ~{est} byte, vicino al limite di {FirmwareLimits.JsonDocumentCapacity}: da verificare sul dispositivo.");
+            Add(Severity.Warning, "JSON_NEAR_LIMIT", L.F("val.jsonnearlimit", est, FirmwareLimits.JsonDocumentCapacity));
 
         foreach (var r in p.Rules.Where(r => r.Func is JmFunc.AutoLeftRightOn or JmFunc.AutoLeftRightOff))
-            Add(Severity.Warning, "AUTOLR_UNSUPPORTED", $"{Names.Rule(r)}: AUTO L/R non è gestito dal motore dei profili salvati.");
+            Add(Severity.Warning, "AUTOLR_UNSUPPORTED", L.F("val.autolr", Names.Rule(r)));
         foreach (var r in p.Rules.Where(r => r.Op == JmOp.Hat && r.Value > 0x0F))
-            Add(Severity.Error, "HAT_RANGE", $"{Names.Rule(r)}: l'op HAT confronta solo 4 bit, il valore {r.Value} non può mai scattare.");
+            Add(Severity.Error, "HAT_RANGE", L.F("val.hatrange", Names.Rule(r), r.Value));
         if (p.Rules.Any(r => FirmwareLimits.IsSigned(r.Op)))
             Add(Severity.Info, "SIGNED_OPS",
-                $"Il profilo usa le regole con segno (S</S>) per gli stick: serve il firmware {FirmwareLimits.SignedOpsMinFirmware} o successivo " +
-                "(un firmware più vecchio le interpreterebbe come \"==\" e farebbe scattare direzioni a caso).");
+                L.F("val.signedops", FirmwareLimits.SignedOpsMinFirmware));
         foreach (var r in p.Rules.Where(r => (int)r.Func > 15 || (int)r.Op > 4))
-            Add(Severity.Error, "BAD_ENUM", $"Regola con codici non validi (op {(int)r.Op}, f {(int)r.Func}).");
+            Add(Severity.Error, "BAD_ENUM", L.F("val.badenum", (int)r.Op, (int)r.Func));
 
         // --- Conflicts (P6) -------------------------------------------------------------------
         foreach (var g in p.Rules.GroupBy(r => (r.Index, r.Value, r.Op)).Where(g => g.Select(r => r.Func).Distinct().Count() > 1))
         {
             var funcs = string.Join(" + ", g.Select(r => Names.Func(r.Func)).Distinct());
             Add(Severity.Warning, "SAME_CONDITION",
-                $"Byte[{g.Key.Index}] {Names.Op(g.Key.Op)} {g.Key.Value}: la stessa condizione attiva {funcs} insieme. " +
-                "Probabile tasto registrato due volte o D-pad catturato come asse.");
+                L.F("val.samecondition", g.Key.Index, Names.Op(g.Key.Op), g.Key.Value, funcs));
         }
         var bitRules = p.Rules.Where(r => r.Op == JmOp.BitAny).ToList();
         for (int a = 0; a < bitRules.Count; a++)
@@ -64,52 +63,49 @@ public static class ProfileValidator
                 var x = bitRules[a]; var y = bitRules[b];
                 if (x.Index == y.Index && x.Value != y.Value && (x.Value & y.Value) != 0 && x.Func != y.Func)
                     Add(Severity.Warning, "OVERLAPPING_BITS",
-                        $"{Names.Rule(x)} e {Names.Rule(y)} condividono dei bit: si attivano insieme.");
+                        L.F("val.overlap", Names.Rule(x), Names.Rule(y)));
             }
 
         // --- Suspicious captures (P4, P5) ---------------------------------------------------------
         var byteHasBits = p.Rules.Where(r => r.Op == JmOp.BitAny).Select(r => r.Index).ToHashSet();
         foreach (var r in p.Rules.Where(r => r.Op == JmOp.Eq && FirmwareLimits.IsDirection(r.Func) && r.Value == 255))
             Add(Severity.Warning, "AXIS_CAPTURED_AS_VALUE",
-                $"{Names.Rule(r)}: direzione catturata come asse (valore 255, \"Force Axis\"). Scatta solo a fondo corsa in un verso.");
+                L.F("val.axisasvalue", Names.Rule(r)));
         foreach (var r in p.Rules.Where(r => r.Op == JmOp.Eq && r.Value != 0 && (r.Value & (r.Value - 1)) == 0
                                              && (byteHasBits.Contains(r.Index) || p.Rules.Count(o => o.Index == r.Index) > 1)))
             Add(Severity.Warning, "EQ_ON_BUTTON_BYTE",
-                $"{Names.Rule(r)}: confronto esatto (==) su un byte di pulsanti: scatta solo se quel tasto è l'unico premuto. Meglio BIT.");
+                L.F("val.eqbutton", Names.Rule(r)));
         // HAT compares only the low nibble: buttons in the high nibble (bits 4-7) do not disturb it.
         var lowNibbleButtons = p.Rules.Where(r => r.Op == JmOp.BitAny && (r.Value & 0x0F) != 0).Select(r => r.Index).ToHashSet();
         foreach (var r in p.Rules.Where(r => r.Op == JmOp.Hat && lowNibbleButtons.Contains(r.Index)))
             Add(Severity.Warning, "HAT_ON_BUTTON_BYTE",
-                $"{Names.Rule(r)}: op HAT su un byte che contiene pulsanti: scatta solo se i 4 bit bassi valgono esattamente {r.Value}, cioè con nessun altro tasto premuto.");
+                L.F("val.hatbutton", Names.Rule(r), r.Value));
 
         // --- Axes ---------------------------------------------------------------------------------
         foreach (var idx in p.AnalogX.Intersect(p.AnalogY))
-            Add(Severity.Warning, "SAME_AXIS_XY", $"Il byte {idx} è usato sia come asse X sia come asse Y: il movimento sarebbe solo in diagonale.");
+            Add(Severity.Warning, "SAME_AXIS_XY", L.F("val.sameaxisxy", idx));
         foreach (var idx in p.AnalogX.Concat(p.AnalogY).Distinct().Where(i => p.Rules.Any(r => r.Index == i)))
-            Add(Severity.Warning, "AXIS_ON_RULE_BYTE", $"Il byte {idx} è usato sia come asse sia nelle regole: probabilmente non è un asse.");
+            Add(Severity.Warning, "AXIS_ON_RULE_BYTE", L.F("val.axisonrule", idx));
 
         // --- XInput (P8) ------------------------------------------------------------------------
         if (p.Vid == 0x045E && p.Pid == 0x02FF)
             Add(Severity.Error, "VIRTUAL_XBOX_ID",
-                "VID/PID 045E:02FF è il controller virtuale che Windows crea per i pad Xbox One/Series: l'adattatore vede " +
-                "il VID/PID USB reale (es. 045E:02EA), quindi questo profilo non si attiverebbe mai.");
+                L.T("val.virtualxbox"));
         else if (XInputLayout.IsKnownXboxOne(p.Vid, p.Pid))
         {
-            Add(Severity.Info, "GIP_FIRMWARE", $"Controller Xbox One/Series (GIP): funziona solo con il firmware {XInputLayout.GipMinFirmware} o successivo.");
+            Add(Severity.Info, "GIP_FIRMWARE", L.F("val.gipfirmware", XInputLayout.GipMinFirmware));
             if (p.Rules.Any(r => r.Index < 4 || r.Index > 17 || (r.Index > 9 && !FirmwareLimits.IsSigned(r.Op))) || p.UseAnalog)
                 Add(Severity.Error, "GIP_SYNTHETIC_INDEXES",
-                    "Pad Xbox One/Series: gli indici non corrispondono al report GIP nativo (pulsanti ai byte 4-5, grilletti 6-9). " +
-                    "Probabilmente vengono dal report HID sintetico di Windows: queste regole non funzionano sull'adattatore.");
+                    L.T("val.gipsynthetic"));
         }
         else if (XInputLayout.IsKnownWirelessReceiver(p.Vid, p.Pid))
-            Add(Severity.Error, "XBOX_RECEIVER_UNSUPPORTED", "Ricevitore wireless Xbox 360: formato dei report diverso, non supportato.");
+            Add(Severity.Error, "XBOX_RECEIVER_UNSUPPORTED", L.T("val.receiver"));
         else if (XInputLayout.IsKnownXbox360Wired(p.Vid, p.Pid))
         {
             bool synthetic = p.Rules.Any(r => r.Index >= 14 || (r.Index >= 6 && !FirmwareLimits.IsSigned(r.Op))) || p.UseAnalog;
             if (synthetic)
                 Add(Severity.Error, "XINPUT_SYNTHETIC_INDEXES",
-                    "Pad Xbox 360: gli indici sembrano presi dal report HID sintetico di Windows (pulsanti al byte 10, hat al byte 11). " +
-                    "L'ESP32 riceve il report XInput nativo (D-pad byte 2, pulsanti byte 3): queste regole non funzionano sull'adattatore.");
+                    L.T("val.xinputsynthetic"));
         }
 
         // --- Compiled .h semantics (P7) -------------------------------------------------------------
@@ -118,12 +114,11 @@ public static class ProfileValidator
             var ignored = p.Rules.Where(r => r.Index == p.DpadIndex && !FirmwareLimits.IsDirection(r.Func)).ToList();
             if (ignored.Count > 0)
                 Add(Severity.Warning, "HEADER_DPAD_INDEX",
-                    $"Nel .h compilato JM_DPAD_INDEX = {p.DpadIndex}: le regole non direzionali su quel byte vengono ignorate " +
-                    $"({string.Join(", ", ignored.Select(r => Names.Func(r.Func)).Distinct())}). Con SAVE invece funzionano.");
+                    L.F("val.headerdpad", p.DpadIndex, string.Join(", ", ignored.Select(r => Names.Func(r.Func)).Distinct())));
             var lost = p.Rules.Where(r => r.Index != p.DpadIndex && FirmwareLimits.IsDirection(r.Func)).ToList();
             if (lost.Count > 0)
                 Add(Severity.Warning, "HEADER_DIR_OUTSIDE_DPAD",
-                    $"Nel .h compilato le direzioni fuori dal byte {p.DpadIndex} vengono ignorate ({string.Join(", ", lost.Select(Names.Rule))}).");
+                    L.F("val.headerdir", p.DpadIndex, string.Join(", ", lost.Select(Names.Rule))));
         }
 
         return issues;

@@ -1,5 +1,6 @@
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Core.Mapping;
 
@@ -45,10 +46,10 @@ public static class PadActions
 
     public static string Label(PadAction a) => a switch
     {
-        PadAction.None => "(nessuna)",
-        PadAction.Directions => "Direzioni (8 vie)",
-        PadAction.AxisX => "Asse orizzontale (sinistra/destra)",
-        PadAction.AxisY => "Asse verticale (su/giù)",
+        PadAction.None => L.T("map.none"),
+        PadAction.Directions => L.T("map.directions"),
+        PadAction.AxisX => L.T("map.axisx"),
+        PadAction.AxisY => L.T("map.axisy"),
         _ => ToFunc(a) is { } f ? Names.Func(f) : a.ToString(),
     };
 }
@@ -64,7 +65,7 @@ public sealed class PadMapping
     public void Set(Control c, PadAction a)
     {
         if (!PadActions.AllowedFor(c.Kind).Contains(a))
-            throw new ArgumentException($"Azione {a} non valida per {c.Name} ({c.Kind}).");
+            throw new ArgumentException(L.F("map.invalid", a, c.Name, c.Kind));
         Actions[c.Id] = a;
     }
 }

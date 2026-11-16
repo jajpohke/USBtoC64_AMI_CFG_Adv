@@ -1,3 +1,5 @@
+using UsbToC64.Core.Text;
+
 namespace UsbToC64.Core.Hid;
 
 /// <summary>
@@ -40,8 +42,7 @@ public static class ControlClassifier
                 .OrderByDescending(id => layout.Elements.Count(e => e.ReportId == id && !e.IsConstant && IsInteresting(e)))
                 .First();
             if (layout.InputReportIds.Count > 1)
-                notes.Add($"Il pad ha {layout.InputReportIds.Count} report di input (id {string.Join(", ", layout.InputReportIds)}): " +
-                          $"uso il report {reportId}. Il firmware non controlla l'id del report, quindi le regole potrebbero scattare anche su altri report.");
+                notes.Add(L.F("hid.multireport", layout.InputReportIds.Count, string.Join(", ", layout.InputReportIds), reportId));
         }
 
         int offset = layout.UsesReportIds ? 1 : 0; // ESP32 raw report starts with the id byte when ids are used
@@ -56,12 +57,12 @@ public static class ControlClassifier
             if (e.UsagePage == PageButton && e.IsVariable && e.BitSize == 1)
             {
                 buttonNo = e.Usage > 0 ? e.Usage : buttonNo + 1;
-                controls.Add(BitControl($"btn{buttonNo}", $"Button {buttonNo}", ControlKind.Button, e, offset));
+                controls.Add(BitControl($"btn{buttonNo}", L.F("hid.button", buttonNo), ControlKind.Button, e, offset));
                 continue;
             }
             if (e.UsagePage == PageButton && !e.IsVariable)
             {
-                notes.Add("Pulsanti dichiarati come array: non mappabili automaticamente (serve la procedura guidata).");
+                notes.Add(L.T("hid.buttonarray"));
                 continue;
             }
             if (e.UsagePage != PageGenericDesktop) continue;
@@ -81,13 +82,13 @@ public static class ControlClassifier
                 axisSeen.TryGetValue(axisName, out int n);
                 axisSeen[axisName] = n + 1;
                 string id = n == 0 ? $"axis_{axisName.ToLowerInvariant()}" : $"axis_{axisName.ToLowerInvariant()}{n + 1}";
-                string name = n == 0 ? $"Asse {axisName}" : $"Asse {axisName} ({n + 1})";
+                string name = n == 0 ? L.F("hid.axis", axisName) : L.F("hid.axisn", axisName, n + 1);
                 controls.Add(AxisControl(id, name, e, offset));
             }
         }
 
         if (vendorFields > 0)
-            notes.Add($"{vendorFields} campi vendor-defined ignorati: se un tasto non compare, serve la procedura guidata.");
+            notes.Add(L.F("hid.vendor", vendorFields));
 
         var desc = new PadDescription { Controls = controls, UsesReportIds = layout.UsesReportIds };
         desc.Notes.AddRange(notes);
@@ -116,17 +117,17 @@ public static class ControlClassifier
         if (e.BitOffset % 8 != 0 || e.BitSize > 4)
         {
             ok = false;
-            note = "Hat non nei 4 bit bassi di un byte: il firmware (op HAT) non lo legge.";
+            note = L.T("hid.hat.notlow");
         }
         else if (range != 4 && range != 8)
         {
             ok = false;
-            note = $"Hat con {range} posizioni: non supportato.";
+            note = L.F("hid.hat.positions", range);
         }
         else if (e.LogicalMin + positions - 1 > 0x0F || e.LogicalMin < 0)
         {
             ok = false;
-            note = "Valori dell'hat fuori dal nibble basso.";
+            note = L.T("hid.hat.range");
         }
         return new Control
         {
@@ -153,22 +154,22 @@ public static class ControlClassifier
         if (e.BitSize < 8)
         {
             ok = false;
-            note = $"Asse da {e.BitSize} bit: troppo piccolo per le soglie del firmware.";
+            note = L.F("hid.axis.small", e.BitSize);
         }
         else if (topBit % 8 != 0)
         {
             ok = false;
-            note = $"Asse da {e.BitSize} bit non allineato al byte: il firmware non può leggerlo.";
+            note = L.F("hid.axis.unaligned", e.BitSize);
         }
         else if (signed)
         {
-            note = $"Asse con segno: usa le regole S</S> (firmware {Model.FirmwareLimits.SignedOpsMinFirmware} o successivo).";
+            note = L.F("hid.axis.signed", Model.FirmwareLimits.SignedOpsMinFirmware);
         }
         else
         {
             long full = (1L << Math.Min(e.BitSize, 31)) - 1;
             if (e.LogicalMax < full * 3 / 4)
-                note = $"Range dichiarato 0..{e.LogicalMax} su {e.BitSize} bit: le soglie 64/190 potrebbero non essere raggiunte.";
+                note = L.F("hid.axis.range", e.LogicalMax, e.BitSize);
         }
         return new Control
         {

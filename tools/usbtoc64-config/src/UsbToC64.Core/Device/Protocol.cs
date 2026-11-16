@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using UsbToC64.Core.Formats;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Core.Device;
 
@@ -35,24 +36,24 @@ public static class ProfileComparer
     {
         var d = new List<string>();
         if (sent.Vid != stored.Vid || sent.Pid != stored.Pid)
-            d.Add($"VID/PID: inviato {sent.Vid:X4}:{sent.Pid:X4}, salvato {stored.Vid:X4}:{stored.Pid:X4}");
+            d.Add(L.F("proto.diff.vidpid", sent.Vid, sent.Pid, stored.Vid, stored.Pid));
         if (sent.DpadIndex != stored.DpadIndex)
-            d.Add($"dpad_idx: inviato {sent.DpadIndex}, salvato {stored.DpadIndex}");
+            d.Add(L.F("proto.diff.dpad", sent.DpadIndex, stored.DpadIndex));
 
         var expectedRules = sent.Rules.Take(FirmwareLimits.MaxRules).ToList();
         if (sent.Rules.Count > FirmwareLimits.MaxRules)
-            d.Add($"Il firmware tiene solo {FirmwareLimits.MaxRules} regole su {sent.Rules.Count} inviate.");
+            d.Add(L.F("proto.diff.maxrules", FirmwareLimits.MaxRules, sent.Rules.Count));
         if (expectedRules.Count != stored.Rules.Count)
-            d.Add($"Numero di regole: inviate {expectedRules.Count}, salvate {stored.Rules.Count}");
+            d.Add(L.F("proto.diff.count", expectedRules.Count, stored.Rules.Count));
         for (int i = 0; i < Math.Min(expectedRules.Count, stored.Rules.Count); i++)
             if (expectedRules[i] != stored.Rules[i])
-                d.Add($"Regola {i + 1}: inviata \"{Names.Rule(expectedRules[i])}\", salvata \"{Names.Rule(stored.Rules[i])}\"");
+                d.Add(L.F("proto.diff.rule", i + 1, Names.Rule(expectedRules[i]), Names.Rule(stored.Rules[i])));
 
-        static string L(IEnumerable<byte> b) => "[" + string.Join(", ", b) + "]";
+        static string Arr(IEnumerable<byte> b) => "[" + string.Join(", ", b) + "]";
         var ex = sent.AnalogX.Take(FirmwareLimits.MaxAnalogPerAxis).ToList();
         var ey = sent.AnalogY.Take(FirmwareLimits.MaxAnalogPerAxis).ToList();
-        if (!ex.SequenceEqual(stored.AnalogX)) d.Add($"Assi X: inviati {L(ex)}, salvati {L(stored.AnalogX)}");
-        if (!ey.SequenceEqual(stored.AnalogY)) d.Add($"Assi Y: inviati {L(ey)}, salvati {L(stored.AnalogY)}");
+        if (!ex.SequenceEqual(stored.AnalogX)) d.Add(L.F("proto.diff.axesx", Arr(ex), Arr(stored.AnalogX)));
+        if (!ey.SequenceEqual(stored.AnalogY)) d.Add(L.F("proto.diff.axesy", Arr(ey), Arr(stored.AnalogY)));
         return d;
     }
 }
@@ -87,7 +88,7 @@ public static class DumppadParser
         {
             string opName = r.Groups[2].Value, funcName = r.Groups[4].Value.Trim();
             if (!OpByName.TryGetValue(opName, out var op) || !FuncByName.TryGetValue(funcName, out var f))
-                throw new FormatException($"Regola non interpretabile nel dumppad: {r.Value.Trim()}");
+                throw new FormatException(L.F("proto.dumppad.badrule", r.Value.Trim()));
             p.Rules.Add(new JmRule(byte.Parse(r.Groups[1].Value, CultureInfo.InvariantCulture),
                                    byte.Parse(r.Groups[3].Value, CultureInfo.InvariantCulture), op, f));
         }
@@ -116,7 +117,7 @@ public enum ReadMethod { GetJm, Dumppad }
 /// <summary>Reply to get_info (exists in the original firmware too).</summary>
 public sealed record AdapterInfo(bool IsAmiga, bool DevMode, bool InvertSwitch, string Raw, bool DevAmiga = false)
 {
-    public override string ToString() => $"modalità {(IsAmiga ? "Amiga" : "C64")}, Developer Mode {(DevMode ? "ON" : "OFF")}";
+    public override string ToString() => L.F("proto.info", IsAmiga ? "Amiga" : "C64", DevMode ? "ON" : "OFF");
 }
 
 public sealed record StoredProfile(JmProfile? Profile, ReadMethod Method, bool HasCustom);
@@ -200,22 +201,20 @@ public sealed class AdapterSession
             // Wait for the firmware banner ("Booting: ..."), printed after its 2 s start-up delay, then retry.
             if (!LastNoise.Any(IsBannerEnd))
             {
-                _log("L'adattatore si sta riavviando: attendo la fine dell'avvio…");
+                _log(L.T("proto.rebooting"));
                 WaitForBanner(TimeSpan.FromSeconds(8));
             }
             if (_link.Lost)
-                throw new IOException("La porta si è chiusa durante il riavvio dell'adattatore.");
+                throw new IOException(L.T("proto.portclosed"));
             Thread.Sleep(300);
             doc = RequestJson("{\"cmd\":\"get_info\"}", timeout ?? TimeSpan.FromSeconds(2));
         }
         using var reply = doc
-            ?? throw new TimeoutException(
-                "L'adattatore non risponde al comando di prova (get_info). Controlla che sia collegato solo al PC " +
-                "(non al C64/Amiga), che la Developer Mode sia spenta e che la porta sia quella giusta.");
+            ?? throw new TimeoutException(L.T("proto.noping"));
         var r = reply.RootElement;
         bool B(string name) => r.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
         if (!r.TryGetProperty("is_amiga", out _))
-            throw new InvalidOperationException($"Risposta inattesa al comando di prova: {r.GetRawText()}");
+            throw new InvalidOperationException(L.F("proto.badping", r.GetRawText()));
         return new AdapterInfo(B("is_amiga"), B("dev_mode"), B("inv_switch"), r.GetRawText(), B("dev_amiga"));
     }
 
@@ -255,15 +254,15 @@ public sealed class AdapterSession
                 string status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "";
                 if (status == "empty") return new StoredProfile(null, ReadMethod.GetJm, false);
                 if (status != "ok")
-                    throw new InvalidOperationException($"L'adattatore ha risposto con un errore: {root.GetRawText()}");
+                    throw new InvalidOperationException(L.F("proto.replyerror", root.GetRawText()));
                 bool hasCustom = root.TryGetProperty("has_custom", out var hc) && hc.ValueKind == JsonValueKind.True;
                 // Same format as save_jm, without "cmd".
                 return new StoredProfile(SaveJmJson.Parse(root.GetRawText()), ReadMethod.GetJm, hasCustom);
             }
         }
-        _log("(nessuna risposta a get_jm: firmware senza il comando, uso dumppad)");
+        _log(L.T("proto.nogetjm"));
         var text = RequestText("dumppad", TimeSpan.FromMilliseconds(400), TimeSpan.FromSeconds(4));
-        if (text.Length == 0) throw new TimeoutException("Nessuna risposta né a get_jm né a dumppad.");
+        if (text.Length == 0) throw new TimeoutException(L.T("proto.noreplyboth"));
         bool has = Regex.IsMatch(text, @"has_custom\s*:\s*TRUE");
         return new StoredProfile(DumppadParser.Parse(text), ReadMethod.Dumppad, has);
     }
@@ -300,10 +299,10 @@ public sealed class AdapterConnection : IDisposable
             try
             {
                 link = port.Open();
-                log($"Porta {link.Name} aperta{(a > 1 ? $" (tentativo {a} di {attempts})" : "")}.");
+                log(a > 1 ? L.F("proto.portopenattempt", link.Name, a, attempts) : L.F("proto.portopen", link.Name));
                 session = new AdapterSession(link, log);
                 var info = session.Ping();
-                log($"Comunicazione OK ({info}).");
+                log(L.F("proto.commok", info));
                 port.ConnectionSucceeded();
                 return new AdapterConnection(link, session, info);
             }
@@ -313,7 +312,7 @@ public sealed class AdapterConnection : IDisposable
                 bool restarted = link?.Lost == true || session?.SawBoot == true;
                 link?.Dispose();
                 if (!restarted || a == attempts) break; // genuinely silent, or out of attempts
-                log("L'adattatore si è riavviato all'apertura della porta: attendo che torni disponibile e riapro.");
+                log(L.T("proto.restartedonopen"));
                 var goneUntil = DateTime.UtcNow + TimeSpan.FromSeconds(3);
                 while (DateTime.UtcNow < goneUntil && port.IsPresent()) sleep(TimeSpan.FromMilliseconds(100));
                 var backUntil = DateTime.UtcNow + TimeSpan.FromSeconds(15);
@@ -323,7 +322,7 @@ public sealed class AdapterConnection : IDisposable
         }
         throw last is TimeoutException or IOException
             ? new TimeoutException(last.Message, last)
-            : last ?? new TimeoutException("Adattatore non raggiungibile.");
+            : last ?? new TimeoutException(L.T("proto.unreachable"));
     }
 }
 
@@ -359,7 +358,7 @@ public sealed class AdapterWriter
         try { conn = AdapterConnection.Connect(_port, _log, _sleep, bootDelay: BootDelay); }
         catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or IOException or UnauthorizedAccessException)
         {
-            return new WriteResult(false, false, null, new(), "Profilo NON inviato. " + ex.Message);
+            return new WriteResult(false, false, null, new(), L.F("proto.notsent", ex.Message));
         }
         var link = conn.Link;
         var session = conn.Session;
@@ -372,8 +371,7 @@ public sealed class AdapterWriter
             {
                 conn.Dispose();
                 return new WriteResult(false, false, null, new(),
-                    $"Profilo NON inviato: usa gli stick analogici (regole S</S>), che richiedono il firmware " +
-                    $"{FirmwareLimits.SignedOpsMinFirmware} o successivo. Sull'adattatore c'è il {fw}: aggiorna prima il firmware.");
+                    L.F("proto.notsentsigned", FirmwareLimits.SignedOpsMinFirmware, fw));
             }
         }
         try
@@ -387,7 +385,7 @@ public sealed class AdapterWriter
             {
                 // The firmware answers "ok" and reboots 200 ms later: on Windows the port can vanish
                 // while the line is still being sent or before the reply is read.
-                _log($"La porta è scomparsa durante l'invio ({ex.Message}).");
+                _log(L.F("proto.portgone", ex.Message));
                 reply = null;
             }
             using (reply)
@@ -396,8 +394,7 @@ public sealed class AdapterWriter
                 {
                     if (!link.Lost && _port.IsPresent())
                         return new WriteResult(false, false, null, new(),
-                            "Nessuna risposta dall'adattatore. Controlla che sia collegato solo al PC (non al C64/Amiga), " +
-                            "che la Developer Mode sia spenta e che la porta sia quella giusta.");
+                            L.T("proto.noreply"));
                     lostAfterSend = true;
                 }
                 else
@@ -405,8 +402,8 @@ public sealed class AdapterWriter
                     var root = reply.RootElement;
                     string status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "";
                     if (status != "ok")
-                        return new WriteResult(false, false, null, new(), $"L'adattatore ha rifiutato il profilo: {root.GetRawText()}");
-                    _log("Profilo accettato. L'adattatore si riavvia…");
+                        return new WriteResult(false, false, null, new(), L.F("proto.rejected", root.GetRawText()));
+                    _log(L.T("proto.accepted"));
                 }
             }
         }
@@ -415,7 +412,7 @@ public sealed class AdapterWriter
             conn.Dispose();
         }
         if (lostAfterSend)
-            _log("Probabile riavvio dopo il salvataggio (la risposta non è arrivata in tempo). Verifico rileggendo.");
+            _log(L.T("proto.probablereboot"));
 
         // 2) wait for the reboot: the port disappears and comes back
         var deadline = DateTime.UtcNow + RebootTimeout;
@@ -424,7 +421,7 @@ public sealed class AdapterWriter
         while (DateTime.UtcNow < deadline && !_port.IsPresent()) _sleep(TimeSpan.FromMilliseconds(200));
         if (!_port.IsPresent())
             return new WriteResult(true, false, null, new(),
-                "Profilo salvato, ma la porta non è ricomparsa dopo il riavvio: verifica non eseguita.");
+                L.T("proto.noportafter"));
         _sleep(BootDelay);
 
         // 3) read back and compare
@@ -433,24 +430,24 @@ public sealed class AdapterWriter
         StoredProfile stored;
         try
         {
-            _log("Rileggo il profilo…");
+            _log(L.T("proto.readingback"));
             using var readConn = AdapterConnection.Connect(_port, _log, _sleep, bootDelay: BootDelay);
             stored = readConn.Session.ReadStored();
         }
         catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException or UnauthorizedAccessException or FormatException)
         {
             return new WriteResult(confirmed, false, null, new(),
-                (confirmed ? "Profilo salvato" : "Esito incerto") + $", ma la rilettura non è riuscita: {ex.Message}");
+                confirmed ? L.F("proto.readbackfailed.saved", ex.Message) : L.F("proto.readbackfailed.uncertain", ex.Message));
         }
         if (stored.Profile == null)
-            return new WriteResult(false, false, stored.Method, new(), "Dopo il riavvio l'adattatore non ha un profilo pad salvato: il salvataggio non è riuscito.");
+            return new WriteResult(false, false, stored.Method, new(), L.T("proto.noprofileafter"));
 
         var diff = ProfileComparer.Compare(profile, stored.Profile);
-        string via = stored.Method == ReadMethod.GetJm ? "get_jm" : "dumppad, firmware senza get_jm";
+        string via = stored.Method == ReadMethod.GetJm ? "get_jm" : L.T("proto.via.dumppad");
         if (diff.Count == 0)
-            return new WriteResult(true, true, stored.Method, diff, $"Salvato e verificato ({via}): l'adattatore contiene esattamente il profilo inviato.");
+            return new WriteResult(true, true, stored.Method, diff, L.F("proto.verified", via));
         return new WriteResult(confirmed, false, stored.Method, diff, confirmed
-            ? $"Salvato, ma il profilo riletto ({via}) è diverso da quello inviato."
-            : $"Il profilo sull'adattatore ({via}) è diverso da quello inviato: probabilmente il salvataggio non è avvenuto.");
+            ? L.F("proto.differs.saved", via)
+            : L.F("proto.differs.notsaved", via));
     }
 }
