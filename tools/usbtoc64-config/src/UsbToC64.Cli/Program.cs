@@ -5,6 +5,7 @@ using UsbToC64.Core.Formats;
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.Mapping;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Text;
 using UsbToC64.Core.Validation;
 using UsbToC64.Device;
 using UsbToC64.Input;
@@ -13,38 +14,13 @@ namespace UsbToC64.Cli;
 
 internal static class Program
 {
-    private const string Usage = """
-        usbtoc64 - preparazione profili gamepad per l'adattatore USBtoC64
-
-        Comandi:
-          devices                          Elenca i gamepad collegati al PC
-          analyze <n> [opzioni]            Classifica i controlli del pad n e propone la mappatura
-              --set <id>=<azione>          Cambia l'azione di un controllo (ripetibile)
-              -o <file.json>               Salva il comando save_jm in un file
-              --dump-descriptor            Stampa il descrittore HID in esadecimale
-          monitor <n> [opzioni]            Anteprima dal vivo: cosa riceve il C64/Amiga su porta DB9
-              --profile <file.json|.h>     Usa questo profilo invece della proposta automatica
-              --set <id>=<azione>          Come per analyze
-          check <file.h|file.json>         Legge un profilo esistente e lo controlla
-          convert <file.h> [-o out.json]   Converte un JoystickMapping.h nel JSON save_jm
-          descriptor <file>                Analizza un descrittore HID salvato come testo esadecimale
-
-        Adattatore (collegato al PC con la USB-C, non al C64/Amiga, Developer Mode spenta):
-          ports                            Elenca le porte seriali (l'ESP32 è riconosciuto da solo)
-          ping [--port COMx]               Verifica che l'adattatore risponda (get_info)
-          version [--port COMx]            Firmware sull'adattatore e firmware incluso nel programma
-          flash [--port COMx] [--yes]      Installa il firmware incluso (CANCELLA TUTTE LE IMPOSTAZIONI)
-          write <file.json|.h> [--port COMx]   Scrive il profilo, attende il riavvio e lo rilegge per verifica
-          read [--port COMx] [--json]      Legge il profilo pad salvato sull'adattatore
-
-        Azioni: None, Fire1, Fire2, Fire3, AutofireOn, AutofireOff, AutofireHold,
-                Up, Down, Left, Right, UpRight, RightDown, DownLeft, LeftUp,
-                Directions (hat), AxisX, AxisY (assi)
-        """;
+    private static string Usage => L.T("cli.usage");
 
     private static int Main(string[] args)
     {
+        L.Add(CliStrings.All);
         Console.OutputEncoding = Encoding.UTF8;
+        args = SelectLanguage(args);
         if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
         {
             Console.WriteLine(Usage);
@@ -66,7 +42,7 @@ internal static class Program
                 "flash" => Flash(args[1..]),
                 "write" => Write(args[1..]),
                 "read" => Read(args[1..]),
-                _ => Fail($"Comando sconosciuto: {args[0]}\n\n{Usage}"),
+                _ => Fail(L.F("cli.unknownCommand", args[0]) + "\n\n" + Usage),
             };
         }
         catch (Exception ex) when (ex is ArgumentException or FormatException or IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException or InvalidDataException)
@@ -82,17 +58,17 @@ internal static class Program
         var list = PadDevices.List();
         if (list.Count == 0)
         {
-            Console.WriteLine("Nessun gamepad trovato.");
+            Console.WriteLine(L.T("cli.noPads"));
             return 1;
         }
         for (int i = 0; i < list.Count; i++)
         {
             var d = list[i];
             Console.WriteLine($"[{i}] {d}");
-            if (d.RawDescriptor == null && !d.IsXInput) Console.WriteLine($"     descrittore non leggibile: {d.DescriptorError}");
+            if (d.RawDescriptor == null && !d.IsXInput) Console.WriteLine("     " + L.F("cli.descriptorUnreadable", d.DescriptorError));
         }
         var slots = PadReader.ConnectedXInputSlots();
-        if (slots.Count > 0) Console.WriteLine($"Slot XInput collegati: {string.Join(", ", slots)}");
+        if (slots.Count > 0) Console.WriteLine(L.F("cli.xinputSlots", string.Join(", ", slots)));
         return 0;
     }
 
@@ -103,9 +79,9 @@ internal static class Program
         var mapping = MappingProposer.Propose(pad);
         ApplySets(mapping, args);
 
-        Console.WriteLine($"Pad: {device}");
+        Console.WriteLine(L.F("cli.pad", device));
         if (HasFlag(args, "--dump-descriptor") && device.RawDescriptor != null)
-            Console.WriteLine($"Descrittore ({device.RawDescriptor.Length} byte):\n{ToHex(device.RawDescriptor)}\n");
+            Console.WriteLine(L.F("cli.descriptorDump", device.RawDescriptor.Length) + $"\n{ToHex(device.RawDescriptor)}\n");
 
         var profile = ProfileBuilder.Build(mapping, device.Vid, device.Pid, device.Name);
         PrintMapping(mapping);
@@ -114,7 +90,7 @@ internal static class Program
         if (Option(args, "-o") is { } outFile)
         {
             File.WriteAllText(outFile, SaveJmJson.Serialize(profile) + "\n");
-            Console.WriteLine($"\nSalvato: {outFile}");
+            Console.WriteLine("\n" + L.F("cli.saved", outFile));
         }
         return 0;
     }
@@ -128,20 +104,20 @@ internal static class Program
         if (Option(args, "--profile") is { } file)
         {
             profile = LoadProfile(file).Profile;
-            Console.WriteLine($"Profilo: {file}");
+            Console.WriteLine(L.F("cli.profileFile", file));
         }
         else
         {
             mapping = MappingProposer.Propose(pad);
             ApplySets(mapping, args);
             profile = ProfileBuilder.Build(mapping, device.Vid, device.Pid, device.Name);
-            Console.WriteLine("Profilo: proposta automatica");
+            Console.WriteLine(L.T("cli.profileAuto"));
         }
 
         var engine = new DynamicEngine(profile);
         int slot = PadReader.ConnectedXInputSlots().FirstOrDefault();
         using var reader = new PadReader(device, pad, slot);
-        Console.WriteLine($"Pad: {device}. Muovi la leva e premi i tasti; un tasto qualsiasi sulla tastiera per uscire.\n");
+        Console.WriteLine(L.F("cli.monitor.start", device) + "\n");
 
         string lastLine = "";
         while (!Console.KeyAvailable)
@@ -151,7 +127,7 @@ internal static class Program
             var state = engine.Process(report);
             if (state == null) continue;
             var active = pad.Controls.Where(c => c.IsActive(report)).Select(c => c.Name);
-            string line = $"C64/Amiga su porta DB9: {state.Value}   pad: {string.Join(", ", active)}";
+            string line = L.F("cli.monitor.line", state.Value, string.Join(", ", active));
             if (line == lastLine) continue;
             lastLine = line;
             Console.Write("\r" + line.PadRight(Math.Max(Console.WindowWidth - 1, line.Length)));
@@ -163,26 +139,26 @@ internal static class Program
 
     private static int Check(string[] args)
     {
-        if (args.Length < 1) return Fail("Specifica un file .h o .json");
+        if (args.Length < 1) return Fail(L.T("cli.check.needFile"));
         var (profile, header) = LoadProfile(args[0]);
         if (header != null)
         {
-            Console.WriteLine($"Generatore: {header.Generator}");
-            foreach (var n in header.Notes) Console.WriteLine($"Nota: {n}");
+            Console.WriteLine(L.F("cli.generator", header.Generator));
+            foreach (var n in header.Notes) Console.WriteLine(L.F("cli.note", n));
         }
         return PrintProfile(profile, header) ? 0 : 2;
     }
 
     private static int Convert(string[] args)
     {
-        if (args.Length < 1) return Fail("Specifica un file .h");
+        if (args.Length < 1) return Fail(L.T("cli.convert.needFile"));
         var (profile, header) = LoadProfile(args[0]);
         bool ok = PrintProfile(profile, header);
         string json = SaveJmJson.Serialize(profile);
         if (Option(args, "-o") is { } outFile)
         {
             File.WriteAllText(outFile, json + "\n");
-            Console.WriteLine($"\nSalvato: {outFile}");
+            Console.WriteLine("\n" + L.F("cli.saved", outFile));
         }
         else Console.WriteLine($"\n{json}");
         return ok ? 0 : 2;
@@ -190,7 +166,7 @@ internal static class Program
 
     private static int Descriptor(string[] args)
     {
-        if (args.Length < 1) return Fail("Specifica il file con il descrittore in esadecimale");
+        if (args.Length < 1) return Fail(L.T("cli.descriptor.needFile"));
         var text = File.ReadAllText(args[0]);
         var bytes = text.Split((char[])[' ', ',', '\n', '\r', '\t'], StringSplitOptions.RemoveEmptyEntries)
             .Select(h => System.Convert.ToByte(h.Replace("0x", "", StringComparison.OrdinalIgnoreCase), 16)).ToArray();
@@ -205,20 +181,20 @@ internal static class Program
     private static int Ports()
     {
         var ports = AdapterPorts.List();
-        if (ports.Count == 0) { Console.WriteLine("Nessuna porta seriale."); return 1; }
+        if (ports.Count == 0) { Console.WriteLine(L.T("cli.ports.none")); return 1; }
         foreach (var p in ports) Console.WriteLine($"{(p.IsEspressif ? "*" : " ")} {p}");
-        Console.WriteLine("(* = ESP32, scelto in automatico)");
+        Console.WriteLine(L.T("cli.ports.legend"));
         return 0;
     }
 
     private static int Write(string[] args)
     {
-        if (args.Length < 1 || args[0].StartsWith('-')) return Fail("Specifica il file del profilo (.json o .h)");
+        if (args.Length < 1 || args[0].StartsWith('-')) return Fail(L.T("cli.write.needFile"));
         var (profile, header) = LoadProfile(args[0]);
         if (!PrintProfile(profile, header))
-            return Fail("\nIl profilo ha errori: non lo scrivo. Correggilo prima (o usa il JSON solo per prova).");
+            return Fail("\n" + L.T("cli.write.hasErrors"));
         var port = AdapterPorts.Find(Option(args, "--port"));
-        Console.WriteLine($"\nAdattatore: {port}");
+        Console.WriteLine("\n" + L.F("cli.write.adapter", port));
         var writer = new AdapterWriter(new SerialAdapterPort(port.PortName), s => Console.WriteLine("  " + s));
         var r = writer.WriteAndVerify(profile);
         Console.WriteLine($"\n{r.Message}");
@@ -231,7 +207,7 @@ internal static class Program
         var port = AdapterPorts.Find(Option(args, "--port"));
         using var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), s => Console.WriteLine("  " + s));
         var info = conn.Info;
-        Console.WriteLine($"L'adattatore su {port.PortName} risponde: {info}.");
+        Console.WriteLine(L.F("cli.ping.ok", port.PortName, info));
         return 0;
     }
 
@@ -242,30 +218,30 @@ internal static class Program
         var port = AdapterPorts.Find(Option(args, "--port"));
         using var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), s => Console.WriteLine("  " + s));
         var fw = conn.Session.GetFirmware();
-        Console.WriteLine($"Adattatore su {port.PortName}: {fw}");
+        Console.WriteLine(L.F("cli.version.adapter", port.PortName, fw));
         var m = Manifest();
-        if (m == null) { Console.WriteLine("Nessun firmware incluso (manca firmware.json)."); return 0; }
-        Console.WriteLine($"Firmware incluso: {m.Version} (build {m.Build})");
+        if (m == null) { Console.WriteLine(L.T("cli.version.noFirmware")); return 0; }
+        Console.WriteLine(L.F("cli.version.included", m.Version, m.Build));
         Console.WriteLine(FirmwareCheck.Compare(fw, m) switch
         {
-            FirmwareStatus.UpdateAvailable => "→ aggiornamento disponibile: usbtoc64 flash",
-            FirmwareStatus.OtherBuild => $"→ stessa versione, build diversa ({fw.Build} → {m.Build}): usbtoc64 flash per installarla",
-            FirmwareStatus.UpToDate => "→ aggiornato",
-            _ => "→ sull'adattatore c'è un firmware più recente",
+            FirmwareStatus.UpdateAvailable => L.T("cli.version.updateAvailable"),
+            FirmwareStatus.OtherBuild => L.F("cli.version.otherBuild", fw.Build, m.Build),
+            FirmwareStatus.UpToDate => L.T("cli.version.upToDate"),
+            _ => L.T("cli.version.newerOnAdapter"),
         });
         return 0;
     }
 
     private static int Flash(string[] args)
     {
-        var m = Manifest() ?? throw new InvalidOperationException("Nessun firmware incluso (manca firmware.json accanto al programma).");
+        var m = Manifest() ?? throw new InvalidOperationException(L.T("cli.flash.noFirmware"));
         var port = AdapterPorts.Find(Option(args, "--port"));
         Console.WriteLine($"Firmware {m.Version} (build {m.Build}) → {port}");
-        Console.WriteLine("ATTENZIONE: l'aggiornamento cancella TUTTE le impostazioni dell'adattatore (profilo pad, mouse, LED, Developer Mode).");
+        Console.WriteLine(L.T("cli.flash.warning"));
         if (!HasFlag(args, "--yes"))
         {
-            Console.Write("Scrivi SI per continuare: ");
-            if (!string.Equals(Console.ReadLine()?.Trim(), "SI", StringComparison.OrdinalIgnoreCase)) return Fail("Annullato.");
+            Console.Write(L.T("cli.flash.prompt"));
+            if (!string.Equals(Console.ReadLine()?.Trim(), L.T("cli.flash.yesWord"), StringComparison.OrdinalIgnoreCase)) return Fail(L.T("cli.flash.cancelled"));
         }
         var r = new FirmwareUpdater(s => Console.WriteLine(s)).Update(port.PortName, m);
         Console.WriteLine(r.Message);
@@ -280,16 +256,31 @@ internal static class Program
         var stored = conn.Session.ReadStored();
         if (stored.Profile == null)
         {
-            Console.WriteLine("Nessun profilo pad (TIER 0) salvato sull'adattatore.");
+            Console.WriteLine(L.T("cli.read.none"));
             return 1;
         }
         if (json) { Console.WriteLine(SaveJmJson.Serialize(stored.Profile)); return 0; }
-        Console.WriteLine($"\nLetto con {(stored.Method == ReadMethod.GetJm ? "get_jm" : "dumppad (firmware senza get_jm)")}:");
+        Console.WriteLine("\n" + L.F("cli.read.via", stored.Method == ReadMethod.GetJm ? "get_jm" : L.T("cli.read.viaDumppad")));
         PrintProfile(stored.Profile, null);
         return 0;
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /// <summary>--lang &lt;en|it|es|de&gt; (removed from the arguments), else USBTOC64_LANG, else English.</summary>
+    private static string[] SelectLanguage(string[] args)
+    {
+        string? lang = Environment.GetEnvironmentVariable("USBTOC64_LANG");
+        var rest = new List<string>(args.Length);
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--lang" && i + 1 < args.Length) { lang = args[++i]; continue; }
+            if (args[i].StartsWith("--lang=", StringComparison.Ordinal)) { lang = args[i]["--lang=".Length..]; continue; }
+            rest.Add(args[i]);
+        }
+        L.Set(lang);
+        return rest.ToArray();
+    }
 
     private static (JmProfile Profile, ImportedHeader? Header) LoadProfile(string file)
     {
@@ -303,14 +294,14 @@ internal static class Program
     private static PadDevice PickDevice(string[] args)
     {
         var list = PadDevices.List();
-        if (list.Count == 0) throw new InvalidOperationException("Nessun gamepad trovato.");
+        if (list.Count == 0) throw new InvalidOperationException(L.T("cli.noPads"));
         if (args.Length == 0 || args[0].StartsWith('-'))
         {
             if (list.Count == 1) return list[0];
-            throw new ArgumentException("Più gamepad collegati: indica il numero (vedi 'devices').");
+            throw new ArgumentException(L.T("cli.pickDevice.many"));
         }
         if (!int.TryParse(args[0], out int n) || n < 0 || n >= list.Count)
-            throw new ArgumentException($"Numero pad non valido: {args[0]} (vedi 'devices').");
+            throw new ArgumentException(L.F("cli.pickDevice.invalid", args[0]));
         return list[n];
     }
 
@@ -320,29 +311,29 @@ internal static class Program
         {
             if (args[i] != "--set") continue;
             var kv = args[i + 1].Split('=', 2);
-            if (kv.Length != 2) throw new ArgumentException($"--set richiede id=azione: {args[i + 1]}");
+            if (kv.Length != 2) throw new ArgumentException(L.F("cli.set.format", args[i + 1]));
             var control = mapping.Pad.Controls.FirstOrDefault(c => string.Equals(c.Id, kv[0], StringComparison.OrdinalIgnoreCase))
-                ?? throw new ArgumentException($"Controllo sconosciuto: {kv[0]}");
+                ?? throw new ArgumentException(L.F("cli.set.unknownControl", kv[0]));
             if (!Enum.TryParse<PadAction>(kv[1], true, out var action))
-                throw new ArgumentException($"Azione sconosciuta: {kv[1]}");
+                throw new ArgumentException(L.F("cli.set.unknownAction", kv[1]));
             mapping.Set(control, action);
         }
     }
 
     private static void PrintMapping(PadMapping m)
     {
-        foreach (var n in m.Pad.Notes) Console.WriteLine($"Nota: {n}");
-        Console.WriteLine("\nControlli (classificati automaticamente):");
-        Console.WriteLine($"  {"id",-12} {"nome",-26} {"tipo",-10} {"byte",4}  {"maschera",-8} azione");
+        foreach (var n in m.Pad.Notes) Console.WriteLine(L.F("cli.note", n));
+        Console.WriteLine("\n" + L.T("cli.controls.title"));
+        Console.WriteLine($"  {"id",-12} {L.T("cli.col.name"),-26} {L.T("cli.col.kind"),-10} {"byte",4}  {L.T("cli.col.mask"),-8} {L.T("cli.col.action")}");
         foreach (var c in m.Pad.Controls)
         {
             string mask = c.Kind switch
             {
                 ControlKind.Hat => c.HatBase == 0 ? "hat 0-7" : $"hat {c.HatBase}-{c.HatBase + c.HatPositions - 1}",
-                ControlKind.Axis => "asse",
+                ControlKind.Axis => L.T("cli.kind.axis"),
                 _ => $"0x{c.Mask:X2}",
             };
-            string action = c.Supported ? PadActions.Label(m.Get(c)) : "NON SUPPORTATO";
+            string action = c.Supported ? PadActions.Label(m.Get(c)) : L.T("cli.unsupported");
             Console.WriteLine($"  {c.Id,-12} {c.Name,-26} {KindLabel(c.Kind),-10} {c.ByteIndex,4}  {mask,-8} {action}");
             if (c.Note != null) Console.WriteLine($"  {"",-12} -> {c.Note}");
         }
@@ -351,25 +342,25 @@ internal static class Program
     /// <returns>false when there are errors.</returns>
     private static bool PrintProfile(JmProfile p, ImportedHeader? header, bool skipVidPid = false)
     {
-        Console.WriteLine($"\nProfilo: VID {p.Vid:X4} PID {p.Pid:X4}{(p.DeviceName != null ? $" ({p.DeviceName})" : "")}");
-        Console.WriteLine($"Regole ({p.Rules.Count}/{FirmwareLimits.MaxRules}):");
+        Console.WriteLine("\n" + L.F("cli.profile.header", p.Vid.ToString("X4"), p.Pid.ToString("X4"), p.DeviceName != null ? $" ({p.DeviceName})" : ""));
+        Console.WriteLine(L.F("cli.profile.rules", p.Rules.Count, FirmwareLimits.MaxRules));
         for (int i = 0; i < p.Rules.Count; i++) Console.WriteLine($"  {i + 1,2}. {Names.Rule(p.Rules[i])}");
         if (p.UseAnalog)
-            Console.WriteLine($"Assi: X [{string.Join(", ", p.AnalogX)}]  Y [{string.Join(", ", p.AnalogY)}]");
+            Console.WriteLine(L.F("cli.profile.axes", string.Join(", ", p.AnalogX), string.Join(", ", p.AnalogY)));
 
         var issues = ProfileValidator.Validate(p, header);
         if (skipVidPid) issues.RemoveAll(i => i.Code == "NO_VIDPID");
-        Console.WriteLine(issues.Count == 0 ? "\nControlli: nessun problema." : "\nControlli:");
+        Console.WriteLine("\n" + L.T(issues.Count == 0 ? "cli.checks.none" : "cli.checks.title"));
         foreach (var i in issues.OrderByDescending(i => i.Severity)) Console.WriteLine($"  {i}");
         return issues.All(i => i.Severity != Severity.Error);
     }
 
     private static string KindLabel(ControlKind k) => k switch
     {
-        ControlKind.Button => "pulsante",
+        ControlKind.Button => L.T("cli.kind.button"),
         ControlKind.DpadButton => "D-pad",
         ControlKind.Hat => "hat",
-        ControlKind.Axis => "asse",
+        ControlKind.Axis => L.T("cli.kind.axis"),
         _ => k.ToString(),
     };
 

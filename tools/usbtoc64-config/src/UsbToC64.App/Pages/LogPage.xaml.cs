@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.App.Pages;
 
@@ -23,7 +24,7 @@ public partial class LogPage : UserControl
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new SaveFileDialog { Filter = "Testo (*.txt)|*.txt", FileName = $"usbtoc64-registro-{DateTime.Now:yyyyMMdd-HHmm}.txt" };
+        var dlg = new SaveFileDialog { Filter = L.T("log.save.filter"), FileName = $"usbtoc64-registro-{DateTime.Now:yyyyMMdd-HHmm}.txt" };
         if (dlg.ShowDialog(_w) == true) File.WriteAllText(dlg.FileName, _w.Hub.LogText());
     }
 
