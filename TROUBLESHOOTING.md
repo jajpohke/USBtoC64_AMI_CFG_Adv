@@ -56,7 +56,15 @@ Wireless dongles need to be plugged in **after** the adapter has fully booted (L
 
 **Q: My Xbox controller doesn't work.**
 
-Xbox controllers are currently not supported. This is a known limitation.
+> ✅ **Xbox controllers are supported since firmware 1.2.3.** Xbox 360 (wired and compatibles) and Xbox One / Series
+> (USB cable) work with firmware **1.2.3**, distributed with [USBtoC64 Config for Windows](WINDOWSTOOL.md)
+> ([download](https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/releases/latest/download/USBtoC64_Adv_Win_x64.zip)).
+> Set them up with the Windows program: the web configurator sees a different report from Windows than the one the
+> adapter receives, so Xbox mappings made in the browser do not work. With firmware 1.2 Xbox controllers are not supported.
+
+1. Install [USBtoC64 Config for Windows](WINDOWSTOOL.md) and let it update the adapter to firmware 1.2.3.
+2. Connect the Xbox controller **to the PC** with a USB cable, choose it in step 2 and click **Save to USBtoC64**.
+3. Wireless Xbox controllers and the Xbox Wireless Adapter are not supported: use a cable.
 
 ---
 

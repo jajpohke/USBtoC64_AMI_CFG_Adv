@@ -2,6 +2,12 @@
 
 This page covers all controllers tested with the USB2C64 Advanced Edition — what works out of the box, what needs manual mapping, and what is currently unsupported.
 
+> ✅ **Xbox controllers are supported since firmware 1.2.3.** Xbox 360 (wired and compatibles) and Xbox One / Series
+> (USB cable) work with firmware **1.2.3**, distributed with [USBtoC64 Config for Windows](WINDOWSTOOL.md)
+> ([download](https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/releases/latest/download/USBtoC64_Adv_Win_x64.zip)).
+> Set them up with the Windows program: the web configurator sees a different report from Windows than the one the
+> adapter receives, so Xbox mappings made in the browser do not work. With firmware 1.2 Xbox controllers are not supported.
+
 - [Plug & Play — Native Profiles](#plug--play--native-profiles)
 - [Mapping a New Controller](#mapping-a-new-controller)
 - [Unsupported Controllers](#unsupported-controllers)
@@ -54,7 +60,7 @@ If you want your mapping compiled directly into the firmware as a zero-latency n
 
 | Controller | Reason |
 | :--- | :--- |
-| **Xbox One** | Protocol not supported |
+| **Xbox 360 / Xbox One / Series** with firmware 1.2 | Supported **only with firmware 1.2.3** and the [Windows program](WINDOWSTOOL.md) (see the note at the top of this page). Wireless connection not supported: use a USB cable. |
 | **Nintendo Switch licensed pads** (e.g. Cuphead, some HoriPad Switch editions) | Protocol-compatible at HID level but cause a continuous reboot loop on the ESP32 in the units tested. Likely a USB enumeration timing issue. Currently unsupported. |
 
 If you own one of these and want to help investigate, feel free to open an issue with the VID/PID and the raw USB dump from the serial `raw` command.
