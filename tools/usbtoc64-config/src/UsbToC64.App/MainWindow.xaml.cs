@@ -12,6 +12,8 @@ public partial class MainWindow : FluentWindow
 {
     public AdapterHub Hub { get; } = new();
     public PadSession Pad { get; } = new();
+    public AppSettings Settings { get; } = AppSettings.Load();
+    private bool _advanced;
 
     private readonly Dictionary<string, UserControl> _pages = new();
 
@@ -25,6 +27,8 @@ public partial class MainWindow : FluentWindow
         _pages["firmware"] = new FirmwarePage(this);
         _pages["terminal"] = new TerminalPage(this);
         _pages["log"] = new LogPage(this);
+        SimpleHost.Content = new SimplePage(this);
+        ShowAdvanced(Settings.StartAdvanced);
 
         Hub.StatusChanged += () => Dispatcher.BeginInvoke(UpdateAdapterCard);
         Hub.BusyChanged += busy => Dispatcher.BeginInvoke(() => AdapterCheck.IsEnabled = !busy);
@@ -39,6 +43,18 @@ public partial class MainWindow : FluentWindow
         Hub.RefreshPorts();
         await CheckAdapterAsync(probeIfSilent: true);
     }
+
+    public UserControl Page(string tag) => _pages[tag];
+
+    /// <summary>Switches between the simple screen and the advanced configuration.</summary>
+    public void ShowAdvanced(bool advanced)
+    {
+        _advanced = advanced;
+        AdvancedRoot.Visibility = advanced ? Visibility.Visible : Visibility.Collapsed;
+        SimpleHost.Visibility = advanced ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void Simple_Click(object sender, RoutedEventArgs e) => ShowAdvanced(false);
 
     public void Navigate(string tag)
     {
@@ -62,7 +78,7 @@ public partial class MainWindow : FluentWindow
         AdapterTitle.Text = "Adattatore: verifica…";
         var s = await Hub.CheckAsync();
         UpdateFirmwareBar(s);
-        if (probeIfSilent && s.NoAnswer) await OfferInstallOnSilentAdapterAsync(s);
+        if (probeIfSilent && s.NoAnswer && _advanced) await OfferInstallOnSilentAdapterAsync(s);
     }
 
     /// <summary>

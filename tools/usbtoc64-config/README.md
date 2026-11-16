@@ -14,7 +14,20 @@ Due programmi:
 
 ## Interfaccia grafica
 
-Stile Windows 11 (tema chiaro/scuro come quello di Windows), menu laterale:
+Stile Windows 11 (tema chiaro/scuro come quello di Windows).
+
+**Modalità semplice** (all'avvio): tre passi in una schermata.
+1. **Adattatore**: pronto, da aggiornare (pulsante *Aggiorna firmware*), non trovato, vergine/in download
+   (*Installa firmware*).
+2. **Pad**: elenco dei pad collegati al PC e anteprima dal vivo di cosa riceve il C64/Amiga su porta DB9.
+   La mappatura è la proposta automatica (o quella personalizzata nella modalità avanzata) e non viene mostrata.
+3. **Salva su USBtoC64**: scrive e verifica. Attivo solo quando i passi 1 e 2 sono a posto (per esempio un pad
+   Xbox con un firmware troppo vecchio chiede prima l'aggiornamento).
+
+*Configurazione avanzata →* apre l'interfaccia completa; la casella *Apri sempre in modalità avanzata*
+ricorda la scelta.
+
+**Configurazione avanzata**, menu laterale:
 
 - **Gamepad**: il pad viene analizzato in automatico; tabella dei controlli (byte, bit, azione) con la riga
   del tasto premuto evidenziata; a destra cosa riceve il **C64/Amiga su porta DB9** e i controlli del profilo;
