@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using UsbToC64.Core.Device;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Device;
 
@@ -38,7 +39,7 @@ public sealed class FirmwareUpdater
     {
         try { manifest.VerifyBin(); }
         catch (Exception ex) when (ex is IOException or InvalidDataException) { return new(false, ex.Message); }
-        _log($"Aggiornamento a {manifest.Version} (build {manifest.Build}) su {portName}");
+        _log(L.F("flash.updating", manifest.Version, manifest.Build, portName));
         var flashed = Flash(portName, manifest.Chip, manifest.Address, manifest.BinPath, manifest.Directory);
         if (flashed != null) return flashed;
 
@@ -46,17 +47,16 @@ public sealed class FirmwareUpdater
         {
             using var conn = ConnectAfterFlash(portName);
             var fw = conn.Session.GetFirmware();
-            _log($"Sull'adattatore ora c'è: {fw}");
+            _log(L.F("flash.nowon", fw));
             bool ok = !fw.IsOriginal && fw.Version.CompareTo(manifest.Version) == 0
                       && (string.IsNullOrEmpty(manifest.Build) || fw.Build == manifest.Build);
             return ok
-                ? new(true, $"Firmware aggiornato a {manifest.Version}. Tutte le impostazioni sono tornate ai valori predefiniti: " +
-                            "scrivi di nuovo il profilo del pad.")
-                : new(false, $"Il flash è terminato, ma l'adattatore riporta {fw} invece di {manifest.Version} (build {manifest.Build}).");
+                ? new(true, L.F("flash.updated", manifest.Version))
+                : new(false, L.F("flash.mismatch", fw, manifest.Version, manifest.Build));
         }
         catch (Exception ex) when (ex is TimeoutException or IOException or InvalidOperationException or UnauthorizedAccessException)
         {
-            return new(false, $"Il flash è terminato, ma l'adattatore non risponde dopo il riavvio: {ex.Message}");
+            return new(false, L.F("flash.noanswer", ex.Message));
         }
     }
 
@@ -66,11 +66,11 @@ public sealed class FirmwareUpdater
     /// </summary>
     public FlashResult UpdateFromFile(string portName, string binPath, string chip = "esp32s3")
     {
-        if (!File.Exists(binPath)) return new(false, $"File non trovato: {binPath}");
+        if (!File.Exists(binPath)) return new(false, L.F("flash.filenotfound", binPath));
         var size = new FileInfo(binPath).Length;
         if (size < 0x10000 || size > 16 * 1024 * 1024)
-            return new(false, $"Il file {Path.GetFileName(binPath)} ({size} byte) non sembra un'immagine completa del firmware.");
-        _log($"Installazione di {Path.GetFileName(binPath)} ({size} byte) su {portName}, indirizzo 0x0");
+            return new(false, L.F("flash.notimage", Path.GetFileName(binPath), size));
+        _log(L.F("flash.installing", Path.GetFileName(binPath), size, portName));
         var flashed = Flash(portName, chip, 0, binPath, Path.GetDirectoryName(binPath) ?? "");
         if (flashed != null) return flashed;
 
@@ -78,14 +78,12 @@ public sealed class FirmwareUpdater
         {
             using var conn = ConnectAfterFlash(portName);
             var fw = conn.Session.GetFirmware();
-            _log($"Sull'adattatore ora c'è: {fw}");
-            return new(true, $"Firmware {Path.GetFileName(binPath)} installato. L'adattatore risponde ({fw}). " +
-                             "Tutte le impostazioni sono tornate ai valori predefiniti.");
+            _log(L.F("flash.nowon", fw));
+            return new(true, L.F("flash.installed", Path.GetFileName(binPath), fw));
         }
         catch (Exception ex) when (ex is TimeoutException or IOException or InvalidOperationException or UnauthorizedAccessException)
         {
-            return new(true, $"Firmware {Path.GetFileName(binPath)} scritto. L'adattatore non risponde ai comandi di questo programma: " +
-                             $"è normale con un firmware diverso ({ex.Message}).");
+            return new(true, L.F("flash.writtennoanswer", Path.GetFileName(binPath), ex.Message));
         }
     }
 
@@ -96,7 +94,7 @@ public sealed class FirmwareUpdater
     public (bool Found, string Description) ProbeChip(string portName)
     {
         var esptool = FindEsptool(AppContext.BaseDirectory);
-        if (esptool == null) return (false, "esptool.exe non trovato accanto al programma");
+        if (esptool == null) return (false, L.T("flash.noesptool"));
         var lines = new List<string>();
         int exit;
         try { exit = Run(esptool, $"--port {portName} --before default_reset --after hard_reset chip_id", TimeSpan.FromSeconds(30), lines.Add, quiet: true); }
@@ -104,7 +102,7 @@ public sealed class FirmwareUpdater
         var chip = lines.FirstOrDefault(l => l.Contains("Chip is", StringComparison.OrdinalIgnoreCase))
                    ?? lines.FirstOrDefault(l => l.Contains("Detecting chip type", StringComparison.OrdinalIgnoreCase));
         foreach (var l in lines) _log("  " + l);
-        return exit == 0 ? (true, chip?.Trim() ?? "ESP32") : (false, lines.LastOrDefault() ?? $"esptool terminato con {exit}");
+        return exit == 0 ? (true, chip?.Trim() ?? "ESP32") : (false, lines.LastOrDefault() ?? L.F("flash.esptoolexit", exit));
     }
 
     /// <returns>null when esptool succeeded, otherwise the failure.</returns>
@@ -112,16 +110,15 @@ public sealed class FirmwareUpdater
     {
         var esptool = FindEsptool(directory) ?? FindEsptool(AppContext.BaseDirectory);
         if (esptool == null)
-            return new(false, "esptool.exe non trovato accanto al programma: lo zip della build deve contenerlo.");
+            return new(false, L.T("flash.noesptoolzip"));
         var args = BuildArguments(portName, chip, address, binPath);
         _log($"> esptool {args}");
         int exit;
         try { exit = Run(esptool, args, TimeSpan.FromMinutes(5), null, quiet: false); }
-        catch (Exception ex) { return new(false, $"esptool non si è avviato: {ex.Message}"); }
+        catch (Exception ex) { return new(false, L.F("flash.nostart", ex.Message)); }
         if (exit != 0)
-            return new(false, $"esptool è terminato con errore ({exit}). L'adattatore potrebbe essere senza firmware: " +
-                              "riprova; se non risponde, tieni premuto BOOT mentre colleghi la USB-C e ripeti l'installazione.");
-        _log("Scrittura completata. Attendo il riavvio dell'adattatore…");
+            return new(false, L.F("flash.failed", exit));
+        _log(L.T("flash.written"));
         return null;
     }
 
@@ -172,7 +169,7 @@ public sealed class FirmwareUpdater
         if (!p.WaitForExit((int)timeout.TotalMilliseconds))
         {
             try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            _log("esptool non ha terminato entro il tempo massimo: interrotto.");
+            _log(L.T("flash.timeout"));
             return -1;
         }
         p.WaitForExit(); // flush the async output

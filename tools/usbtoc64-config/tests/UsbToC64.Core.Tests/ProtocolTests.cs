@@ -191,7 +191,7 @@ public class ProtocolTests
         Assert.True(r.Saved);
         Assert.False(r.Verified);
         Assert.Single(r.Differences);
-        Assert.Contains("Regola 1", r.Differences[0]);
+        Assert.Contains("Rule 1", r.Differences[0]);
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public class ProtocolTests
         var log = new List<string>();
         var r = Writer(new FakeAdapter { RebootBeforeReply = true }, log).WriteAndVerify(Sample());
         Assert.True(r.Verified, r.Message);
-        Assert.Contains(log, l => l.Contains("Probabile riavvio"));
+        Assert.Contains(log, l => l.Contains("Probable restart"));
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public class ProtocolTests
         var log = new List<string>();
         var r = Writer(new FakeAdapter { RebootBeforeReply = true, ThrowOnSend = true }, log).WriteAndVerify(Sample());
         Assert.True(r.Verified, r.Message);
-        Assert.Contains(log, l => l.Contains("scomparsa durante l'invio"));
+        Assert.Contains(log, l => l.Contains("disappeared while sending"));
     }
 
     [Fact]
@@ -219,7 +219,7 @@ public class ProtocolTests
         var log = new List<string>();
         var r = Writer(a, log).WriteAndVerify(Sample());
         Assert.False(r.Saved);
-        Assert.StartsWith("Profilo NON inviato", r.Message);
+        Assert.StartsWith("Profile NOT sent", r.Message);
         Assert.DoesNotContain(log, l => l.Contains("save_jm"));
     }
 
@@ -229,7 +229,7 @@ public class ProtocolTests
         var log = new List<string>();
         var r = Writer(new FakeAdapter { ResetOnOpen = true }, log).WriteAndVerify(Sample());
         Assert.True(r.Verified, r.Message);
-        Assert.Contains(log, l => l.Contains("Comunicazione OK"));
+        Assert.Contains(log, l => l.Contains("Communication OK"));
     }
 
     [Fact]
@@ -240,8 +240,8 @@ public class ProtocolTests
         var log = new List<string>();
         var r = Writer(a, log).WriteAndVerify(Sample());
         Assert.True(r.Verified, r.Message);
-        Assert.Contains(log, l => l.Contains("riapro"));
-        Assert.Contains(log, l => l.Contains("tentativo 2"));
+        Assert.Contains(log, l => l.Contains("reopening"));
+        Assert.Contains(log, l => l.Contains("attempt 2"));
     }
 
     [Fact]
@@ -258,7 +258,7 @@ public class ProtocolTests
     {
         var r = Writer(new FakeAdapter { Silent = true }).WriteAndVerify(Sample());
         Assert.False(r.Saved);
-        Assert.Contains("Nessuna risposta", r.Message);
+        Assert.Contains("No reply", r.Message);
     }
 
     [Fact]

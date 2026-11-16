@@ -1,4 +1,5 @@
 using UsbToC64.Core.Hid;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Core.XInput;
 
@@ -86,19 +87,18 @@ public static class XInputLayout
             Btn("btn_rb", "RB", 5, 0x20),
             Btn("btn_back", "View", 4, 0x08),
             Btn("btn_start", "Menu", 4, 0x04),
-            Btn("btn_ls", "Click stick sinistro", 5, 0x40),
-            Btn("btn_rs", "Click stick destro", 5, 0x80),
+            Btn("btn_ls", L.T("xinput.lsclick"), 5, 0x40),
+            Btn("btn_rs", L.T("xinput.rsclick"), 5, 0x80),
             // Triggers 0..1023: bit 1 of the high byte set = pressed more than half way
-            Btn("trg_lt", "LT (oltre metà corsa)", 7, 0x02),
-            Btn("trg_rt", "RT (oltre metà corsa)", 9, 0x02),
-            Stick("axis_lx", "Stick sinistro X", 11, 0x30),
-            Stick("axis_ly", "Stick sinistro Y", 13, 0x31),
-            Stick("axis_rx", "Stick destro X", 15, 0x33),
-            Stick("axis_ry", "Stick destro Y", 17, 0x34),
+            Btn("trg_lt", L.T("xinput.lt"), 7, 0x02),
+            Btn("trg_rt", L.T("xinput.rt"), 9, 0x02),
+            Stick("axis_lx", L.T("xinput.lx"), 11, 0x30),
+            Stick("axis_ly", L.T("xinput.ly"), 13, 0x31),
+            Stick("axis_rx", L.T("xinput.rx"), 15, 0x33),
+            Stick("axis_ry", L.T("xinput.ry"), 17, 0x34),
         };
         var d = new PadDescription { Controls = c, UsesReportIds = false, IsXInput = true };
-        d.Notes.Add($"Pad Xbox One/Series (protocollo GIP): layout nativo del report che riceve l'ESP32. " +
-                    $"Serve il firmware {GipMinFirmware} o successivo, che accende il controller e filtra i messaggi di stato.");
+        d.Notes.Add(L.F("xinput.note.gip", GipMinFirmware));
         return d;
     }
 
@@ -148,19 +148,19 @@ public static class XInputLayout
             Btn("btn_rb", "RB", 3, 0x02),
             Btn("btn_back", "Back", 2, 0x20),
             Btn("btn_start", "Start", 2, 0x10),
-            Btn("btn_ls", "Click stick sinistro", 2, 0x40),
-            Btn("btn_rs", "Click stick destro", 2, 0x80),
+            Btn("btn_ls", L.T("xinput.lsclick"), 2, 0x40),
+            Btn("btn_rs", L.T("xinput.rsclick"), 2, 0x80),
             Btn("btn_guide", "Guide", 3, 0x04),
             // Triggers (0..255): bit 7 set = pressed more than half way
-            Btn("trg_lt", "LT (oltre metà corsa)", 4, 0x80),
-            Btn("trg_rt", "RT (oltre metà corsa)", 5, 0x80),
-            Stick("axis_lx", "Stick sinistro X", 7, 0x30),
-            Stick("axis_ly", "Stick sinistro Y", 9, 0x31),
-            Stick("axis_rx", "Stick destro X", 11, 0x33),
-            Stick("axis_ry", "Stick destro Y", 13, 0x34),
+            Btn("trg_lt", L.T("xinput.lt"), 4, 0x80),
+            Btn("trg_rt", L.T("xinput.rt"), 5, 0x80),
+            Stick("axis_lx", L.T("xinput.lx"), 7, 0x30),
+            Stick("axis_ly", L.T("xinput.ly"), 9, 0x31),
+            Stick("axis_rx", L.T("xinput.rx"), 11, 0x33),
+            Stick("axis_ry", L.T("xinput.ry"), 13, 0x34),
         };
         var d = new PadDescription { Controls = c, UsesReportIds = false, IsXInput = true };
-        d.Notes.Add("Pad XInput: layout nativo del report a 20 byte (quello che riceve l'ESP32), non il report HID mostrato da Windows.");
+        d.Notes.Add(L.T("xinput.note.360"));
         return d;
     }
 
@@ -188,6 +188,6 @@ public static class XInputLayout
     {
         Id = id, Name = name, Kind = ControlKind.Axis, ByteIndex = highByte, Mask = 0xFF, AxisUsage = usage,
         Signed = true, UpIsPositive = usage is 0x31 or 0x34,
-        Note = $"Stick con segno: regole S</S> (firmware {Model.FirmwareLimits.SignedOpsMinFirmware} o successivo).",
+        Note = L.F("xinput.signednote", Model.FirmwareLimits.SignedOpsMinFirmware),
     };
 }

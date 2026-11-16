@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Core.Formats;
 
@@ -76,14 +77,14 @@ public static class HeaderImporter
 
         var block = Regex.Match(text, @"JM_JOY_RULES\[\]\s*=\s*\{(.*?)\};", RegexOptions.Singleline);
         if (!block.Success)
-            throw new FormatException("JM_JOY_RULES non trovato: non sembra un JoystickMapping.h del configuratore.");
+            throw new FormatException(L.T("fmt.norules"));
 
         var ruleRx = new Regex(@"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(JM_\w+)\s*,\s*(JM_\w+)\s*\}");
         foreach (Match m in ruleRx.Matches(StripComments(block.Groups[1].Value)))
         {
             string opName = m.Groups[3].Value, funcName = m.Groups[4].Value;
-            if (!Ops.TryGetValue(opName, out var op)) { result.Notes.Add($"Operatore sconosciuto {opName}: regola ignorata."); continue; }
-            if (!Funcs.TryGetValue(funcName, out var fn)) { result.Notes.Add($"Funzione sconosciuta {funcName}: regola ignorata."); continue; }
+            if (!Ops.TryGetValue(opName, out var op)) { result.Notes.Add(L.F("fmt.unknownop", opName)); continue; }
+            if (!Funcs.TryGetValue(funcName, out var fn)) { result.Notes.Add(L.F("fmt.unknownfunc", funcName)); continue; }
             p.Rules.Add(new JmRule(byte.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture),
                                    byte.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture), op, fn));
         }
@@ -92,14 +93,13 @@ public static class HeaderImporter
         {
             foreach (var b in ParseByteArray(text, "JM_MOUSE_X_INDEXES")) p.AnalogX.Add(b);
             foreach (var b in ParseByteArray(text, "JM_MOUSE_Y_INDEXES")) p.AnalogY.Add(b);
-            result.Notes.Add("Assi analogici importati: nel .h compilato valgono solo in modalità mouse, " +
-                             "con SAVE (motore dinamico) valgono anche come direzioni del joystick.");
+            result.Notes.Add(L.T("fmt.analog"));
         }
 
         if (gen == HeaderGenerator.LegacyWebHid)
-            result.Notes.Add("File del vecchio configuratore (config.html): non ha WEB_META, il configuratore web attuale non può importarlo.");
+            result.Notes.Add(L.T("fmt.legacy"));
         if (gen == HeaderGenerator.SmartWebConfigurator && result.WebMeta.Count == 0)
-            result.Notes.Add("WEB_META vuoto: il file è stato esportato senza mappature.");
+            result.Notes.Add(L.T("fmt.emptymeta"));
 
         return result;
     }

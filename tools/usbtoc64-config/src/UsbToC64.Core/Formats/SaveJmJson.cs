@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Core.Formats;
 
@@ -39,7 +40,7 @@ public static class SaveJmJson
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
         if (root.TryGetProperty("cmd", out var cmd) && cmd.GetString() != "save_jm")
-            throw new FormatException($"Comando JSON non supportato: {cmd.GetString()}");
+            throw new FormatException(L.F("fmt.badcmd", cmd.GetString()));
 
         var p = new JmProfile
         {
@@ -55,7 +56,7 @@ public static class SaveJmJson
             if (root.TryGetProperty("analog_y", out var ay)) foreach (var v in ay.EnumerateArray()) p.AnalogY.Add((byte)v.GetInt32());
         }
         if (!root.TryGetProperty("rules", out var rules))
-            throw new FormatException("Manca \"rules\": il firmware ignorerebbe il comando.");
+            throw new FormatException(L.T("fmt.norulesjson"));
         foreach (var r in rules.EnumerateArray())
         {
             p.Rules.Add(new JmRule(

@@ -3,7 +3,9 @@ namespace UsbToC64.Core.Text;
 /// <summary>Texts of UsbToC64.Core, UsbToC64.Input and UsbToC64.Device (messages shown by the App and the CLI).</summary>
 public static partial class CoreStrings
 {
-    public static IEnumerable<Tr> All => Common;
+    public static IEnumerable<Tr> All =>
+        Common.Concat(Validation).Concat(Firmware).Concat(Protocol).Concat(Settings)
+              .Concat(Pad).Concat(Formats).Concat(Serial).Concat(Flash);
 
     private static readonly Tr[] Common =
     {

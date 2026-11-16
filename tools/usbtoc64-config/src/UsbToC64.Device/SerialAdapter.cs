@@ -3,12 +3,13 @@ using System.Text;
 using Microsoft.Win32;
 using UsbToC64.Core.Device;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Text;
 
 namespace UsbToC64.Device;
 
 public sealed record AdapterPortInfo(string PortName, string Description, bool IsEspressif)
 {
-    public override string ToString() => IsEspressif ? $"{PortName} — {Description}" : $"{PortName} — {Description} (non ESP32)";
+    public override string ToString() => IsEspressif ? $"{PortName} — {Description}" : L.F("serial.portnotesp", PortName, Description);
 }
 
 public static class AdapterPorts
@@ -53,7 +54,7 @@ public static class AdapterPorts
         }
 
         foreach (var p in present.Where(p => !known.Contains(p)))
-            result.Add(new AdapterPortInfo(p, "porta seriale", false));
+            result.Add(new AdapterPortInfo(p, L.T("serial.port"), false));
 
         return result.OrderByDescending(p => p.IsEspressif).ThenBy(p => p.PortName, StringComparer.OrdinalIgnoreCase).ToList();
     }
@@ -64,16 +65,15 @@ public static class AdapterPorts
         var all = List();
         if (!string.IsNullOrWhiteSpace(requested))
             return all.FirstOrDefault(p => string.Equals(p.PortName, requested, StringComparison.OrdinalIgnoreCase))
-                   ?? throw new InvalidOperationException($"La porta {requested} non è presente.");
+                   ?? throw new InvalidOperationException(L.F("serial.notpresent", requested));
         var esp = all.Where(p => p.IsEspressif).ToList();
         return esp.Count switch
         {
             1 => esp[0],
             0 => throw new InvalidOperationException(
-                "Adattatore non trovato: nessuna porta ESP32 (VID 303A). Collegalo al PC con la USB-C, senza il C64/Amiga, " +
-                "oppure indica la porta a mano."),
+                L.T("serial.notfound")),
             _ => throw new InvalidOperationException(
-                $"Trovati {esp.Count} ESP32 ({string.Join(", ", esp.Select(p => p.PortName))}): indica la porta a mano."),
+                L.F("serial.multiple", esp.Count, string.Join(", ", esp.Select(p => p.PortName)))),
         };
     }
 }
@@ -147,8 +147,8 @@ public sealed class SerialAdapterPort : IAdapterPort
         }
         sp.Dispose();
         throw new IOException(last is UnauthorizedAccessException
-            ? $"La porta {Name} è occupata da un altro programma (terminale seriale, browser con il configuratore web…)."
-            : $"Impossibile aprire {Name}: {last?.Message}", last);
+            ? L.F("serial.busy", Name)
+            : L.F("serial.cannotopen", Name, last?.Message), last);
     }
 }
 
@@ -182,7 +182,7 @@ internal sealed class SerialLink : IAdapterLink
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
         {
             Lost = true;
-            throw new IOException($"Invio non riuscito su {Name}: {ex.Message}", ex);
+            throw new IOException(L.F("serial.sendfailed", Name, ex.Message), ex);
         }
     }
 
