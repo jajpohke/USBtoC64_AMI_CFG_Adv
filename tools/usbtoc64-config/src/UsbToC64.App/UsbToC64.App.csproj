@@ -9,7 +9,6 @@
     <Nullable>enable</Nullable>
     <AssemblyName>USBtoC64Config</AssemblyName>
     <RootNamespace>UsbToC64.App</RootNamespace>
-    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
