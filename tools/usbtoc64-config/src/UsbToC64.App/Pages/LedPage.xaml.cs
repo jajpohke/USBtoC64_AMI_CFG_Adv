@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using UsbToC64.App.Services;
 using UsbToC64.Core.Device;
+using UsbToC64.Core.Text;
 using MessageBox = System.Windows.MessageBox;
 
 namespace UsbToC64.App.Pages;
@@ -34,7 +35,7 @@ public partial class LedPage : UserControl
 {
     private readonly MainWindow _w;
     private AdapterHub Hub => _w.Hub;
-    private readonly List<LedSlotRow> _rows;
+    private List<LedSlotRow> _rows = new();
     private bool _loadedOnce;
 
     public LedPage(MainWindow w)
@@ -42,14 +43,26 @@ public partial class LedPage : UserControl
         InitializeComponent();
         _w = w;
         OpPanel.Attach(Hub);
+        BuildRows();
+        Show(LedSettings.Default);
+        // Event and colour names come from the Core: rebuild the rows (keeping the choices) when the language changes.
+        L.Changed += () => Dispatcher.BeginInvoke(() =>
+        {
+            var current = _rows.ToDictionary(r => r.Slot.Key, r => r.Selected.Hex);
+            BuildRows();
+            foreach (var r in _rows) r.Set(current[r.Slot.Key]);
+        });
+        Hub.BusyChanged += busy => Dispatcher.BeginInvoke(() => LoadBtn.IsEnabled = SaveBtn.IsEnabled = ResetBtn.IsEnabled = !busy);
+        IsVisibleChanged += async (_, e) => { if ((bool)e.NewValue && !_loadedOnce && Hub.Status.Info != null) await LoadAsync(); };
+    }
+
+    private void BuildRows()
+    {
         var palette = LedSettings.Palette
             .Select(p => new LedColor(p.Hex, p.Name, new SolidColorBrush((Color)ColorConverter.ConvertFromString(p.Hex))))
             .ToList();
         _rows = LedSettings.Slots.Select(s => new LedSlotRow(s, palette, LedSettings.Default.Colors[s.Key])).ToList();
         Slots.ItemsSource = _rows;
-        Show(LedSettings.Default);
-        Hub.BusyChanged += busy => Dispatcher.BeginInvoke(() => LoadBtn.IsEnabled = SaveBtn.IsEnabled = ResetBtn.IsEnabled = !busy);
-        IsVisibleChanged += async (_, e) => { if ((bool)e.NewValue && !_loadedOnce && Hub.Status.Info != null) await LoadAsync(); };
     }
 
     private void Show(LedSettings l)
@@ -65,15 +78,15 @@ public partial class LedPage : UserControl
     private async Task LoadAsync()
     {
         if (Hub.IsBusy) return;
-        OpPanel.Begin("Lettura dei colori LED");
+        OpPanel.Begin(L.T("led.op.read"));
         try
         {
-            Show(await Hub.SessionAsync("Lettura impostazioni LED", s => s.GetLed()));
+            Show(await Hub.SessionAsync(L.T("led.session.read"), s => s.GetLed()));
             _loadedOnce = true;
-            OpPanel.End("Colori letti");
-            Result.Text = $"Letti dall'adattatore alle {DateTime.Now:HH:mm}.";
+            OpPanel.End(L.T("led.read.done"));
+            Result.Text = L.F("led.readAt", DateTime.Now.ToString("HH:mm"));
         }
-        catch (Exception ex) { OpPanel.End("Lettura non riuscita"); Result.Text = ex.Message; }
+        catch (Exception ex) { OpPanel.End(L.T("led.read.failed")); Result.Text = ex.Message; }
     }
 
     private async void Load_Click(object sender, RoutedEventArgs e) => await LoadAsync();
@@ -82,30 +95,30 @@ public partial class LedPage : UserControl
     {
         if (Hub.IsBusy) return;
         var l = Current();
-        OpPanel.Begin("Salvataggio dei colori LED");
+        OpPanel.Begin(L.T("led.op.save"));
         try
         {
-            await Hub.SessionAsync("Salvataggio impostazioni LED", s => { s.SaveLed(l); return true; });
-            OpPanel.End("Colori salvati");
-            Result.Text = $"Salvati sull'adattatore alle {DateTime.Now:HH:mm}: il LED li usa subito.";
+            await Hub.SessionAsync(L.T("led.session.save"), s => { s.SaveLed(l); return true; });
+            OpPanel.End(L.T("led.save.done"));
+            Result.Text = L.F("led.savedAt", DateTime.Now.ToString("HH:mm"));
         }
-        catch (Exception ex) { OpPanel.End("Salvataggio non riuscito"); Result.Text = ex.Message; }
+        catch (Exception ex) { OpPanel.End(L.T("led.save.failed")); Result.Text = ex.Message; }
     }
 
     private async void Reset_Click(object sender, RoutedEventArgs e)
     {
         if (Hub.IsBusy) return;
-        if (MessageBox.Show(_w, "Ripristinare i colori e il formato LED predefiniti? L'adattatore si riavvia.",
-                "Ripristina predefiniti", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
-        OpPanel.Begin("Ripristino dei colori predefiniti");
+        if (MessageBox.Show(_w, L.T("led.reset.confirm"),
+                L.T("led.reset.title"), MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+        OpPanel.Begin(L.T("led.op.reset"));
         try
         {
-            await Hub.SessionAsync("Ripristino impostazioni LED", s => { s.ResetLed(); return true; });
+            await Hub.SessionAsync(L.T("led.session.reset"), s => { s.ResetLed(); return true; });
             Show(LedSettings.Default);
-            OpPanel.End("Colori predefiniti ripristinati");
-            Result.Text = "Colori predefiniti ripristinati. L'adattatore si sta riavviando.";
+            OpPanel.End(L.T("led.reset.done"));
+            Result.Text = L.T("led.reset.result");
         }
-        catch (Exception ex) { OpPanel.End("Ripristino non riuscito"); Result.Text = ex.Message; }
+        catch (Exception ex) { OpPanel.End(L.T("led.reset.failed")); Result.Text = ex.Message; }
         await Task.Delay(4000);
         await _w.CheckAdapterAsync();
     }

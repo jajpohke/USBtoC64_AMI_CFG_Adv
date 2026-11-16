@@ -2,32 +2,33 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-             xmlns:c="clr-namespace:UsbToC64.App.Controls">
+             xmlns:c="clr-namespace:UsbToC64.App.Controls"
+             xmlns:l="clr-namespace:UsbToC64.App.Loc">
     <DockPanel Margin="24,18,24,16">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <ui:Button x:Name="CheckBtn" Content="Controlla" Icon="{ui:SymbolIcon ArrowSync24}" Margin="0,0,8,0" Click="Check_Click" />
-                <ui:Button x:Name="FileBtn" Content="Installa da file…" Icon="{ui:SymbolIcon FolderOpen24}" Margin="0,0,8,0" Click="File_Click" />
-                <ui:Button x:Name="UpdateBtn" Content="Aggiorna firmware…" Icon="{ui:SymbolIcon ArrowUpload24}" Appearance="Primary" Click="Update_Click" />
+                <ui:Button x:Name="CheckBtn" Content="{l:T fwp.check}" Icon="{ui:SymbolIcon ArrowSync24}" Margin="0,0,8,0" Click="Check_Click" />
+                <ui:Button x:Name="FileBtn" Content="{l:T fwp.installFile}" Icon="{ui:SymbolIcon FolderOpen24}" Margin="0,0,8,0" Click="File_Click" />
+                <ui:Button x:Name="UpdateBtn" Content="{l:T fwp.update}" Icon="{ui:SymbolIcon ArrowUpload24}" Appearance="Primary" Click="Update_Click" />
             </StackPanel>
-            <TextBlock Text="Firmware" Style="{StaticResource PageTitle}" VerticalAlignment="Center" />
+            <TextBlock Text="{l:T fwp.title}" Style="{StaticResource PageTitle}" VerticalAlignment="Center" />
         </DockPanel>
 
         <c:OperationPanel x:Name="OpPanel" DockPanel.Dock="Bottom" Margin="0,10,0,0" />
 
         <StackPanel>
-            <ui:InfoBar x:Name="StatusBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Stato" Margin="0,0,0,12" />
+            <ui:InfoBar x:Name="StatusBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="{l:T fwp.status}" Margin="0,0,0,12" />
             <UniformGrid Columns="2" Margin="0,0,0,12">
                 <ui:Card Margin="0,0,6,0" VerticalContentAlignment="Top">
                     <StackPanel>
-                        <TextBlock Text="Sull'adattatore" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{l:T fwp.onBoard}" Style="{StaticResource CardTitle}" />
                         <TextBlock x:Name="OnBoard" FontSize="20" FontWeight="SemiBold" Text="—" />
                         <TextBlock x:Name="OnBoardDetail" Style="{StaticResource Hint}" Margin="0,6,0,0" />
                     </StackPanel>
                 </ui:Card>
                 <ui:Card Margin="6,0,0,0" VerticalContentAlignment="Top">
                     <StackPanel>
-                        <TextBlock Text="Incluso nel programma" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{l:T fwp.included}" Style="{StaticResource CardTitle}" />
                         <TextBlock x:Name="Included" FontSize="20" FontWeight="SemiBold" Text="—" />
                         <TextBlock x:Name="IncludedDetail" Style="{StaticResource Hint}" Margin="0,6,0,0" />
                     </StackPanel>
@@ -35,11 +36,11 @@
             </UniformGrid>
             <ui:Card VerticalContentAlignment="Top">
                 <StackPanel>
-                    <TextBlock Text="Prima di aggiornare" Style="{StaticResource CardTitle}" />
-                    <TextBlock Style="{StaticResource Hint}" FontSize="13" Text="• L'aggiornamento cancella TUTTE le impostazioni salvate sull'adattatore (profilo pad, mouse, LED, Developer Mode, inversione dello switch), come «erase all» dalla pagina web." />
-                    <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0" Text="• L'adattatore va collegato solo al PC con la USB-C, non al C64/Amiga. Non scollegarlo durante l'aggiornamento." />
-                    <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0" Text="• «Installa da file…» scrive un'immagine completa a scelta (per esempio il firmware di Emanuele) all'indirizzo 0x0. Un firmware diverso può non rispondere ai comandi di questo programma." />
-                    <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0" Text="• Se l'aggiornamento si interrompe e l'adattatore non risponde: tieni premuto BOOT mentre colleghi la USB-C e ripeti l'aggiornamento." />
+                    <TextBlock Text="{l:T fwp.before.title}" Style="{StaticResource CardTitle}" />
+                    <TextBlock Style="{StaticResource Hint}" FontSize="13" Text="{l:T fwp.before.erase}" />
+                    <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0" Text="{l:T fwp.before.usb}" />
+                    <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0" Text="{l:T fwp.before.file}" />
+                    <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0" Text="{l:T fwp.before.boot}" />
                 </StackPanel>
             </ui:Card>
         </StackPanel>
