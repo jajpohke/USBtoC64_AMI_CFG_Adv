@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
 using UsbToC64.App.Services;
+using UsbToC64.Core.Text;
 using MessageBox = System.Windows.MessageBox;
 
 namespace UsbToC64.App.Pages;
@@ -42,6 +43,7 @@ public partial class TerminalPage : UserControl
         Hub.TerminalStateChanged += () => Dispatcher.BeginInvoke(UpdateState);
         // Operations started from the other sections appear here too, so the whole exchange is in one place.
         Hub.LogLine += line => Dispatcher.BeginInvoke(() => { if (Hub.TerminalConnected || Hub.IsBusy) Append("· " + line); });
+        L.Changed += () => Dispatcher.BeginInvoke(UpdateState);
         UpdateState();
     }
 
@@ -55,9 +57,11 @@ public partial class TerminalPage : UserControl
     private void UpdateState()
     {
         bool on = Hub.TerminalConnected;
-        StateText.Text = on ? $"● Collegato · {Hub.TerminalPort} · 115200" : "Scollegato";
-        ConnectBtn.Content = on ? "Disconnetti" : "Connetti";
+        StateText.Text = on ? L.F("term.state.connected", Hub.TerminalPort) : L.T("term.state.disconnected");
+        ConnectBtn.Content = L.T(on ? "term.disconnect" : "term.connect");
         ConnectBtn.Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = on ? Wpf.Ui.Controls.SymbolRegular.PlugDisconnected24 : Wpf.Ui.Controls.SymbolRegular.PlugConnected24 };
+        // Formatted (not {l:T}) because the text contains literal braces.
+        Input.PlaceholderText = L.F("term.input.placeholder");
         // The input is always available: sending connects the terminal if needed.
     }
 
@@ -68,7 +72,7 @@ public partial class TerminalPage : UserControl
             if (Hub.TerminalConnected) Hub.DisconnectTerminal();
             else Hub.ConnectTerminal();
         }
-        catch (Exception ex) { Append($"(impossibile collegarsi: {ex.Message})"); }
+        catch (Exception ex) { Append(L.F("term.connectFailed", ex.Message)); }
         UpdateState();
         if (Hub.TerminalConnected) Input.Focus();
     }
@@ -82,11 +86,11 @@ public partial class TerminalPage : UserControl
         if (!Hub.TerminalConnected)
         {
             try { Hub.ConnectTerminal(); UpdateState(); }
-            catch (Exception ex) { Append($"(impossibile collegarsi: {ex.Message})"); return; }
+            catch (Exception ex) { Append(L.F("term.connectFailed", ex.Message)); return; }
         }
         if (!Confirm(text)) return;
         try { Hub.SendTerminal(text); }
-        catch (Exception ex) { Append($"(invio non riuscito: {ex.Message})"); }
+        catch (Exception ex) { Append(L.F("term.sendFailed", ex.Message)); }
         if (_history.Count == 0 || _history[^1] != text) _history.Add(text);
         _historyPos = _history.Count;
         Input.Clear();
@@ -98,15 +102,14 @@ public partial class TerminalPage : UserControl
         string c = cmd.ToLowerInvariant();
         string? msg = null;
         if (c.StartsWith("devmode on"))
-            msg = "Con «devmode on» l'adattatore si riavvia in Developer Mode e la seriale passa ai pin 43/44: dalla USB-C " +
-                  "il terminale non riceverà più niente. Per tornare indietro serve la seriale sui pin 43/44 («devmode off»).\n\nInviare comunque?";
+            msg = L.T("term.confirm.devmode");
         else if (c == "reboot")
-            msg = "L'adattatore si riavvia. Il terminale si ricollega da solo appena torna disponibile.\n\nInviare?";
+            msg = L.T("term.confirm.reboot");
         else if (c == "flash")
-            msg = "Il comando «flash» del firmware cambia lo stato della scheda. Per aggiornare il firmware usa la sezione Firmware.\n\nInviare comunque?";
+            msg = L.T("term.confirm.flash");
         else if (c.Contains("factory_reset") || c.Contains("clear_mem"))
-            msg = "Il comando cancella impostazioni salvate sull'adattatore.\n\nInviare comunque?";
-        return msg == null || MessageBox.Show(_w, msg, "Conferma comando", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+            msg = L.T("term.confirm.erase");
+        return msg == null || MessageBox.Show(_w, msg, L.T("term.confirm.title"), MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
     }
 
     private void Input_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -129,7 +132,7 @@ public partial class TerminalPage : UserControl
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new SaveFileDialog { Filter = "Testo (*.txt)|*.txt", FileName = $"usbtoc64-terminale-{DateTime.Now:yyyyMMdd-HHmm}.txt" };
+        var dlg = new SaveFileDialog { Filter = L.T("term.save.filter"), FileName = $"usbtoc64-terminale-{DateTime.Now:yyyyMMdd-HHmm}.txt" };
         if (dlg.ShowDialog(_w) == true) File.WriteAllText(dlg.FileName, _text.ToString());
     }
 }

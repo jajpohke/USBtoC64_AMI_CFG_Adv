@@ -1,5 +1,6 @@
 using UsbToC64.Core.Device;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Text;
 using UsbToC64.Device;
 
 namespace UsbToC64.App.Services;
@@ -51,7 +52,7 @@ public sealed class AdapterHub : IDisposable
     public AdapterHub()
     {
         try { Manifest = FirmwareManifest.FindNextTo(AppContext.BaseDirectory); }
-        catch (Exception ex) { Log($"firmware.json non leggibile: {ex.Message}"); }
+        catch (Exception ex) { Log(L.F("hub.manifest.unreadable", ex.Message)); }
     }
 
     // ------------------------------------------------------------------ log
@@ -106,11 +107,11 @@ public sealed class AdapterHub : IDisposable
         try
         {
             var port = FindPort();
-            Log($"--- {title} su {port}");
+            Log(L.F("hub.op.start", title, port));
             if (_termLink != null)
             {
                 resumePort = _termPort;
-                StopTerminal("(terminale in pausa: operazione in corso)");
+                StopTerminal(L.T("hub.term.paused"));
             }
             return await Task.Run(() => work(port.PortName));
         }
@@ -119,7 +120,7 @@ public sealed class AdapterHub : IDisposable
             if (resumePort != null)
             {
                 try { StartTerminal(resumePort); }
-                catch (Exception ex) { TerminalLine?.Invoke($"(terminale non riaperto: {ex.Message})"); }
+                catch (Exception ex) { TerminalLine?.Invoke(L.F("hub.term.notReopened", ex.Message)); }
             }
             _op.Release();
             BusyChanged?.Invoke(false);
@@ -133,11 +134,11 @@ public sealed class AdapterHub : IDisposable
         try { portName = FindPort().PortName; } catch (Exception) { /* reported below */ }
         try
         {
-            var s = await Run("Controllo adattatore", portName =>
+            var s = await Run(L.T("hub.op.check"), portName =>
             {
                 using var conn = AdapterConnection.Connect(PortFor(portName), Log);
                 var fw = conn.Session.GetFirmware();
-                Log($"Sull'adattatore: {fw}");
+                Log(L.F("hub.check.onAdapter", fw));
                 JmProfile? pad = null;
                 bool known = false;
                 if (!fw.IsOriginal)
@@ -172,7 +173,7 @@ public sealed class AdapterHub : IDisposable
 
     /// <summary>esptool identifies the chip on the port (nothing written).</summary>
     public Task<(bool Found, string Description)> ProbeChipAsync() =>
-        Run("Identificazione del chip", portName =>
+        Run(L.T("hub.op.probe"), portName =>
         {
             _ports.Remove(portName);
             return new FirmwareUpdater(Log).ProbeChip(portName);
@@ -183,7 +184,7 @@ public sealed class AdapterHub : IDisposable
         FlashResult r;
         try
         {
-            r = await Run("Installazione firmware da file", portName =>
+            r = await Run(L.T("hub.op.flashFile"), portName =>
             {
                 _ports.Remove(portName);
                 return new FirmwareUpdater(Log).UpdateFromFile(portName, binPath);
@@ -199,7 +200,7 @@ public sealed class AdapterHub : IDisposable
         WriteResult r;
         try
         {
-            r = await Run("Scrittura del profilo", portName =>
+            r = await Run(L.T("hub.op.write"), portName =>
                 new AdapterWriter(PortFor(portName), Log).WriteAndVerify(profile));
         }
         catch (Exception ex) { r = new WriteResult(false, false, null, new(), ex.Message); }
@@ -211,7 +212,7 @@ public sealed class AdapterHub : IDisposable
 
     public async Task<StoredProfile> ReadAsync()
     {
-        var s = await Run("Lettura del profilo", portName =>
+        var s = await Run(L.T("hub.op.read"), portName =>
         {
             using var conn = AdapterConnection.Connect(PortFor(portName), Log);
             return conn.Session.ReadStored();
@@ -222,12 +223,12 @@ public sealed class AdapterHub : IDisposable
 
     public async Task<FlashResult> FlashAsync()
     {
-        if (Manifest == null) return new FlashResult(false, "Questo programma non include un firmware (manca firmware.json).");
+        if (Manifest == null) return new FlashResult(false, L.T("hub.noFirmware"));
         var m = Manifest;
         FlashResult r;
         try
         {
-            r = await Run("Aggiornamento firmware", portName =>
+            r = await Run(L.T("hub.op.flash"), portName =>
             {
                 _ports.Remove(portName); // the board restarts: forget the DTR/RTS combination learnt before
                 return new FirmwareUpdater(Log).Update(portName, m);
@@ -246,7 +247,7 @@ public sealed class AdapterHub : IDisposable
         StartTerminal(FindPort().PortName);
     }
 
-    public void DisconnectTerminal() => StopTerminal("(terminale scollegato)");
+    public void DisconnectTerminal() => StopTerminal(L.T("hub.term.disconnected"));
 
     private void StartTerminal(string portName)
     {
@@ -255,7 +256,7 @@ public sealed class AdapterHub : IDisposable
         _termLink = link;
         _termPort = portName;
         _termStop = false;
-        TerminalLine?.Invoke($"(collegato a {link.Name})");
+        TerminalLine?.Invoke(L.F("hub.term.connected", link.Name));
         _termThread = new Thread(() =>
         {
             var current = link;
@@ -266,7 +267,7 @@ public sealed class AdapterHub : IDisposable
                 if (!current.Lost) continue;
 
                 // The adapter restarted (reboot, USB reconnection at boot): reconnect like a serial monitor.
-                TerminalLine?.Invoke("(porta persa: attendo che l'adattatore torni disponibile…)");
+                TerminalLine?.Invoke(L.T("hub.term.lost"));
                 current.Dispose();
                 var until = DateTime.UtcNow + TimeSpan.FromSeconds(30);
                 IAdapterLink? reopened = null;
@@ -280,14 +281,14 @@ public sealed class AdapterHub : IDisposable
                 }
                 if (reopened == null)
                 {
-                    if (!_termStop) TerminalLine?.Invoke("(adattatore non tornato: terminale scollegato)");
+                    if (!_termStop) TerminalLine?.Invoke(L.T("hub.term.notBack"));
                     _termLink = null; _termPort = null;
                     TerminalStateChanged?.Invoke();
                     return;
                 }
                 current = reopened;
                 _termLink = reopened;
-                TerminalLine?.Invoke($"(ricollegato a {reopened.Name})");
+                TerminalLine?.Invoke(L.F("hub.term.reconnected", reopened.Name));
             }
         })
         { IsBackground = true, Name = "Terminal" };
@@ -310,7 +311,7 @@ public sealed class AdapterHub : IDisposable
 
     public void SendTerminal(string line)
     {
-        if (_termLink == null) throw new InvalidOperationException("Terminale non collegato.");
+        if (_termLink == null) throw new InvalidOperationException(L.T("hub.term.notConnected"));
         TerminalLine?.Invoke("> " + line);
         _termLink.SendLine(line);
     }
