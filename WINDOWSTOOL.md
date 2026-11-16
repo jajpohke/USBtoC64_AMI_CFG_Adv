@@ -86,7 +86,7 @@ verify it**.
 When you see **Done! Profile saved and verified.**, unplug the adapter from the PC and connect it to the
 C64/Amiga together with the controller.
 
-<!-- TODO screenshot: images/windowstool/simple-4-done.png -->
+![Done](images/windowstool/simple-4-done.png)
 
 ---
 
