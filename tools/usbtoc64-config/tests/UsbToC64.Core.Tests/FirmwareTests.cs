@@ -29,7 +29,7 @@ public class FirmwareTests
     public void Check_SameVersionDifferentBuild_IsUpdate_SameBuildIsNot()
     {
         var onBoard = new AdapterFirmware(FirmwareVersion.Parse("1.2.1"), "abc1234", false);
-        Assert.Equal(FirmwareStatus.UpdateAvailable, FirmwareCheck.Compare(onBoard, Manifest("1.2.1", "def5678")));
+        Assert.Equal(FirmwareStatus.OtherBuild, FirmwareCheck.Compare(onBoard, Manifest("1.2.1", "def5678")));
         Assert.Equal(FirmwareStatus.UpToDate, FirmwareCheck.Compare(onBoard, Manifest("1.2.1", "abc1234")));
         Assert.Equal(FirmwareStatus.AdapterNewer, FirmwareCheck.Compare(onBoard, Manifest("1.2.0")));
     }

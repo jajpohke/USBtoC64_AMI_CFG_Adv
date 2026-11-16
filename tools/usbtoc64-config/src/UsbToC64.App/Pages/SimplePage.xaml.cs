@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using UsbToC64.App.Services;
 using UsbToC64.Core.Device;
 using UsbToC64.Core.Model;
+using UsbToC64.Core.Text;
 using UsbToC64.Core.Validation;
 using MessageBox = System.Windows.MessageBox;
 
@@ -46,6 +47,7 @@ public partial class SimplePage : UserControl
         Hub.StatusChanged += () => Dispatcher.BeginInvoke(() => { _statusSeen = true; Refresh(); });
         Hub.BusyChanged += _ => Dispatcher.BeginInvoke(Refresh);
         Session.Changed += () => Dispatcher.BeginInvoke(Refresh);
+        L.Changed += () => Dispatcher.BeginInvoke(Refresh);
         _timer.Tick += (_, _) =>
         {
             var snap = Session.Snapshot();
@@ -81,16 +83,16 @@ public partial class SimplePage : UserControl
         {
             _adapter = AdapterStep.Checking;
             SetNum(Num1, Num1Text, "1", CurBg, CurFg);
-            AdapterState.Text = "Verifica dell'adattatore in corso…";
+            AdapterState.Text = L.T("simple.adapter.checking");
             AdapterHint.Text = "";
         }
         else if (s.NoAnswer)
         {
             _adapter = AdapterStep.Blank;
             SetNum(Num1, Num1Text, "!", WarnBg, WarnFg);
-            AdapterState.Text = $"Adattatore vergine o in modalità download ({s.Port})";
-            AdapterHint.Text = "C'è un ESP32 pronto per essere scritto, ma non risponde ai comandi. Installa il firmware: la memoria verrà cancellata.";
-            if (m != null) { AdapterAction.Content = $"Installa firmware {m.Version}"; AdapterAction.Visibility = Visibility.Visible; }
+            AdapterState.Text = L.F("simple.adapter.blank", s.Port);
+            AdapterHint.Text = L.T("simple.adapter.blankHint");
+            if (m != null) { AdapterAction.Content = L.F("simple.adapter.install", m.Version); AdapterAction.Visibility = Visibility.Visible; }
             AdapterFile.Visibility = Visibility.Visible;
             AdapterRetry.Visibility = Visibility.Visible;
         }
@@ -98,34 +100,36 @@ public partial class SimplePage : UserControl
         {
             _adapter = AdapterStep.NotFound;
             SetNum(Num1, Num1Text, "✖", ErrBg, ErrFg);
-            AdapterState.Text = "Adattatore non trovato";
-            AdapterHint.Text = "Collegalo al PC con la USB-C, senza C64/Amiga, e chiudi gli altri programmi che usano la porta (IDE di Arduino, configuratore web).";
+            AdapterState.Text = L.T("simple.adapter.notFound");
+            AdapterHint.Text = L.T("simple.adapter.notFoundHint");
             AdapterRetry.Visibility = checking ? Visibility.Collapsed : Visibility.Visible;
         }
         else
         {
             var need = RequiredFirmware();
             bool tooOld = need != null && fw != null && (fw.IsOriginal || fw.Version < need);
-            bool update = fw != null && m != null && FirmwareCheck.Compare(fw, m) == FirmwareStatus.UpdateAvailable;
-            string fwText = fw == null ? "" : fw.IsOriginal ? "firmware originale" : $"firmware {fw.Version}";
+            var cmp = fw != null && m != null ? FirmwareCheck.Compare(fw, m) : (FirmwareStatus?)null;
+            bool update = cmp == FirmwareStatus.UpdateAvailable;
+            string fwText = fw == null ? "" : fw.IsOriginal ? L.T("simple.fw.original") : L.F("simple.fw.version", fw.Version);
             string mode = s.Info.IsAmiga ? "Amiga" : "C64";
             if (update || tooOld)
             {
                 _adapter = AdapterStep.NeedsUpdate;
                 SetNum(Num1, Num1Text, "!", WarnBg, WarnFg);
-                AdapterState.Text = $"Il firmware va aggiornato · USBtoC64 su {s.Port} · {fwText}";
+                AdapterState.Text = L.F("simple.adapter.needsUpdate", s.Port, fwText);
                 AdapterHint.Text = m == null
-                    ? $"Questo pad richiede il firmware {need}, ma il programma non ne include uno: usa «Installa da file…»."
-                    : $"Questo programma include il firmware {m.Version}. L'aggiornamento cancella le impostazioni salvate sull'adattatore.";
-                if (m != null) { AdapterAction.Content = "Aggiorna firmware"; AdapterAction.Visibility = Visibility.Visible; }
+                    ? L.F("simple.adapter.needsFile", need)
+                    : L.F("simple.adapter.updateHint", m.Version);
+                if (m != null) { AdapterAction.Content = L.T("simple.adapter.update"); AdapterAction.Visibility = Visibility.Visible; }
                 else AdapterFile.Visibility = Visibility.Visible;
             }
             else
             {
                 _adapter = AdapterStep.Ready;
                 SetNum(Num1, Num1Text, "✔", OkBg, OkFg);
-                AdapterState.Text = $"Pronto · USBtoC64 su {s.Port} · {fwText}" + (m != null && fw != null && !fw.IsOriginal ? " aggiornato" : "");
-                AdapterHint.Text = $"Collegato al PC con la USB-C. Modalità rilevata: {mode}.";
+                AdapterState.Text = L.F(cmp == FirmwareStatus.UpToDate ? "simple.adapter.readyUpToDate" : "simple.adapter.ready", s.Port, fwText);
+                AdapterHint.Text = L.F("simple.adapter.readyHint", mode)
+                                   + (cmp == FirmwareStatus.OtherBuild ? " " + L.F("simple.adapter.otherBuild", fw!.Build, m!.Build) : "");
             }
         }
 
@@ -137,7 +141,7 @@ public partial class SimplePage : UserControl
         {
             SetNum(Num2, Num2Text, "2", CurBg, CurFg);
             PadState.Foreground = WarnFg;
-            PadState.Text = "Nessun pad collegato al PC: collegalo e premi il pulsante di aggiornamento accanto all'elenco.";
+            PadState.Text = L.T("simple.pad.none");
         }
         else if (padProblem != null)
         {
@@ -151,7 +155,7 @@ public partial class SimplePage : UserControl
             bool same = s.StoredPadKnown && s.StoredPad != null && Session.Profile != null
                         && ProfileComparer.Compare(Session.Profile, s.StoredPad).Count == 0;
             PadState.Foreground = OkFg;
-            PadState.Text = same ? "Pronto · questo profilo è già salvato sull'adattatore." : "Pronto.";
+            PadState.Text = L.T(same ? "simple.pad.readySaved" : "simple.pad.ready");
         }
 
         // ---- step 3
@@ -159,8 +163,8 @@ public partial class SimplePage : UserControl
         SaveBtn.IsEnabled = canSave;
         if (!_saving && DoneCard.Visibility != Visibility.Visible)
             SetNum(Num3, Num3Text, "3", canSave ? CurBg : IdleBg, canSave ? CurFg : IdleFg);
-        SaveHint.Text = canSave || _saving ? "Il profilo viene scritto sull'adattatore e riletto per verifica."
-            : _adapter != AdapterStep.Ready ? "Prima completa il passo 1." : "Prima completa il passo 2.";
+        SaveHint.Text = L.T(canSave || _saving ? "simple.save.hint"
+            : _adapter != AdapterStep.Ready ? "simple.save.step1First" : "simple.save.step2First");
     }
 
     /// <summary>Why the selected pad cannot be saved, in plain words; null when it can.</summary>
@@ -168,13 +172,13 @@ public partial class SimplePage : UserControl
     {
         var p = Session.Profile;
         if (Session.Device == null) return null;
-        if (p == null || Session.Pad == null) return "Questo pad non è stato riconosciuto: prova la configurazione avanzata.";
+        if (p == null || Session.Pad == null) return L.T("simple.pad.unknown");
         var errors = Session.Issues.Where(i => i.Severity == Severity.Error).ToList();
         if (errors.Count > 0) return errors[0].Message;
         var need = RequiredFirmware();
         var fw = Hub.Status.Firmware;
         if (need != null && fw != null && (fw.IsOriginal || fw.Version < need))
-            return $"Questo pad richiede il firmware {need}: aggiorna prima il firmware al passo 1.";
+            return L.F("simple.pad.needsFw", need);
         return null;
     }
 
@@ -182,7 +186,7 @@ public partial class SimplePage : UserControl
     {
         _fillingCombo = true;
         PadCombo.Items.Clear();
-        if (Session.Devices.Count == 0) PadCombo.Items.Add("(nessun pad collegato al PC)");
+        if (Session.Devices.Count == 0) PadCombo.Items.Add(L.T("simple.pad.noneItem"));
         foreach (var d in Session.Devices) PadCombo.Items.Add($"{d.Name}   {d.Vid:X4}:{d.Pid:X4}");
         PadCombo.SelectedIndex = Session.Device == null ? 0 : Math.Max(0, Session.Devices.IndexOf(Session.Device));
         _fillingCombo = false;
@@ -217,14 +221,13 @@ public partial class SimplePage : UserControl
         var m = Hub.Manifest;
         if (m == null || Hub.IsBusy) return;
         if (MessageBox.Show(_w,
-                $"Installare il firmware {m.Version} sull'adattatore?\n\n" +
-                "Tutte le impostazioni salvate sull'adattatore verranno cancellate. Non scollegarlo durante l'aggiornamento.",
-                "Aggiorna firmware", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
-        AdapterState.Text = "Aggiornamento del firmware in corso: non scollegare l'adattatore…";
+                L.F("simple.update.confirm", m.Version),
+                L.T("simple.adapter.update"), MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
+        AdapterState.Text = L.T("simple.update.running");
         var r = await Hub.FlashAsync();
         await _w.CheckAdapterAsync(probeIfSilent: false);
         _w.RefreshFirmwareBar();
-        if (!r.Success) MessageBox.Show(_w, r.Message, "Aggiornamento firmware", MessageBoxButton.OK, MessageBoxImage.Error);
+        if (!r.Success) MessageBox.Show(_w, r.Message, L.T("simple.update.title"), MessageBoxButton.OK, MessageBoxImage.Error);
     }
 
     private async void AdapterFile_Click(object sender, RoutedEventArgs e)
@@ -257,7 +260,7 @@ public partial class SimplePage : UserControl
         else
         {
             SaveError.Text = r.Message + (r.Differences.Count > 0 ? "\n" + string.Join("\n", r.Differences.Select(d => "• " + d)) : "") +
-                             "\nI dettagli sono nel Registro (configurazione avanzata).";
+                             "\n" + L.T("simple.save.seeLog");
             SaveError.Visibility = Visibility.Visible;
             SetNum(Num3, Num3Text, "✖", ErrBg, ErrFg);
         }

@@ -27,6 +27,12 @@
     <ProjectReference Include="..\..\src\UsbToC64.Input\UsbToC64.Input.csproj" />
   </ItemGroup>
 
+  <!-- Texts of the App and the CLI are plain C#: compiled here too so that LocalizationTests can check them. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\UsbToC64.App\Strings\*.cs" Link="LinkedStrings\App\%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\UsbToC64.Cli\Strings\*.cs" Link="LinkedStrings\Cli\%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

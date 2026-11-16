@@ -7,6 +7,13 @@ public sealed class AppSettings
 {
     public bool StartAdvanced { get; set; }
 
+    /// <summary>"en", "it", "es", "de"; null = English (default).</summary>
+    public string? Language { get; set; }
+
+    private static AppSettings? _current;
+    /// <summary>The preferences of this run, loaded once.</summary>
+    public static AppSettings Current => _current ??= Load();
+
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "USBtoC64Config", "settings.json");
 

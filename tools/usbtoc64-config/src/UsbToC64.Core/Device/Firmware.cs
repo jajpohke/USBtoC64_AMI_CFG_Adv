@@ -88,7 +88,11 @@ public sealed class FirmwareManifest
     }
 }
 
-public enum FirmwareStatus { UpdateAvailable, UpToDate, AdapterNewer }
+/// <summary>
+/// UpdateAvailable: older version number. OtherBuild: same number, different build (development builds): offered
+/// in the advanced Firmware page but not required in the simple mode.
+/// </summary>
+public enum FirmwareStatus { UpdateAvailable, OtherBuild, UpToDate, AdapterNewer }
 
 public static class FirmwareCheck
 {
@@ -96,10 +100,10 @@ public static class FirmwareCheck
     {
         if (onAdapter.Version < available.Version) return FirmwareStatus.UpdateAvailable;
         if (onAdapter.Version > available.Version) return FirmwareStatus.AdapterNewer;
-        // Same number: a different build of the same version (development builds) still counts as an update.
+        // Same number: a different build of the same version (development builds).
         return !onAdapter.IsOriginal && !string.IsNullOrEmpty(available.Build) && !string.IsNullOrEmpty(onAdapter.Build)
                && onAdapter.Build != "local" && onAdapter.Build != available.Build
-            ? FirmwareStatus.UpdateAvailable
+            ? FirmwareStatus.OtherBuild
             : FirmwareStatus.UpToDate;
     }
 }

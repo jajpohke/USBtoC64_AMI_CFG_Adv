@@ -249,6 +249,7 @@ internal static class Program
         Console.WriteLine(FirmwareCheck.Compare(fw, m) switch
         {
             FirmwareStatus.UpdateAvailable => "→ aggiornamento disponibile: usbtoc64 flash",
+            FirmwareStatus.OtherBuild => $"→ stessa versione, build diversa ({fw.Build} → {m.Build}): usbtoc64 flash per installarla",
             FirmwareStatus.UpToDate => "→ aggiornato",
             _ => "→ sull'adattatore c'è un firmware più recente",
         });

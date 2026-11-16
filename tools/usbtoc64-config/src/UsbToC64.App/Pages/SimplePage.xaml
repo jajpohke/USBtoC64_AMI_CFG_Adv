@@ -2,7 +2,8 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-             xmlns:c="clr-namespace:UsbToC64.App.Controls">
+             xmlns:c="clr-namespace:UsbToC64.App.Controls"
+             xmlns:l="clr-namespace:UsbToC64.App.Loc">
     <UserControl.Resources>
         <Style x:Key="StepCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
@@ -38,11 +39,14 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Margin="0,0,0,18">
-                <TextBlock Text="Configura il tuo pad" FontSize="28" FontWeight="SemiBold" />
-                <TextBlock Style="{StaticResource Hint}" FontSize="14" Margin="0,4,0,0"
-                           Text="Tre passi: adattatore, pad, salva. Poi collega l'adattatore al C64/Amiga e gioca." />
-            </StackPanel>
+            <DockPanel Grid.Row="0" Margin="0,0,0,18">
+                <c:LanguagePicker DockPanel.Dock="Right" VerticalAlignment="Top" Margin="16,6,0,0" />
+                <StackPanel>
+                    <TextBlock Text="{l:T simple.title}" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Hint}" FontSize="14" Margin="0,4,0,0" TextWrapping="Wrap"
+                               Text="{l:T simple.subtitle}" />
+                </StackPanel>
+            </DockPanel>
 
             <!-- 1. Adapter -->
             <Border Grid.Row="1" Style="{StaticResource StepCard}">
@@ -51,13 +55,13 @@
                         <TextBlock x:Name="Num1Text" Text="1" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
                     </Border>
                     <StackPanel>
-                        <TextBlock Text="1 · Adattatore" Style="{StaticResource StepTitle}" />
+                        <TextBlock Text="{l:T simple.step1}" Style="{StaticResource StepTitle}" />
                         <TextBlock x:Name="AdapterState" TextWrapping="Wrap" FontSize="14" />
                         <TextBlock x:Name="AdapterHint" Style="{StaticResource Hint}" Margin="0,4,0,0" />
                         <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                             <ui:Button x:Name="AdapterAction" Appearance="Primary" Visibility="Collapsed" Margin="0,0,8,0" Click="AdapterAction_Click" />
-                            <ui:Button x:Name="AdapterFile" Content="Installa da file…" Visibility="Collapsed" Margin="0,0,8,0" Click="AdapterFile_Click" />
-                            <ui:Button x:Name="AdapterRetry" Content="Riprova" Icon="{ui:SymbolIcon ArrowSync24}" Visibility="Collapsed" Click="AdapterRetry_Click" />
+                            <ui:Button x:Name="AdapterFile" Content="{l:T simple.installFile}" Visibility="Collapsed" Margin="0,0,8,0" Click="AdapterFile_Click" />
+                            <ui:Button x:Name="AdapterRetry" Content="{l:T simple.retry}" Icon="{ui:SymbolIcon ArrowSync24}" Visibility="Collapsed" Click="AdapterRetry_Click" />
                             <ui:ProgressRing x:Name="AdapterRing" IsIndeterminate="True" Width="20" Height="20" Visibility="Collapsed" />
                         </StackPanel>
                     </StackPanel>
@@ -71,9 +75,9 @@
                         <TextBlock x:Name="Num2Text" Text="2" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
                     </Border>
                     <StackPanel>
-                        <TextBlock Text="2 · Pad da configurare" Style="{StaticResource StepTitle}" />
+                        <TextBlock Text="{l:T simple.step2}" Style="{StaticResource StepTitle}" />
                         <DockPanel Margin="0,2,0,10">
-                            <ui:Button DockPanel.Dock="Right" Icon="{ui:SymbolIcon ArrowSync24}" Margin="8,0,0,0" ToolTip="Aggiorna l'elenco dei pad" Click="RefreshPads_Click" />
+                            <ui:Button DockPanel.Dock="Right" Icon="{ui:SymbolIcon ArrowSync24}" Margin="8,0,0,0" ToolTip="{l:T simple.refreshPads}" Click="RefreshPads_Click" />
                             <ComboBox x:Name="PadCombo" MinHeight="36" SelectionChanged="PadCombo_SelectionChanged" />
                         </DockPanel>
                         <DockPanel x:Name="PreviewRow">
@@ -81,7 +85,7 @@
                                 <c:Db9Preview x:Name="Preview" Width="190" />
                             </Viewbox>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Hint}" FontSize="13" Text="Prova il pad: qui vedi cosa riceverà il C64/Amiga su porta DB9." />
+                                <TextBlock Style="{StaticResource Hint}" FontSize="13" Text="{l:T simple.tryPad}" />
                                 <TextBlock x:Name="PadState" TextWrapping="Wrap" Margin="0,10,0,0" FontSize="13.5" />
                             </StackPanel>
                         </DockPanel>
@@ -96,23 +100,29 @@
                         <TextBlock x:Name="Num3Text" Text="3" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
                     </Border>
                     <StackPanel>
-                        <TextBlock Text="3 · Salva" Style="{StaticResource StepTitle}" />
+                        <TextBlock Text="{l:T simple.step3}" Style="{StaticResource StepTitle}" />
                         <ui:Button x:Name="SaveBtn" Appearance="Primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                                    Height="56" FontSize="18" FontWeight="Bold" Icon="{ui:SymbolIcon ArrowUpload24}"
-                                   Content="Salva su USBtoC64" Click="Save_Click" />
+                                   Content="{l:T simple.save}" Click="Save_Click" />
                         <StackPanel x:Name="Saving" Orientation="Horizontal" Margin="0,10,0,0" Visibility="Collapsed">
                             <ui:ProgressRing IsIndeterminate="True" Width="18" Height="18" Margin="0,0,10,0" />
-                            <TextBlock Text="Scrittura e verifica in corso: non scollegare l'adattatore…" VerticalAlignment="Center" />
+                            <TextBlock Text="{l:T simple.saving}" VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBlock x:Name="SaveHint" Style="{StaticResource Hint}" Margin="0,8,0,0"
-                                   Text="Il profilo viene scritto sull'adattatore e riletto per verifica." />
+                        <TextBlock x:Name="SaveHint" Style="{StaticResource Hint}" Margin="0,8,0,0" TextWrapping="Wrap" />
+                        <!-- Theme colours (WPF-UI InfoBar success), readable in light and dark. -->
                         <Border x:Name="DoneCard" CornerRadius="8" Padding="14,10" Margin="0,10,0,0" Visibility="Collapsed"
-                                Background="#1F3328" BorderBrush="#2F5A3A" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="✔  Fatto! Profilo salvato e verificato." FontWeight="SemiBold" Foreground="#6CCB5F" />
-                                <TextBlock Text="Scollega l'adattatore dal PC e collegalo al C64/Amiga insieme al pad." Margin="0,4,0,0"
-                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                            </StackPanel>
+                                Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
+                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            <DockPanel>
+                                <ui:SymbolIcon DockPanel.Dock="Left" Symbol="CheckmarkCircle24" Filled="True" FontSize="20" Margin="0,0,10,0"
+                                               VerticalAlignment="Top" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+                                <StackPanel>
+                                    <TextBlock Text="{l:T simple.done.title}" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                    <TextBlock Text="{l:T simple.done.text}" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DockPanel>
                         </Border>
                         <TextBlock x:Name="SaveError" TextWrapping="Wrap" Margin="0,10,0,0" Foreground="#FF6B6B" Visibility="Collapsed" />
                     </StackPanel>
@@ -120,9 +130,9 @@
             </Border>
 
             <DockPanel Grid.Row="5" Margin="0,8,0,0">
-                <ui:Button DockPanel.Dock="Right" Content="Configurazione avanzata →" Appearance="Transparent"
+                <ui:Button DockPanel.Dock="Right" Content="{l:T simple.advanced}" Appearance="Transparent"
                            Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold" Click="Advanced_Click" />
-                <CheckBox x:Name="StartAdvanced" Content="Apri sempre in modalità avanzata" VerticalAlignment="Center"
+                <CheckBox x:Name="StartAdvanced" Content="{l:T simple.startAdvanced}" VerticalAlignment="Center"
                           Checked="StartAdvanced_Changed" Unchecked="StartAdvanced_Changed" />
             </DockPanel>
         </Grid>

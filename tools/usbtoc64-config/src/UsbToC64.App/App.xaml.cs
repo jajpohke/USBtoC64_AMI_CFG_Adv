@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
+using UsbToC64.App.Services;
+using UsbToC64.Core.Text;
 using Wpf.Ui.Appearance;
 
 namespace UsbToC64.App;
@@ -16,6 +18,10 @@ public partial class App : Application
         base.OnStartup(e);
         try
         {
+            // Program language: English unless chosen otherwise (saved in the preferences).
+            L.Add(AppStrings.All);
+            L.Set(AppSettings.Current.Language);
+
             // Follow the Windows light/dark theme.
             ApplicationThemeManager.ApplySystemTheme();
             var w = new MainWindow();
@@ -44,9 +50,9 @@ public partial class App : Application
         {
             var path = Path.Combine(AppContext.BaseDirectory, "USBtoC64Config-errore.txt");
             File.WriteAllText(path, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\n{text}");
-            text += $"\n\nDettagli salvati in: {path}";
+            text += "\n\n" + L.F("app.error.saved", path);
         }
         catch (Exception) { /* folder not writable */ }
-        MessageBox.Show(text, "USBtoC64 Config - errore imprevisto", MessageBoxButton.OK, MessageBoxImage.Error);
+        MessageBox.Show(text, L.T("app.error.title"), MessageBoxButton.OK, MessageBoxImage.Error);
     }
 }

@@ -52,6 +52,12 @@ public partial class FirmwarePage : UserControl
                     StatusBar.Message = $"Puoi installare il firmware {m.Version} (build {m.Build}).";
                     canUpdate = true;
                     break;
+                case FirmwareStatus.OtherBuild:
+                    StatusBar.Severity = InfoBarSeverity.Informational;
+                    StatusBar.Title = "Stessa versione, build diversa";
+                    StatusBar.Message = $"Sull'adattatore c'è il firmware {fw.Version} build {fw.Build}; il programma include la build {m.Build}. " +
+                                        "Non è necessario aggiornare, ma puoi installarla.";
+                    break;
                 case FirmwareStatus.UpToDate:
                     StatusBar.Severity = InfoBarSeverity.Success;
                     StatusBar.Title = "Firmware aggiornato";
