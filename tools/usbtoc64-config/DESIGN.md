@@ -186,7 +186,7 @@ Conseguenze:
 - Per i pad XInput il tool **non sniffa i byte**: usa la tabella sopra. La pressione dei tasti (via XInput API) serve solo a dire quale tasto fisico si vuole configurare.
 - D-pad e pulsanti: regole BITANY sui byte 2/3 → **supportati**.
 - Grilletti: BITANY `0x80` su byte 4/5 = premuto oltre metà corsa → **supportati come pulsanti**.
-- Stick: valori signed → **non supportati** con il firmware attuale (le soglie unsigned 64/190 non funzionano). Richiede un'estensione firmware (fuori da questa fase).
+- Stick: valori signed → supportati dal firmware **1.2.3** con le regole `S<`/`S>` (§7.1); con le versioni precedenti le soglie unsigned 64/190 non funzionano.
 - Xbox One/Series (GIP): supportati dal firmware **1.2.2** (vedi sotto).
 
 ### 4.1 Firmware 1.2.2: pad Xbox

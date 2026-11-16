@@ -89,8 +89,8 @@ La riga di comando è in inglese; `--lang it|es|de` (o la variabile d'ambiente `
   `config.html`) e segnalano i problemi noti.
 - `write` / `read` scrivono (con verifica) e leggono il profilo sull'adattatore.
 
-Pad XInput (Xbox 360 cablato): il tool usa il layout nativo che riceve l'ESP32, non il report
-HID mostrato da Windows. Gli stick XInput non sono utilizzabili con il firmware attuale.
+Pad XInput (Xbox 360 cablato, Xbox One/Series via cavo): il tool usa il layout nativo che riceve l'ESP32, non il
+report HID mostrato da Windows. Servono il firmware 1.2.2 (pad Xbox) e 1.2.3 (stick analogici), incluso nello zip.
 
 ## Sviluppo
 
