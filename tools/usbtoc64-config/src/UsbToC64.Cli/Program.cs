@@ -22,7 +22,7 @@ internal static class Program
               --set <id>=<azione>          Cambia l'azione di un controllo (ripetibile)
               -o <file.json>               Salva il comando save_jm in un file
               --dump-descriptor            Stampa il descrittore HID in esadecimale
-          monitor <n> [opzioni]            Anteprima dal vivo: cosa vedrebbe il C64
+          monitor <n> [opzioni]            Anteprima dal vivo: cosa riceve il C64/Amiga su porta DB9
               --profile <file.json|.h>     Usa questo profilo invece della proposta automatica
               --set <id>=<azione>          Come per analyze
           check <file.h|file.json>         Legge un profilo esistente e lo controlla
@@ -151,7 +151,7 @@ internal static class Program
             var state = engine.Process(report);
             if (state == null) continue;
             var active = pad.Controls.Where(c => c.IsActive(report)).Select(c => c.Name);
-            string line = $"C64: {state.Value}   pad: {string.Join(", ", active)}";
+            string line = $"C64/Amiga su porta DB9: {state.Value}   pad: {string.Join(", ", active)}";
             if (line == lastLine) continue;
             lastLine = line;
             Console.Write("\r" + line.PadRight(Math.Max(Console.WindowWidth - 1, line.Length)));

@@ -187,7 +187,7 @@ internal sealed class MainForm : Form
         _grid.Columns.Add(TextCol("Bit / valori", 85));
         _grid.Columns.Add(new DataGridViewComboBoxColumn
         {
-            HeaderText = "Azione sul C64", Width = 230, FlatStyle = FlatStyle.Flat,
+            HeaderText = "Azione", Width = 230, FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox,
         });
         _grid.Columns.Add(TextCol("Stato", 70));

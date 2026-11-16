@@ -45,7 +45,7 @@ internal sealed class C64Panel : Control
         var s = _live ? _state ?? default : default;
 
         using var title = new Font(Font.FontFamily, Font.Size + 1, FontStyle.Bold);
-        g.DrawString(_live ? "Uscita verso il C64" : "Uscita verso il C64 (nessun pad)", title,
+        g.DrawString(_live ? "C64/Amiga su porta DB9" : "C64/Amiga su porta DB9 (nessun pad)", title,
             _live ? SystemBrushes.ControlText : SystemBrushes.GrayText, 8, 6);
 
         // --- directions: a cross of four arrow keys

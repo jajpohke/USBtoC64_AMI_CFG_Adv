@@ -17,8 +17,8 @@ Due programmi:
 1. Collega il pad al PC e avvia `USBtoC64Config.exe`: il pad viene scelto e analizzato in automatico.
 2. La tabella elenca i controlli trovati (pulsanti, D-pad/hat, assi) con byte e bit che userà l'adattatore.
    Premendo un tasto la riga si evidenzia in verde.
-3. Nella colonna **Azione sul C64** si sceglie cosa fa ogni controllo. **Proposta automatica** ripristina i valori iniziali.
-4. A destra si vede dal vivo cosa riceverebbe il C64 (direzioni, F1–F3, autofire).
+3. Nella colonna **Azione** si sceglie cosa fa ogni controllo. **Proposta automatica** ripristina i valori iniziali.
+4. A destra si vede dal vivo cosa riceve il C64/Amiga su porta DB9 (direzioni, F1–F3, autofire).
 5. In basso: **Avvisi** (problemi del profilo), **Regole per il firmware**, **JSON save_jm**.
 6. **Test connessione** verifica che l'adattatore risponda (comando `get_info`, presente anche nel firmware
    originale). Lo stesso test viene fatto in automatico prima di ogni scrittura e lettura.
@@ -55,7 +55,7 @@ usbtoc64 read
 
 - `analyze` legge il descrittore HID del pad, classifica in automatico direzioni (hat, D-pad,
   assi X/Y) e pulsanti, propone le azioni e mostra le regole che finirebbero nel firmware.
-- `monitor` mostra dal vivo cosa vedrebbe il C64 (direzioni, fire, autofire), usando una replica
+- `monitor` mostra dal vivo cosa riceve il C64/Amiga su porta DB9 (direzioni, fire, autofire), usando una replica
   del motore del firmware.
 - `check` / `convert` leggono i `JoystickMapping.h` dei configuratori web (anche il vecchio
   `config.html`) e segnalano i problemi noti.
