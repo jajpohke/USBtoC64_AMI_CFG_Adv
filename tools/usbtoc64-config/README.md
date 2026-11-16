@@ -20,11 +20,20 @@ Stile Windows 11 (tema chiaro/scuro come quello di Windows), menu laterale:
   del tasto premuto evidenziata; a destra cosa riceve il **C64/Amiga su porta DB9** e i controlli del profilo;
   in basso le viste *Anteprima / Regole per il firmware / JSON*, **Leggi dall'adattatore** e
   **Scrivi sull'adattatore e verifica**. Importa/Esporta profili `.h`/`.json`.
-- **Firmware**: versione sull'adattatore e versione inclusa, aggiornamento (cancella tutte le impostazioni).
-- **Terminale**: menu di servizio del firmware (`service`, `info`, `dumppad`…) e comandi JSON, con comandi
-  rapidi, cronologia, conferma per i comandi che cambiano lo stato, riconnessione automatica dopo un riavvio.
+- **Mouse**: velocità del puntatore Amiga e C64, rotella, temporizzazione PAL/NTSC (valgono subito).
+- **LED**: colore per ogni evento (tavolozza del firmware), formato GRB/RGB, modalità monocromatica.
+- **Impostazioni**: modalità C64/Amiga e inversione dello switch, Developer Mode, stato e cancellazione
+  della memoria (mouse, pad, LED), factory reset.
+- **Firmware**: versione sull'adattatore e versione inclusa, aggiornamento; **Installa da file…** per
+  un'immagine completa a scelta (es. firmware di Emanuele), sempre a 0x0. Tutte le installazioni cancellano
+  le impostazioni.
+- **Terminale**: menu di servizio del firmware (`service`, `info`, `dumppad`…) e comandi JSON, con casella
+  di comando sempre attiva, comandi rapidi, cronologia, conferma per i comandi che cambiano lo stato,
+  riconnessione automatica dopo un riavvio.
 - **Registro**: tutto lo scambio con l'adattatore della sessione, salvabile su file.
-- **Mouse, LED, Impostazioni**: in arrivo (per ora dalle pagine del configuratore web).
+
+All'avvio, se c'è un ESP32 che non risponde (vergine, in modalità download con BOOT premuto, o con un altro
+firmware), il programma lo identifica con esptool senza scrivere niente e propone di installare il firmware.
 
 Il riquadro in basso a sinistra mostra porta, firmware, modalità (C64 o Amiga, come rilevata) e profilo salvato.
 Durante scrittura, lettura e aggiornamento un pannello mostra lo scambio seriale in corso.

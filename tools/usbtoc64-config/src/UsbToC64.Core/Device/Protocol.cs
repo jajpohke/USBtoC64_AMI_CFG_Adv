@@ -114,7 +114,7 @@ public static class DumppadParser
 public enum ReadMethod { GetJm, Dumppad }
 
 /// <summary>Reply to get_info (exists in the original firmware too).</summary>
-public sealed record AdapterInfo(bool IsAmiga, bool DevMode, bool InvertSwitch, string Raw)
+public sealed record AdapterInfo(bool IsAmiga, bool DevMode, bool InvertSwitch, string Raw, bool DevAmiga = false)
 {
     public override string ToString() => $"modalità {(IsAmiga ? "Amiga" : "C64")}, Developer Mode {(DevMode ? "ON" : "OFF")}";
 }
@@ -216,7 +216,7 @@ public sealed class AdapterSession
         bool B(string name) => r.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
         if (!r.TryGetProperty("is_amiga", out _))
             throw new InvalidOperationException($"Risposta inattesa al comando di prova: {r.GetRawText()}");
-        return new AdapterInfo(B("is_amiga"), B("dev_mode"), B("inv_switch"), r.GetRawText());
+        return new AdapterInfo(B("is_amiga"), B("dev_mode"), B("inv_switch"), r.GetRawText(), B("dev_amiga"));
     }
 
     private void WaitForBanner(TimeSpan max)

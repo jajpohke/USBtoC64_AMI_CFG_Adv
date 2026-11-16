@@ -19,10 +19,9 @@ public partial class MainWindow : FluentWindow
     {
         InitializeComponent();
         _pages["gamepad"] = new GamepadPage(this);
-        _pages["mouse"] = new ComingSoonPage("Mouse", "Velocità del mouse per C64 e Amiga, rotella, temporizzazione PAL/NTSC.");
-        _pages["led"] = new ComingSoonPage("LED", "Colori del LED per modalità, fuoco e autofire.");
-        _pages["settings"] = new ComingSoonPage("Impostazioni",
-            "Modalità C64/Amiga e inversione dello switch, Developer Mode, cancellazione della memoria, factory reset.");
+        _pages["mouse"] = new MousePage(this);
+        _pages["led"] = new LedPage(this);
+        _pages["settings"] = new SettingsPage(this);
         _pages["firmware"] = new FirmwarePage(this);
         _pages["terminal"] = new TerminalPage(this);
         _pages["log"] = new LogPage(this);
@@ -38,7 +37,7 @@ public partial class MainWindow : FluentWindow
     {
         Pad.RefreshDevices();
         Hub.RefreshPorts();
-        await CheckAdapterAsync();
+        await CheckAdapterAsync(probeIfSilent: true);
     }
 
     public void Navigate(string tag)
@@ -53,21 +52,63 @@ public partial class MainWindow : FluentWindow
             Host.Content = page;
     }
 
-    private async void AdapterCheck_Click(object sender, RoutedEventArgs e) => await CheckAdapterAsync();
+    private async void AdapterCheck_Click(object sender, RoutedEventArgs e) => await CheckAdapterAsync(probeIfSilent: true);
 
     /// <summary>Connection test, firmware version, stored profile; offers the firmware update when needed.</summary>
-    public async Task CheckAdapterAsync()
+    public async Task CheckAdapterAsync(bool probeIfSilent = false)
     {
         if (Hub.IsBusy) return;
         Hub.RefreshPorts();
         AdapterTitle.Text = "Adattatore: verifica…";
         var s = await Hub.CheckAsync();
         UpdateFirmwareBar(s);
+        if (probeIfSilent && s.NoAnswer) await OfferInstallOnSilentAdapterAsync(s);
+    }
+
+    /// <summary>
+    /// An ESP32 port that does not answer: blank, in download mode (BOOT held) or another firmware.
+    /// esptool identifies the chip without writing anything; then the user can install a firmware.
+    /// </summary>
+    private async Task OfferInstallOnSilentAdapterAsync(AdapterStatus s)
+    {
+        AdapterTitle.Text = $"ESP32 su {s.Port}: identificazione…";
+        var (found, desc) = await Hub.ProbeChipAsync();
+        UpdateAdapterCard();
+        if (!found)
+        {
+            Hub.Log($"Il dispositivo su {s.Port} non risponde e non è stato identificato: {desc}");
+            return;
+        }
+        AdapterTitle.Text = $"ESP32 su {s.Port}";
+        AdapterLine1.Text = "Non risponde ai comandi: vergine, in download o con un altro firmware";
+        AdapterLine2.Text = desc;
+        var fw = (FirmwarePage)_pages["firmware"];
+        string included = Hub.Manifest == null ? "" : $"\n\nSì = installa il firmware incluso ({Hub.Manifest.Version})";
+        var answer = System.Windows.MessageBox.Show(this,
+            $"Su {s.Port} c'è un ESP32 pronto per essere scritto ({desc}), ma non risponde ai comandi del programma: " +
+            "può essere vergine, in modalità download (BOOT premuto) o avere un firmware diverso." +
+            "\n\nVuoi installare un firmware? Tutta la memoria dell'adattatore verrà cancellata." +
+            included + "\nNo = scegli un file .bin\nAnnulla = non fare niente",
+            "Adattatore pronto per la scrittura",
+            Hub.Manifest == null ? System.Windows.MessageBoxButton.OKCancel : System.Windows.MessageBoxButton.YesNoCancel,
+            System.Windows.MessageBoxImage.Question, System.Windows.MessageBoxResult.Cancel);
+        if (answer == System.Windows.MessageBoxResult.Cancel) return;
+        Navigate("firmware");
+        if (answer == System.Windows.MessageBoxResult.Yes) await fw.InstallIncludedAsync(confirm: false);
+        else await fw.InstallFromFileAsync();
     }
 
     private void UpdateAdapterCard()
     {
         var s = Hub.Status;
+        if (s.NoAnswer)
+        {
+            AdapterDot.Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0xB4, 0x54));
+            AdapterTitle.Text = $"ESP32 su {s.Port}";
+            AdapterLine1.Text = "Non risponde: vergine, in download o con un altro firmware";
+            AdapterLine2.Text = "Vai a Firmware per installarlo";
+            return;
+        }
         if (s.Error != null || s.Info == null)
         {
             AdapterDot.Fill = Brushes.Gray;

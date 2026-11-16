@@ -11,7 +11,8 @@ public sealed record AdapterStatus(
     AdapterFirmware? Firmware,
     JmProfile? StoredPad,
     bool StoredPadKnown,
-    string? Error);
+    string? Error,
+    bool NoAnswer = false);
 
 /// <summary>
 /// Everything that talks to the adapter: one operation at a time, a shared log (Registro),
@@ -128,6 +129,8 @@ public sealed class AdapterHub : IDisposable
     /// <summary>Connection test + firmware version + stored pad profile (get_jm only, i.e. firmware 1.2.1+).</summary>
     public async Task<AdapterStatus> CheckAsync()
     {
+        string? portName = null;
+        try { portName = FindPort().PortName; } catch (Exception) { /* reported below */ }
         try
         {
             var s = await Run("Controllo adattatore", portName =>
@@ -151,10 +154,44 @@ public sealed class AdapterHub : IDisposable
         catch (Exception ex)
         {
             Log(ex.Message);
-            var s = new AdapterStatus(null, null, null, null, false, ex.Message);
+            // An ESP32 port that does not answer: blank, in download mode, or another firmware.
+            bool noAnswer = portName != null && ex is TimeoutException;
+            var s = new AdapterStatus(portName, null, null, null, false, ex.Message, noAnswer);
             SetStatus(s);
             return s;
         }
+    }
+
+    /// <summary>Runs commands on a connected session (connection test included).</summary>
+    public Task<T> SessionAsync<T>(string title, Func<AdapterSession, T> work) =>
+        Run(title, portName =>
+        {
+            using var conn = AdapterConnection.Connect(PortFor(portName), Log);
+            return work(conn.Session);
+        });
+
+    /// <summary>esptool identifies the chip on the port (nothing written).</summary>
+    public Task<(bool Found, string Description)> ProbeChipAsync() =>
+        Run("Identificazione del chip", portName =>
+        {
+            _ports.Remove(portName);
+            return new FirmwareUpdater(Log).ProbeChip(portName);
+        });
+
+    public async Task<FlashResult> FlashFileAsync(string binPath)
+    {
+        FlashResult r;
+        try
+        {
+            r = await Run("Installazione firmware da file", portName =>
+            {
+                _ports.Remove(portName);
+                return new FirmwareUpdater(Log).UpdateFromFile(portName, binPath);
+            });
+        }
+        catch (Exception ex) { r = new FlashResult(false, ex.Message); }
+        Log(r.Message);
+        return r;
     }
 
     public async Task<WriteResult> WriteAsync(JmProfile profile)

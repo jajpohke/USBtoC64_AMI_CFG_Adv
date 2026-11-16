@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
 using UsbToC64.App.Services;
 using UsbToC64.Core.Device;
 using Wpf.Ui.Controls;
@@ -20,7 +21,7 @@ public partial class FirmwarePage : UserControl
         _w = w;
         OpPanel.Attach(Hub);
         Hub.StatusChanged += () => Dispatcher.BeginInvoke(Refresh);
-        Hub.BusyChanged += busy => Dispatcher.BeginInvoke(() => { CheckBtn.IsEnabled = !busy; Refresh(); });
+        Hub.BusyChanged += busy => Dispatcher.BeginInvoke(() => { CheckBtn.IsEnabled = FileBtn.IsEnabled = !busy; Refresh(); });
         Refresh();
     }
 
@@ -64,15 +65,65 @@ public partial class FirmwarePage : UserControl
             }
         }
         // Reinstalling is allowed (e.g. to reset everything), the highlight only when an update is available.
-        UpdateBtn.IsEnabled = m != null && fw != null && !Hub.IsBusy;
+        UpdateBtn.IsEnabled = m != null && (fw != null || s.NoAnswer) && !Hub.IsBusy;
+        if (fw == null && s.NoAnswer)
+        {
+            StatusBar.Severity = InfoBarSeverity.Warning;
+            StatusBar.Title = "L'adattatore non risponde";
+            StatusBar.Message = $"C'è un ESP32 su {s.Port}, ma non risponde ai comandi: può essere vergine, in modalità download " +
+                                "(BOOT premuto) o con un firmware diverso. Puoi installare il firmware incluso o un file.";
+            canUpdate = m != null;
+            UpdateBtn.Appearance = canUpdate ? ControlAppearance.Primary : ControlAppearance.Secondary;
+        }
         UpdateBtn.Appearance = canUpdate ? ControlAppearance.Primary : ControlAppearance.Secondary;
     }
 
     private async void Check_Click(object sender, RoutedEventArgs e)
     {
         OpPanel.Begin("Controllo dell'adattatore");
-        await _w.CheckAdapterAsync();
+        await _w.CheckAdapterAsync(probeIfSilent: true);
         OpPanel.End(Hub.Status.Error == null ? "Controllo completato" : "Adattatore non raggiungibile");
+    }
+
+    private async void File_Click(object sender, RoutedEventArgs e) => await InstallFromFileAsync();
+
+    /// <summary>Full image chosen by the user, always at 0x0 (also used when the adapter is blank).</summary>
+    public async Task InstallFromFileAsync()
+    {
+        if (Hub.IsBusy) return;
+        var dlg = new OpenFileDialog { Title = "Scegli il firmware da installare (immagine completa, indirizzo 0x0)", Filter = "Firmware (*.bin)|*.bin|Tutti i file (*.*)|*.*" };
+        if (dlg.ShowDialog(_w) != true) return;
+        var answer = MessageBox.Show(_w,
+            $"Installare {Path.GetFileName(dlg.FileName)} sull'adattatore, all'indirizzo 0x0?\n\n" +
+            "⚠ Tutta la memoria dell'adattatore viene cancellata: le impostazioni tornano ai valori predefiniti.\n\n" +
+            "Un firmware diverso da questo progetto può non rispondere ai comandi del programma: in quel caso le sezioni " +
+            "Gamepad, Mouse, LED e Impostazioni non potranno comunicare con l'adattatore.",
+            "Installa firmware da file", MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel);
+        if (answer != MessageBoxResult.OK) return;
+        OpPanel.Begin($"Installazione di {Path.GetFileName(dlg.FileName)}");
+        var r = await Hub.FlashFileAsync(dlg.FileName);
+        OpPanel.End(r.Success ? "Firmware installato" : "Installazione non riuscita");
+        await _w.CheckAdapterAsync(probeIfSilent: false);
+        _w.RefreshFirmwareBar();
+        MessageBox.Show(_w, r.Message, r.Success ? "Firmware installato" : "Installazione firmware",
+            MessageBoxButton.OK, r.Success ? System.Windows.MessageBoxImage.Information : System.Windows.MessageBoxImage.Error);
+    }
+
+    /// <summary>The included firmware, also used when the adapter is blank.</summary>
+    public async Task InstallIncludedAsync(bool confirm)
+    {
+        var m = Hub.Manifest;
+        if (m == null || Hub.IsBusy) return;
+        if (confirm && MessageBox.Show(_w,
+                $"Installare il firmware {m.Version} sull'adattatore?\n\n⚠ Tutta la memoria dell'adattatore viene cancellata.",
+                "Installa firmware", MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
+        OpPanel.Begin("Installazione del firmware");
+        var r = await Hub.FlashAsync();
+        OpPanel.End(r.Success ? "Firmware installato" : "Installazione non riuscita");
+        await _w.CheckAdapterAsync(probeIfSilent: false);
+        _w.RefreshFirmwareBar();
+        MessageBox.Show(_w, r.Message, r.Success ? "Firmware installato" : "Installazione firmware",
+            MessageBoxButton.OK, r.Success ? System.Windows.MessageBoxImage.Information : System.Windows.MessageBoxImage.Error);
     }
 
     private async void Update_Click(object sender, RoutedEventArgs e)
@@ -90,7 +141,7 @@ public partial class FirmwarePage : UserControl
         OpPanel.Begin("Aggiornamento del firmware");
         var r = await Hub.FlashAsync();
         OpPanel.End(r.Success ? "Firmware aggiornato" : "Aggiornamento non riuscito");
-        await _w.CheckAdapterAsync();
+        await _w.CheckAdapterAsync(probeIfSilent: false);
         _w.RefreshFirmwareBar();
         MessageBox.Show(_w, r.Message, r.Success ? "Firmware aggiornato" : "Aggiornamento firmware",
             MessageBoxButton.OK, r.Success ? System.Windows.MessageBoxImage.Information : System.Windows.MessageBoxImage.Error);

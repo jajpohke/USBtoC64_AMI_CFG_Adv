@@ -24,8 +24,10 @@
         </DockPanel>
 
         <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+            <TextBlock DockPanel.Dock="Left" Text="Comando" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
             <ui:Button x:Name="SendBtn" DockPanel.Dock="Right" Content="Invia" Icon="{ui:SymbolIcon Send24}" Appearance="Primary" Margin="8,0,0,0" Click="Send_Click" />
-            <TextBox x:Name="Input" FontFamily="{StaticResource MonoFont}" FontSize="13" PreviewKeyDown="Input_PreviewKeyDown" />
+            <ui:TextBox x:Name="Input" FontFamily="{StaticResource MonoFont}" FontSize="13" PreviewKeyDown="Input_PreviewKeyDown"
+                        PlaceholderText="Scrivi un comando (es. info, dumppad, {&quot;cmd&quot;:&quot;get_info&quot;}) e premi Invio" />
         </DockPanel>
 
         <TextBox x:Name="Output" Style="{StaticResource Mono}" />

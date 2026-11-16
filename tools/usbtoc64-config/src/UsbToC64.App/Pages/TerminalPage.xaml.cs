@@ -20,7 +20,7 @@ public partial class TerminalPage : UserControl
     private static readonly (string Cmd, bool Confirm)[] QuickCommands =
     {
         ("service", false), ("info", false), ("dumppad", false), ("ledtest", false), ("exit", false),
-        ("reboot", true), ("devmode on", true),
+        ("reboot", true),
     };
 
     public TerminalPage(MainWindow w)
@@ -58,7 +58,7 @@ public partial class TerminalPage : UserControl
         StateText.Text = on ? $"● Collegato · {Hub.TerminalPort} · 115200" : "Scollegato";
         ConnectBtn.Content = on ? "Disconnetti" : "Connetti";
         ConnectBtn.Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = on ? Wpf.Ui.Controls.SymbolRegular.PlugDisconnected24 : Wpf.Ui.Controls.SymbolRegular.PlugConnected24 };
-        Input.IsEnabled = SendBtn.IsEnabled = on;
+        // The input is always available: sending connects the terminal if needed.
     }
 
     private void Connect_Click(object sender, RoutedEventArgs e)

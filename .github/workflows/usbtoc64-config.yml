@@ -121,7 +121,6 @@ jobs:
           path: tools/usbtoc64-config/publish
 
       - name: esptool.exe
-        if: ${{ needs.firmware.result == 'success' }}
         shell: pwsh
         run: |
           $zip = "esptool.zip"

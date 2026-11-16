@@ -17,6 +17,7 @@ internal sealed class FakeAdapter : IAdapterPort
     public bool NoComm { get; init; }            // nothing answers (wrong port, connected to the C64, dev mode)
     public bool ResetOnOpen { get; init; }       // opening the port restarts the chip (seen on Windows)
     public string? Version { get; init; }        // null = original firmware (no get_version)
+    public string? LastSettings { get; set; }    // last mouse_save / led_save line
     public int ResetAndDropOnOpen { get; set; }  // ... and the USB reconnection at boot kills the handle (n times)
     public JmProfile? Stored { get; private set; }
     public int Opens { get; private set; }
@@ -76,6 +77,16 @@ internal sealed class FakeAdapter : IAdapterPort
                 _out.Enqueue("{\"is_amiga\":false,\"dev_mode\":false,\"inv_switch\":false,\"dev_amiga\":false}");
                 return;
             }
+            if (line == "{\"cmd\":\"mouse_get\"}") { _out.Enqueue("{\"amiga_speed\":4,\"c64_speed\":2,\"enable_wheel\":1,\"pal_timing\":0}"); return; }
+            if (line.StartsWith("{\"cmd\":\"mouse_save\"")) { _a.LastSettings = line; _out.Enqueue("{\"status\":\"ok\"}"); return; }
+            if (line == "{\"cmd\":\"led_get\"}")
+            {
+                _out.Enqueue("{\"led_fmt\":1,\"multicolor\":0,\"idle_amiga\":\"#FFFFFF\",\"idle_c64\":\"#FF9900\",\"dir_glowing\":\"#FF00FF\"," +
+                             "\"btn_fire1\":\"#00FF00\",\"btn_fire2\":\"#FF0000\",\"btn_fire3\":\"#00FFFF\",\"btn_alt\":\"#0000FF\",\"btn_auto\":\"#000000\"}");
+                return;
+            }
+            if (line.StartsWith("{\"cmd\":\"led_save\"")) { _a.LastSettings = line; _out.Enqueue("{\"status\":\"ok\"}"); return; }
+            if (line == "{\"cmd\":\"mem_status\"}") { _out.Enqueue("{\"mouse\":true,\"pad\":false,\"led\":true,\"dev\":false,\"inv\":false}"); return; }
             if (line == "{\"cmd\":\"get_version\"}")
             {
                 if (_a.Version != null) _out.Enqueue($"{{\"fw\":\"{_a.Version}\",\"build\":\"abc1234\",\"proto\":1}}");

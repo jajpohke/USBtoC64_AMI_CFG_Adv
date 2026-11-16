@@ -7,6 +7,7 @@
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                 <ui:Button x:Name="CheckBtn" Content="Controlla" Icon="{ui:SymbolIcon ArrowSync24}" Margin="0,0,8,0" Click="Check_Click" />
+                <ui:Button x:Name="FileBtn" Content="Installa da file…" Icon="{ui:SymbolIcon FolderOpen24}" Margin="0,0,8,0" Click="File_Click" />
                 <ui:Button x:Name="UpdateBtn" Content="Aggiorna firmware…" Icon="{ui:SymbolIcon ArrowUpload24}" Appearance="Primary" Click="Update_Click" />
             </StackPanel>
             <TextBlock Text="Firmware" Style="{StaticResource PageTitle}" VerticalAlignment="Center" />
@@ -37,6 +38,7 @@
                     <TextBlock Text="Prima di aggiornare" Style="{StaticResource CardTitle}" />
                     <TextBlock Style="{StaticResource Hint}" FontSize="13" Text="• L'aggiornamento cancella TUTTE le impostazioni salvate sull'adattatore (profilo pad, mouse, LED, Developer Mode, inversione dello switch), come «erase all» dalla pagina web." />
                     <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0" Text="• L'adattatore va collegato solo al PC con la USB-C, non al C64/Amiga. Non scollegarlo durante l'aggiornamento." />
+                    <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0" Text="• «Installa da file…» scrive un'immagine completa a scelta (per esempio il firmware di Emanuele) all'indirizzo 0x0. Un firmware diverso può non rispondere ai comandi di questo programma." />
                     <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0" Text="• Se l'aggiornamento si interrompe e l'adattatore non risponde: tieni premuto BOOT mentre colleghi la USB-C e ripeti l'aggiornamento." />
                 </StackPanel>
             </ui:Card>

@@ -228,7 +228,7 @@ tools/usbtoc64-config/
 │   │   └── Formats/               JSON save_jm, .h (con WEB_META), import .h/.json
 │   ├── UsbToC64.Input/            lettura pad: HidSharp (HID, descrittore) e XInput
 │   ├── UsbToC64.Device/           seriale: ricerca porta (VID Espressif), apertura; la logica save/verify è in Core/Device
-│   ├── UsbToC64.App/              WPF + WPF-UI (Fluent): Gamepad, Firmware, Terminale, Registro (Mouse/LED/Impostazioni in arrivo)
+│   ├── UsbToC64.App/              WPF + WPF-UI (Fluent): Gamepad, Mouse, LED, Impostazioni, Firmware, Terminale, Registro
 │   └── UsbToC64.Cli/              comandi da terminale
 └── tests/UsbToC64.Core.Tests/     xUnit, incluse catture reali (file 24/25)
 ```
