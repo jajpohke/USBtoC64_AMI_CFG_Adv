@@ -16,6 +16,9 @@ Due programmi:
 
 Stile Windows 11 (tema chiaro/scuro come quello di Windows).
 
+**Lingue**: English (predefinita), Italiano, Español, Deutsch. Si sceglie dalla combo con il mappamondo in alto a
+destra nella modalità semplice o in *Impostazioni*; vale subito e viene ricordata.
+
 **Modalità semplice** (all'avvio): tre passi in una schermata.
 1. **Adattatore**: pronto, da aggiornare (pulsante *Aggiorna firmware*), non trovato, vergine/in download
    (*Installa firmware*).
@@ -35,7 +38,7 @@ ricorda la scelta.
   **Scrivi sull'adattatore e verifica**. Importa/Esporta profili `.h`/`.json`.
 - **Mouse**: velocità del puntatore Amiga e C64, rotella, temporizzazione PAL/NTSC (valgono subito).
 - **LED**: colore per ogni evento (tavolozza del firmware), formato GRB/RGB, modalità monocromatica.
-- **Impostazioni**: modalità C64/Amiga e inversione dello switch, Developer Mode, stato e cancellazione
+- **Impostazioni**: lingua del programma, modalità C64/Amiga e inversione dello switch, Developer Mode, stato e cancellazione
   della memoria (mouse, pad, LED), factory reset.
 - **Firmware**: versione sull'adattatore e versione inclusa, aggiornamento; **Installa da file…** per
   un'immagine completa a scelta (es. firmware di Emanuele), sempre a 0x0. Tutte le installazioni cancellano
@@ -73,7 +76,10 @@ usbtoc64 ports
 usbtoc64 ping
 usbtoc64 write profilo.json
 usbtoc64 read
+usbtoc64 --lang it devices
 ```
+
+La riga di comando è in inglese; `--lang it|es|de` (o la variabile d'ambiente `USBTOC64_LANG`) sceglie la lingua.
 
 - `analyze` legge il descrittore HID del pad, classifica in automatico direzioni (hat, D-pad,
   assi X/Y) e pulsanti, propone le azioni e mostra le regole che finirebbero nel firmware.
