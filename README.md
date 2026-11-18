@@ -1,4 +1,4 @@
-# 🕹️ USB to Commodore 64 & Amiga — Advanced Edition v1.2
+# 🕹️ USB to Commodore 64 & Amiga — Advanced Edition v1.3
 
 An ESP32-S3 firmware to connect modern USB controllers and mice to classic **Commodore 64** and **Amiga** computers via the DB9 joystick port.
 
@@ -41,8 +41,8 @@ If you need any of the above features, or run into mouse-related issues, we reco
 - [🎮 Controller Support](JOYSTICKGUIDE.md) — supported pads, plug & play profiles, mapping guide
 - [🚥 LED Guide](LEDGUIDE.md) — status colors, behaviour, customisation
 - [🛠️ Service Menu](SERVICEMENUGUIDE.md) — serial console, advanced commands, coloradj
-- [✨ What's New](#whats-new-in-v12) — v1.2 changelog
-- [🤝 Credits](#credits)
+- [✨ What's New](#-whats-new-in-v13) — v1.3 and v1.2 changelog
+- [🤝 Credits](#-credits)
 
 ---
 
@@ -53,6 +53,24 @@ If you need any of the above features, or run into mouse-related issues, we reco
 - If testing the board standalone on a desk, connect all 4 serial adapter pins (including 5V). If the ESP32 is already powered by the DB9 port or its own USB-C connector, **connect only TX, RX and GND** — never 5V.
 
 ---
+
+## ✨ What's New in v1.3
+
+- **[USBtoC64 Config for Windows](WINDOWSTOOL.md)** — a Windows program that checks the adapter, recognises the
+  controller by itself and saves the profile, with write and read-back verification. Simple mode in three steps,
+  advanced configuration with every setting, serial terminal, command line. English, Italiano, Español, Deutsch.
+- **Up to 8 pad profiles** (firmware 1.3.0) — one per controller, each with a name. The adapter uses by itself the
+  profile of the pad you plug in, so you can swap pads without setting anything up again. Profiles saved from the
+  web configurator go to the pad's slot and appear as *WebConfigured* in the Windows program.
+- **Xbox controllers** (firmware 1.2.2) — Xbox 360 wired and compatibles, Xbox One / Series with a USB cable.
+- **Analog sticks** (firmware 1.2.3) — sticks with signed axes (e.g. Xbox) can drive the directions.
+- **Firmware update from the program** — the included firmware is installed by the Windows program, with a progress
+  bar and a list of the configured pads before they are erased.
+- **Web configurator** — saves now wait for the adapter's confirmation (*SAVED* / *NOT SAVED* / *NOT CONFIRMED*) and
+  long profiles are no longer truncated; new link to the Windows program on the main page.
+
+Firmware 1.3.0 is in the [latest release](../../releases/latest) and is installed by the Windows program; it is
+fully compatible with the web configurator. The `USBtoC64_Adv.bin` in the repository root is still v1.2.
 
 ## ✨ What's New in v1.2
 

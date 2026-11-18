@@ -18,7 +18,9 @@ For advanced diagnostics and developer tools, see [DEVELOPER.md](DEVELOPER.md).
 - The USB2C64 board
 - A USB-C cable
 - Google Chrome (required — Firefox does not support WebSerial or WebHID)
-- The precompiled `.bin` file from the [Releases](../../releases) page
+- The precompiled `.bin` file: from the [latest release](../../releases/latest) download
+  `USBtoC64_Adv_ONLY_Firmware_<version>.zip` and extract `USBtoC64_Adv.bin` (on Windows, the
+  [Windows program](WINDOWSTOOL.md) installs the firmware by itself)
 
 ### Option A — Web Flasher (recommended, no installation required)
 
