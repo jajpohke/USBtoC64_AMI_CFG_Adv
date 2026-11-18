@@ -3,8 +3,8 @@
 This page covers all controllers tested with the USB2C64 Advanced Edition — what works out of the box, what needs manual mapping, and what is currently unsupported.
 
 > ✅ **Xbox controllers are supported since firmware 1.2.3.** Xbox 360 (wired and compatibles) and Xbox One / Series
-> (USB cable) work with firmware **1.2.3**, distributed with [USBtoC64 Config for Windows](WINDOWSTOOL.md)
-> ([download](https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/releases/latest/download/USBtoC64_Adv_Win_x64.zip)).
+> (USB cable) work with firmware **1.2.3 or later** (1.3.0 is distributed with [USBtoC64 Config for Windows](WINDOWSTOOL.md),
+> [download](https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/releases/latest/download/USBtoC64_Adv_Win_x64.zip)).
 > Set them up with the Windows program: the web configurator sees a different report from Windows than the one the
 > adapter receives, so Xbox mappings made in the browser do not work. With firmware 1.2 Xbox controllers are not supported.
 

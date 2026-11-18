@@ -8,9 +8,10 @@ This fork was born with a few specific goals: improving compatibility with stubb
 
 For a full setup walkthrough, see the [Getting Started guide](GETSTARTED.md).
 
-> 🪟 **New: [USBtoC64 Config for Windows](WINDOWSTOOL.md)** — set up the adapter for your controller in three clicks
-> (adapter check, automatic controller recognition, save and verify). Includes firmware 1.2.3 with Xbox 360 /
-> Xbox One / Series and analog stick support. [⬇️ Download](https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/releases/latest/download/USBtoC64_Adv_Win_x64.zip)
+> 🪟 **New: [USBtoC64 Config for Windows](WINDOWSTOOL.md)** — set up the adapter for your controllers in three clicks
+> (adapter check, automatic controller recognition, save and verify). Includes firmware 1.3.0: up to **8 pad profiles**
+> chosen automatically by the pad you plug in, Xbox 360 / Xbox One / Series and analog stick support.
+> [⬇️ Download](https://github.com/jajpohke/USBtoC64_AMI_CFG_Adv/releases/latest/download/USBtoC64_Adv_Win_x64.zip)
 
 ### ⚠️ Features not implemented in this fork
 
