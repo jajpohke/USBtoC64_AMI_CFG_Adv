@@ -18,7 +18,7 @@
 
 // Firmware version, reported by {"cmd":"get_version"} and shown in the boot banner.
 // FW_BUILD is set by the GitHub Actions build (commit id); local builds report "local".
-#define FW_VERSION "1.2.3"
+#define FW_VERSION "1.3.0"
 #ifndef FW_BUILD
 #define FW_BUILD "local"
 #endif
@@ -334,14 +334,16 @@ void start_sniff(uint8_t addr) {
     bool found_internal = false;
     use_html_configurator = false; 
 
-// TIER 0 — HTML configurator rules blob (highest priority when VID/PID match)
-    if (jm_rules_dyn_count > 0 && prefs.isKey("jm_blob")) {
-        NVS_JM_Blob jm_full;
-        size_t len = prefs.getBytes("jm_blob", &jm_full, sizeof(NVS_JM_Blob));
-        if (len > 0 && connected_vid == jm_full.vid && connected_pid == jm_full.pid) {
+// TIER 0 — drawer of this pad (web configurator / config tool rules, highest priority)
+    int active_slot = jm_slot_find(connected_vid, connected_pid);
+    if (active_slot >= 0) {
+        NVS_JM_Slot jm_slot;
+        if (jm_slot_read(active_slot, jm_slot) && (jm_slot.blob.rule_count > 0 || jm_slot.blob.use_analog)) {
+            jm_apply_blob(jm_slot.blob);
             use_html_configurator = true;
             found_custom = true;
-            dual_println(">>> TIER 0 MATCH: Loaded HTML Configurator Rules");
+            dual_printf(">>> TIER 0 MATCH: slot %d \"%s\"\n", active_slot + 1,
+                        jm_slot.label[0] ? jm_slot.label : "WebConfigured");
         }
     }
 
@@ -847,10 +849,28 @@ void loop() {
                     blob.rules[blob.rule_count].func  = (JM_Func)(r["f"] | 0);
                     blob.rule_count++;
                 }
-                prefs.putBytes("jm_blob", &blob, sizeof(NVS_JM_Blob));
-                prefs.putBool("has_custom", true);
-                activePort->print("{\"status\":\"ok\"}\n");
-                delay(200); esp_restart();
+                // Drawer (1.3.0): "slot" 0..7 chosen by the config tool; otherwise the drawer of this pad,
+                // else the first free one, else the oldest (web configurator). "label" optional: without it
+                // a re-save of the same pad keeps its label, a new drawer has none ("WebConfigured").
+                int slot = doc.containsKey("slot") ? doc["slot"].as<int>() : jm_slot_choose(blob.vid, blob.pid);
+                if (slot < 0 || slot >= JM_SLOTS) {
+                    activePort->printf("{\"status\":\"error\",\"reason\":\"slot\",\"detail\":\"%d\"}\n", slot);
+                } else {
+                    char label[JM_LABEL_LEN + 1] = "";
+                    if (doc.containsKey("label")) {
+                        jm_label_copy(label, doc["label"].as<const char*>());
+                    } else {
+                        NVS_JM_Slot prev;
+                        if (jm_slot_read(slot, prev) && prev.blob.vid == blob.vid && prev.blob.pid == blob.pid)
+                            strcpy(label, prev.label);
+                    }
+                    if (jm_slot_write(slot, blob, label)) {
+                        activePort->printf("{\"status\":\"ok\",\"slot\":%d}\n", slot);
+                        delay(200); esp_restart();
+                    } else {
+                        activePort->print("{\"status\":\"error\",\"reason\":\"nvs\",\"detail\":\"\"}\n");
+                    }
+                }
             } else {
                 // Added (proto 1): previously no reply at all (bad JSON, buffer too small, missing rules)
                 activePort->printf("{\"status\":\"error\",\"reason\":\"%s\",\"detail\":\"%s\"}\n",
@@ -859,46 +879,79 @@ void loop() {
         }
         else if (incoming.startsWith("{\"cmd\":\"get_version\"")) {
             // Added (proto 1): firmware version for the config tool. The original firmware does not answer.
-            activePort->printf("{\"fw\":\"%s\",\"build\":\"%s\",\"proto\":1}\n", FW_VERSION, FW_BUILD);
+            activePort->printf("{\"fw\":\"%s\",\"build\":\"%s\",\"proto\":2,\"slots\":%d}\n", FW_VERSION, FW_BUILD, JM_SLOTS);
         }
         else if (incoming.startsWith("{\"cmd\":\"get_jm\"")) {
-            // Added (proto 1): read back the TIER 0 blob in the same format as save_jm, for verification.
-            // Not used by the web configurator pages.
-            size_t blob_len = prefs.getBytesLength("jm_blob");
-            if (blob_len == 0) {
-                activePort->print("{\"status\":\"empty\",\"proto\":1}\n");
-            } else if (blob_len != sizeof(NVS_JM_Blob)) {
-                activePort->printf("{\"status\":\"error\",\"reason\":\"blob_size\",\"size\":%u,\"expected\":%u,\"proto\":1}\n",
-                                   (unsigned)blob_len, (unsigned)sizeof(NVS_JM_Blob));
+            // Read back a drawer in the same format as save_jm (verification, editing).
+            // {"cmd":"get_jm","slot":n}; without "slot": the most recently saved drawer (proto 1 behaviour).
+            StaticJsonDocument<64> req;
+            deserializeJson(req, incoming);
+            int slot = req.containsKey("slot") ? req["slot"].as<int>() : jm_slot_latest();
+            NVS_JM_Slot s;
+            if (slot < 0 || slot >= JM_SLOTS || !jm_slot_read(slot, s)) {
+                activePort->printf("{\"status\":\"empty\",\"proto\":2,\"slot\":%d}\n", slot);
             } else {
-                NVS_JM_Blob blob;
-                prefs.getBytes("jm_blob", &blob, sizeof(NVS_JM_Blob));
+                const NVS_JM_Blob &blob = s.blob;
                 uint8_t rc = blob.rule_count <= JM_DYN_MAX_RULES ? blob.rule_count : JM_DYN_MAX_RULES;
                 uint8_t xc = blob.analog_x_count <= JM_DYN_MAX_ANALOG ? blob.analog_x_count : JM_DYN_MAX_ANALOG;
                 uint8_t yc = blob.analog_y_count <= JM_DYN_MAX_ANALOG ? blob.analog_y_count : JM_DYN_MAX_ANALOG;
-                String out;
-                out.reserve(200 + rc * 32);
-                out += "{\"status\":\"ok\",\"proto\":1,\"has_custom\":";
-                out += prefs.getBool("has_custom", false) ? "true" : "false";
-                out += ",\"vid\":";        out += String((unsigned)blob.vid);
-                out += ",\"pid\":";        out += String((unsigned)blob.pid);
-                out += ",\"dpad_idx\":";   out += String((int)blob.dpad_index);
-                out += ",\"use_analog\":"; out += blob.use_analog ? "1" : "0";
-                out += ",\"analog_x\":[";
-                for (uint8_t i = 0; i < xc; i++) { if (i) out += ","; out += String((unsigned)blob.analog_x[i]); }
-                out += "],\"analog_y\":[";
-                for (uint8_t i = 0; i < yc; i++) { if (i) out += ","; out += String((unsigned)blob.analog_y[i]); }
-                out += "],\"rules\":[";
+                StaticJsonDocument<3072> out;
+                out["status"] = "ok"; out["proto"] = 2; out["slot"] = slot; out["label"] = (char*)s.label;
+                out["seq"] = s.seq;
+                out["has_custom"] = prefs.getBool("has_custom", false);
+                out["vid"] = blob.vid; out["pid"] = blob.pid; out["dpad_idx"] = blob.dpad_index;
+                out["use_analog"] = blob.use_analog ? 1 : 0;
+                JsonArray ax = out.createNestedArray("analog_x");
+                for (uint8_t i = 0; i < xc; i++) ax.add(blob.analog_x[i]);
+                JsonArray ay = out.createNestedArray("analog_y");
+                for (uint8_t i = 0; i < yc; i++) ay.add(blob.analog_y[i]);
+                JsonArray rules = out.createNestedArray("rules");
                 for (uint8_t i = 0; i < rc; i++) {
-                    if (i) out += ",";
-                    out += "{\"i\":";  out += String((unsigned)blob.rules[i].index);
-                    out += ",\"v\":";  out += String((unsigned)blob.rules[i].value);
-                    out += ",\"op\":"; out += String((unsigned)blob.rules[i].op);
-                    out += ",\"f\":";  out += String((unsigned)blob.rules[i].func);
-                    out += "}";
+                    JsonObject r = rules.createNestedObject();
+                    r["i"] = blob.rules[i].index; r["v"] = blob.rules[i].value;
+                    r["op"] = (uint8_t)blob.rules[i].op; r["f"] = (uint8_t)blob.rules[i].func;
                 }
-                out += "]}\n";
-                activePort->print(out);
+                serializeJson(out, *activePort);
+                activePort->println();
+            }
+        }
+        else if (incoming.startsWith("{\"cmd\":\"list_jm\"")) {
+            // Added (proto 2): the drawers in use. Not used by the web configurator pages.
+            StaticJsonDocument<1536> out;
+            out["status"] = "ok"; out["proto"] = 2; out["slots"] = JM_SLOTS;
+            JsonArray items = out.createNestedArray("items");
+            NVS_JM_Slot s;
+            for (int i = 0; i < JM_SLOTS; i++) {
+                if (!jm_slot_read(i, s)) continue;
+                JsonObject o = items.createNestedObject();
+                o["slot"] = i; o["vid"] = s.blob.vid; o["pid"] = s.blob.pid;
+                o["label"] = (char*)s.label;   // char*: copied into the document
+                o["rules"] = s.blob.rule_count;
+                o["analog"] = s.blob.use_analog ? 1 : 0; o["seq"] = s.seq;
+            }
+            serializeJson(out, *activePort);
+            activePort->println();
+        }
+        else if (incoming.startsWith("{\"cmd\":\"label_jm\"")) {
+            // Added (proto 2): rename a drawer. {"cmd":"label_jm","slot":n,"label":"..."}
+            StaticJsonDocument<192> req;
+            if (deserializeJson(req, incoming) || !req.containsKey("slot")) {
+                activePort->print("{\"status\":\"error\",\"reason\":\"json\",\"detail\":\"\"}\n");
+            } else if (jm_slot_set_label(req["slot"].as<int>(), req["label"] | "")) {
+                activePort->print("{\"status\":\"ok\"}\n");
+            } else {
+                activePort->print("{\"status\":\"error\",\"reason\":\"empty\",\"detail\":\"\"}\n");
+            }
+        }
+        else if (incoming.startsWith("{\"cmd\":\"del_jm\"")) {
+            // Added (proto 2): empty a drawer. {"cmd":"del_jm","slot":n}
+            StaticJsonDocument<64> req;
+            if (deserializeJson(req, incoming) || !req.containsKey("slot")) {
+                activePort->print("{\"status\":\"error\",\"reason\":\"json\",\"detail\":\"\"}\n");
+            } else if (jm_slot_delete(req["slot"].as<int>())) {
+                activePort->print("{\"status\":\"ok\"}\n");
+            } else {
+                activePort->print("{\"status\":\"error\",\"reason\":\"empty\",\"detail\":\"\"}\n");
             }
         }
         else if (incoming.startsWith("{\"cmd\":\"get_info\"")) {
@@ -1062,7 +1115,7 @@ void loop() {
                 String t = doc["target"].as<String>();
                 if (t == "mouse") { prefs.remove("amiga_speed"); prefs.remove("c64_speed"); prefs.remove("en_wheel"); prefs.remove("pal_timing"); }
                 else if (t == "pad") { 
-                    prefs.remove("has_custom"); prefs.remove("cust_blob"); prefs.remove("jm_blob");
+                    prefs.remove("has_custom"); prefs.remove("cust_blob"); jm_slot_clear_all(); // all the drawers
                     prefs.remove("vid"); prefs.remove("pid");
                     prefs.remove("dpad_type"); prefs.remove("byte_x"); prefs.remove("byte_y");
                     prefs.remove("byte_dpad_x"); prefs.remove("byte_dpad_y");

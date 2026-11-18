@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using UsbToC64.App.Controls;
 using UsbToC64.App.Services;
 using UsbToC64.Core.Device;
 using UsbToC64.Core.Text;
@@ -21,6 +22,7 @@ public partial class FirmwarePage : UserControl
         InitializeComponent();
         _w = w;
         OpPanel.Attach(Hub);
+        FwProgress.Attach(Hub);
         Hub.StatusChanged += () => Dispatcher.BeginInvoke(Refresh);
         L.Changed += () => Dispatcher.BeginInvoke(Refresh);
         Hub.BusyChanged += busy => Dispatcher.BeginInvoke(() => { CheckBtn.IsEnabled = FileBtn.IsEnabled = !busy; Refresh(); });
@@ -93,18 +95,25 @@ public partial class FirmwarePage : UserControl
 
     private async void File_Click(object sender, RoutedEventArgs e) => await InstallFromFileAsync();
 
+    /// <summary>The pad profiles that the installation will erase (warning added to the confirmations).</summary>
+    private string PadsWarning() => Hub.StoredPadsWarning() is { } w ? "\n\n" + w : "";
+
     /// <summary>Full image chosen by the user, always at 0x0 (also used when the adapter is blank).</summary>
-    public async Task InstallFromFileAsync()
+    /// <param name="progress">Progress panel of the calling page (simple mode); default: this page's.</param>
+    public async Task InstallFromFileAsync(ProgressPanel? progress = null)
     {
+        var pp = progress ?? FwProgress;
         if (Hub.IsBusy) return;
         var dlg = new OpenFileDialog { Title = L.T("fwp.file.dialogTitle"), Filter = L.T("fwp.file.filter") };
         if (dlg.ShowDialog(_w) != true) return;
         var answer = MessageBox.Show(_w,
-            L.F("fwp.file.confirm", Path.GetFileName(dlg.FileName)),
+            L.F("fwp.file.confirm", Path.GetFileName(dlg.FileName)) + PadsWarning(),
             L.T("fwp.file.confirmTitle"), MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel);
         if (answer != MessageBoxResult.OK) return;
         OpPanel.Begin(L.F("fwp.op.installing", Path.GetFileName(dlg.FileName)));
-        var r = await Hub.FlashFileAsync(dlg.FileName);
+        pp.Begin();
+        var r = await Hub.FlashFileAsync(dlg.FileName, pp.Report);
+        pp.End(r.Success);
         OpPanel.End(L.T(r.Success ? "fwp.installed" : "fwp.installFailed"));
         await _w.CheckAdapterAsync(probeIfSilent: false);
         _w.RefreshFirmwareBar();
@@ -118,10 +127,12 @@ public partial class FirmwarePage : UserControl
         var m = Hub.Manifest;
         if (m == null || Hub.IsBusy) return;
         if (confirm && MessageBox.Show(_w,
-                L.F("fwp.included.confirm", m.Version),
+                L.F("fwp.included.confirm", m.Version) + PadsWarning(),
                 L.T("fwp.included.confirmTitle"), MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
         OpPanel.Begin(L.T("fwp.op.installIncluded"));
-        var r = await Hub.FlashAsync();
+        FwProgress.Begin();
+        var r = await Hub.FlashAsync(FwProgress.Report);
+        FwProgress.End(r.Success);
         OpPanel.End(L.T(r.Success ? "fwp.installed" : "fwp.installFailed"));
         await _w.CheckAdapterAsync(probeIfSilent: false);
         _w.RefreshFirmwareBar();
@@ -134,12 +145,14 @@ public partial class FirmwarePage : UserControl
         var m = Hub.Manifest;
         if (m == null || Hub.IsBusy) return;
         var answer = MessageBox.Show(_w,
-            L.F("fwp.update.confirm", m.Version),
+            L.F("fwp.update.confirm", m.Version) + PadsWarning(),
             L.T("fwp.update.title"), MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel);
         if (answer != MessageBoxResult.OK) return;
 
         OpPanel.Begin(L.T("fwp.op.update"));
-        var r = await Hub.FlashAsync();
+        FwProgress.Begin();
+        var r = await Hub.FlashAsync(FwProgress.Report);
+        FwProgress.End(r.Success);
         OpPanel.End(L.T(r.Success ? "fwp.updated" : "fwp.updateFailed"));
         await _w.CheckAdapterAsync(probeIfSilent: false);
         _w.RefreshFirmwareBar();

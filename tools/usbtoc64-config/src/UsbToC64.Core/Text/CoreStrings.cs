@@ -5,7 +5,7 @@ public static partial class CoreStrings
 {
     public static IEnumerable<Tr> All =>
         Common.Concat(Validation).Concat(Firmware).Concat(Protocol).Concat(Settings)
-              .Concat(Pad).Concat(Formats).Concat(Serial).Concat(Flash);
+              .Concat(Pad).Concat(Formats).Concat(Serial).Concat(Flash).Concat(Slots);
 
     private static readonly Tr[] Common =
     {

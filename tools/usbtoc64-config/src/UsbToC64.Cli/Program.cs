@@ -42,6 +42,9 @@ internal static class Program
                 "flash" => Flash(args[1..]),
                 "write" => Write(args[1..]),
                 "read" => Read(args[1..]),
+                "slots" => Slots(args[1..]),
+                "slot-rename" => SlotRename(args[1..]),
+                "slot-delete" => SlotDelete(args[1..]),
                 _ => Fail(L.F("cli.unknownCommand", args[0]) + "\n\n" + Usage),
             };
         }
@@ -196,7 +199,7 @@ internal static class Program
         var port = AdapterPorts.Find(Option(args, "--port"));
         Console.WriteLine("\n" + L.F("cli.write.adapter", port));
         var writer = new AdapterWriter(new SerialAdapterPort(port.PortName), s => Console.WriteLine("  " + s));
-        var r = writer.WriteAndVerify(profile);
+        var r = writer.WriteAndVerify(profile, SlotOption(args), Option(args, "--label"));
         Console.WriteLine($"\n{r.Message}");
         foreach (var d in r.Differences) Console.WriteLine($"  ≠ {d}");
         return r.Verified ? 0 : r.Saved ? 3 : 1;
@@ -253,7 +256,16 @@ internal static class Program
         var port = AdapterPorts.Find(Option(args, "--port"));
         bool json = HasFlag(args, "--json");
         using var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), json ? null : s => Console.WriteLine("  " + s));
-        var stored = conn.Session.ReadStored();
+        StoredProfile stored;
+        if (SlotOption(args) is { } slot)
+        {
+            if (!SlotCommands.Supports(conn.Session.GetFirmware()))
+                return Fail(L.F("cli.slots.needFirmware", FirmwareLimits.SlotsMinFirmware));
+            var d = conn.Session.ReadSlot(slot);
+            if (d != null && !json) Console.WriteLine(L.F("cli.slots.reading", d.Info.Number, d.Info.DisplayLabel));
+            stored = new StoredProfile(d?.Profile, ReadMethod.GetJm, d != null);
+        }
+        else stored = conn.Session.ReadStored();
         if (stored.Profile == null)
         {
             Console.WriteLine(L.T("cli.read.none"));
@@ -262,6 +274,71 @@ internal static class Program
         if (json) { Console.WriteLine(SaveJmJson.Serialize(stored.Profile)); return 0; }
         Console.WriteLine("\n" + L.F("cli.read.via", stored.Method == ReadMethod.GetJm ? "get_jm" : L.T("cli.read.viaDumppad")));
         PrintProfile(stored.Profile, null);
+        return 0;
+    }
+
+    /// <summary>--slot n (1..8, as shown to the user) → 0-based drawer.</summary>
+    private static int? SlotOption(string[] args)
+    {
+        if (Option(args, "--slot") is not { } s) return null;
+        if (!int.TryParse(s, out int n) || n < 1 || n > FirmwareLimits.MaxSlots)
+            throw new ArgumentException(L.F("cli.slots.badNumber", s, FirmwareLimits.MaxSlots));
+        return n - 1;
+    }
+
+    private static AdapterConnection ConnectForSlots(string[] args)
+    {
+        var port = AdapterPorts.Find(Option(args, "--port"));
+        var conn = AdapterConnection.Connect(new SerialAdapterPort(port.PortName), s => Console.WriteLine("  " + s));
+        if (!SlotCommands.Supports(conn.Session.GetFirmware()))
+        {
+            conn.Dispose();
+            throw new InvalidOperationException(L.F("cli.slots.needFirmware", FirmwareLimits.SlotsMinFirmware));
+        }
+        return conn;
+    }
+
+    private static int Slots(string[] args)
+    {
+        using var conn = ConnectForSlots(args);
+        var list = conn.Session.ListSlots();
+        Console.WriteLine("\n" + L.F("cli.slots.header", list.Count, FirmwareLimits.MaxSlots));
+        for (int i = 0; i < FirmwareLimits.MaxSlots; i++)
+        {
+            var s = list.FirstOrDefault(x => x.Slot == i);
+            Console.WriteLine(s == null
+                ? $"  [{i + 1}] {L.T("cli.slots.empty")}"
+                : $"  [{s.Number}] {s.DisplayLabel,-24}  {s.Ids}  {L.F("cli.slots.rules", s.RuleCount)}{(s.Analog ? " + " + L.T("cli.slots.analog") : "")}");
+        }
+        return 0;
+    }
+
+    private static int SlotRename(string[] args)
+    {
+        if (args.Length < 2 || args[0].StartsWith('-')) return Fail(L.T("cli.slots.renameUsage"));
+        int slot = SlotOption(new[] { "--slot", args[0] })!.Value;
+        using var conn = ConnectForSlots(args);
+        conn.Session.RenameSlot(slot, args[1]);
+        var d = conn.Session.ReadSlot(slot);
+        Console.WriteLine(L.F("cli.slots.renamed", slot + 1, d?.Info.DisplayLabel ?? ""));
+        return 0;
+    }
+
+    private static int SlotDelete(string[] args)
+    {
+        if (args.Length < 1 || args[0].StartsWith('-')) return Fail(L.T("cli.slots.deleteUsage"));
+        int slot = SlotOption(new[] { "--slot", args[0] })!.Value;
+        using var conn = ConnectForSlots(args);
+        var d = conn.Session.ReadSlot(slot);
+        if (d == null) return Fail(L.F("cli.slots.isEmpty", slot + 1));
+        if (!HasFlag(args, "--yes"))
+        {
+            Console.Write(L.F("cli.slots.deletePrompt", d.Info.Number, d.Info.DisplayLabel, d.Info.Ids));
+            if (!string.Equals(Console.ReadLine()?.Trim(), L.T("cli.flash.yesWord"), StringComparison.OrdinalIgnoreCase))
+                return Fail(L.T("cli.flash.cancelled"));
+        }
+        conn.Session.DeleteSlot(slot);
+        Console.WriteLine(L.F("cli.slots.deleted", d.Info.Number, d.Info.DisplayLabel));
         return 0;
     }
 

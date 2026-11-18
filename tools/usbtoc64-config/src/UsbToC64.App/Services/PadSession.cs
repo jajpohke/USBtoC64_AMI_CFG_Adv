@@ -1,3 +1,4 @@
+using UsbToC64.Core.Device;
 using UsbToC64.Core.Emulation;
 using UsbToC64.Core.Formats;
 using UsbToC64.Core.Hid;
@@ -37,6 +38,24 @@ public sealed class PadSession : IDisposable
     /// <summary>Recipes of <see cref="ExtraNotes"/>, so the notes can be rewritten in a new language.</summary>
     private readonly List<Func<string>> _extraNoteMakers = new();
     public List<Issue> Issues { get; private set; } = new();
+
+    /// <summary>Cards of the pads seen by this PC (%APPDATA%\USBtoC64Config\pads): controls for offline editing.</summary>
+    public PadCatalog Catalog { get; } = new(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "USBtoC64Config", "pads"));
+
+    /// <summary>Drawer being edited (opened from the drawers page); null = normal editing of the connected pad.</summary>
+    public SlotInfo? EditSlot { get; private set; }
+    /// <summary>Editing a drawer without its pad: the controls come from <see cref="OfflineFrom"/>.</summary>
+    public bool Offline { get; private set; }
+    public OfflineSource? OfflineFrom { get; private set; }
+    /// <summary>Rules of the drawer that match no control: kept as they are when saving.</summary>
+    private List<JmRule> _keptRules = new();
+    private List<byte> _keptAxesX = new(), _keptAxesY = new();
+    private ushort _offlineVid, _offlinePid;
+
+    /// <summary>VID/PID of the profile being edited (the pad, or the drawer when offline).</summary>
+    public ushort? TargetVid => Device?.Vid ?? (Offline ? _offlineVid : null);
+    public ushort? TargetPid => Device?.Pid ?? (Offline ? _offlinePid : null);
 
     /// <summary>Structure changed (pad, mapping, profile): rebuild the views.</summary>
     public event Action? Changed;
@@ -81,6 +100,14 @@ public sealed class PadSession : IDisposable
         string? error = null;
         try { Devices = PadDevices.List(); }
         catch (Exception ex) { Devices = new(); error = ex.Message; }
+        if (Offline && EditSlot != null)
+        {
+            // Editing a drawer without its pad: if the pad is now connected, go on with it (edits kept).
+            int i = Devices.FindIndex(d => d.Vid == _offlineVid && d.Pid == _offlinePid);
+            if (i >= 0 && Profile != null) OpenWithDevice(i, Profile, EditSlot);
+            else Changed?.Invoke();
+            return error;
+        }
         if (Devices.Count == 0) { Clear(); return error; }
         Select(0);
         return error;
@@ -92,6 +119,7 @@ public sealed class PadSession : IDisposable
         if (index < 0 || index >= Devices.Count) { Clear(); return null; }
         Device = Devices[index];
         ViewOnly = false; ViewHeader = null; ClearNotes();
+        EditSlot = null; Offline = false; OfflineFrom = null; _keptRules = new(); _keptAxesX = new(); _keptAxesY = new();
         try { Pad = Device.Describe(); }
         catch (Exception ex)
         {
@@ -99,14 +127,77 @@ public sealed class PadSession : IDisposable
             Clear();
             return msg;
         }
+        RememberCard(Device);
         Mapping = MappingProposer.Propose(Pad);
         Rebuild();
         StartReader();
         return null;
     }
 
+    private void RememberCard(PadDevice d) =>
+        Catalog.Save(new PadCard(d.Vid, d.Pid, d.Name, d.IsXInput ? d.XInputKind : null,
+            d.IsXInput || d.RawDescriptor == null ? null : Convert.ToHexString(d.RawDescriptor), DateTime.UtcNow));
+
+    // ------------------------------------------------------------------ drawers
+
+    /// <summary>
+    /// Opens a drawer for editing: with its pad when connected (live preview), otherwise from the card of the pad,
+    /// a known Xbox layout or the rules themselves.
+    /// </summary>
+    public void OpenSlot(SlotContent drawer)
+    {
+        int i = Devices.FindIndex(d => d.Vid == drawer.Info.Vid && d.Pid == drawer.Info.Pid);
+        if (i >= 0) { OpenWithDevice(i, drawer.Profile, drawer.Info); return; }
+
+        StopReader();
+        Device = null; ViewOnly = false; ViewHeader = null; ClearNotes();
+        var (pad, source) = OfflinePad.Describe(drawer.Profile, Catalog.Find(drawer.Info.Vid, drawer.Info.Pid));
+        Pad = pad;
+        Offline = true; OfflineFrom = source; EditSlot = drawer.Info;
+        _offlineVid = drawer.Info.Vid; _offlinePid = drawer.Info.Pid;
+        ApplyImported(MappingImporter.FromProfile(pad, drawer.Profile), drawer.Profile);
+    }
+
+    private void OpenWithDevice(int index, JmProfile profile, SlotInfo slot)
+    {
+        var err = Select(index);
+        if (err != null || Pad == null) return;
+        EditSlot = slot;
+        ApplyImported(MappingImporter.FromProfile(Pad, profile), profile);
+    }
+
+    /// <summary>Mapping from the drawer; rules matching no control are kept unchanged and listed as notes.</summary>
+    private void ApplyImported(MappingImporter.Result res, JmProfile source)
+    {
+        Mapping = res.Mapping;
+        _keptRules = res.UnmatchedRules.ToList();
+        _keptAxesX = source.AnalogX.Where(a => res.UnmatchedAxes.Contains(a)).ToList();
+        _keptAxesY = source.AnalogY.Where(a => res.UnmatchedAxes.Contains(a)).ToList();
+        ClearNotes();
+        foreach (var r in _keptRules) AddNote(() => L.F("pad.note.kept", Names.Rule(r)));
+        foreach (var a in res.UnmatchedAxes) AddNote(() => L.F("pad.note.axis", a));
+        Rebuild();
+    }
+
+    /// <summary>Back to the connected pad (leaves the drawer editing).</summary>
+    public void CloseSlot()
+    {
+        EditSlot = null;
+        Offline = false; OfflineFrom = null;
+        _keptRules = new(); _keptAxesX = new(); _keptAxesY = new();
+        if (Devices.Count > 0) Select(Math.Max(0, Device == null ? 0 : Devices.IndexOf(Device)));
+        else { Pad = null; Mapping = null; Profile = null; Rebuild(); }
+    }
+
+    /// <summary>After a save into a drawer: the editing continues on the saved drawer.</summary>
+    public void SlotSaved(SlotInfo info)
+    {
+        if (EditSlot != null) { EditSlot = info; Changed?.Invoke(); }
+    }
+
     private void Clear()
     {
+        if (Offline) return; // editing a drawer without its pad
         Device = null; Pad = null; Mapping = null;
         if (!ViewOnly) Profile = null;
         Rebuild();
@@ -119,6 +210,7 @@ public sealed class PadSession : IDisposable
         if (Pad == null) return;
         Mapping = MappingProposer.Propose(Pad);
         ViewOnly = false; ViewHeader = null; ClearNotes();
+        _keptRules = new(); _keptAxesX = new(); _keptAxesY = new();
         Rebuild();
     }
 
@@ -131,8 +223,14 @@ public sealed class PadSession : IDisposable
 
     private void Rebuild()
     {
-        if (!ViewOnly && Mapping != null && Device != null)
-            Profile = ProfileBuilder.Build(Mapping, Device.Vid, Device.Pid, Device.Name);
+        if (!ViewOnly && Mapping != null && (Device != null || Offline))
+        {
+            var p = ProfileBuilder.Build(Mapping, TargetVid!.Value, TargetPid!.Value, Device?.Name ?? EditSlot?.DisplayLabel);
+            foreach (var r in _keptRules) if (p.Rules.Count < FirmwareLimits.MaxRules) p.Rules.Add(r);
+            foreach (var a in _keptAxesX) if (!p.AnalogX.Contains(a)) p.AnalogX.Add(a);
+            foreach (var a in _keptAxesY) if (!p.AnalogY.Contains(a)) p.AnalogY.Add(a);
+            Profile = p;
+        }
         lock (_sync)
         {
             _engine = Profile != null && Device != null ? new DynamicEngine(Profile) : null;

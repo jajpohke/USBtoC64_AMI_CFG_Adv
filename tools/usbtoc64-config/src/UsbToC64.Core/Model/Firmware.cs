@@ -80,6 +80,13 @@ public static class FirmwareLimits
     /// <summary>Signed stick threshold on the high byte: 51/128 ≈ 40 % of the travel.</summary>
     public const sbyte SignedStickThreshold = 51;
 
+    /// <summary>First firmware with the 8 labelled profile drawers (list_jm, label_jm, del_jm).</summary>
+    public const string SlotsMinFirmware = "1.3.0";
+    /// <summary><c>JM_SLOTS</c> (Globals.h)</summary>
+    public const int MaxSlots = 8;
+    /// <summary><c>JM_LABEL_LEN</c>: label length in UTF-8 bytes.</summary>
+    public const int LabelMaxBytes = 24;
+
     public static bool IsDirection(JmFunc f) => f <= JmFunc.LeftUp;
     public static bool IsSigned(JmOp op) => op is JmOp.SignedLess or JmOp.SignedGreater;
 }

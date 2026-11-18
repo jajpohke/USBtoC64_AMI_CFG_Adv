@@ -10,7 +10,12 @@ namespace UsbToC64.Core.Formats;
 public static class SaveJmJson
 {
     /// <summary>Serializes in the exact key order used by the web configurator. No trailing newline.</summary>
-    public static string Serialize(JmProfile p)
+    public static string Serialize(JmProfile p) => Serialize(p, null, null);
+
+    /// <summary>
+    /// With a drawer and/or a label (firmware 1.3.0). Older firmware ignores the two extra keys.
+    /// </summary>
+    public static string Serialize(JmProfile p, int? slot, string? label)
     {
         var inv = CultureInfo.InvariantCulture;
         var sb = new StringBuilder();
@@ -31,7 +36,10 @@ public static class SaveJmJson
               .Append(",\"op\":").Append((int)r.Op)
               .Append(",\"f\":").Append((int)r.Func).Append('}');
         }
-        sb.Append("]}");
+        sb.Append(']');
+        if (slot != null) sb.Append(",\"slot\":").Append(slot.Value.ToString(inv));
+        if (label != null) sb.Append(",\"label\":").Append(JsonSerializer.Serialize(label));
+        sb.Append('}');
         return sb.ToString();
     }
 
@@ -76,10 +84,10 @@ public static class SaveJmJson
     public static int EstimateArduinoJsonBytes(JmProfile p)
     {
         const int slot = 16;
-        int slots = 8                                  // root members
+        int slots = 10                                 // root members (slot and label included)
                     + p.AnalogX.Count + p.AnalogY.Count // array elements
                     + p.Rules.Count * (1 + 4);          // array element + 4 members each
-        int strings = "save_jm".Length + 1
+        int strings = "save_jm".Length + 1 + FirmwareLimits.LabelMaxBytes + 1 + "slotlabel".Length + 2
                       + "cmd vid pid dpad_idx use_analog analog_x analog_y rules i v op f".Replace(" ", "").Length + 12;
         return slots * slot + strings;
     }

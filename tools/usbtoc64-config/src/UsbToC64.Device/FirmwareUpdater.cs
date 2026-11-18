@@ -14,8 +14,33 @@ public sealed record FlashResult(bool Success, string Message);
 public sealed class FirmwareUpdater
 {
     private readonly Action<string> _log;
+    private readonly Action<OpProgress> _progress;
 
-    public FirmwareUpdater(Action<string>? log = null) => _log = log ?? (_ => { });
+    public FirmwareUpdater(Action<string>? log = null, Action<OpProgress>? progress = null)
+    {
+        _log = log ?? (_ => { });
+        _progress = progress ?? (_ => { });
+    }
+
+    /// <summary>
+    /// Progress of the esptool output: connection, erase (no percentage), writing (percentage), verification, reset.
+    /// Overall share: connect 0–5 %, erase 5–15 %, write 15–85 %, verify 85–88 %, restart and check up to 100 %.
+    /// </summary>
+    public static OpProgress? ParseEsptoolLine(string line)
+    {
+        if (line.Contains("Erasing flash", StringComparison.OrdinalIgnoreCase)) return new(OpPhase.Erase, null);
+        var m = Progress.Match(line);
+        if (m.Success && line.Contains("Writing at", StringComparison.Ordinal))
+        {
+            int pct = Math.Clamp(int.Parse(m.Groups[1].Value), 0, 100);
+            return new(OpPhase.Write, 0.15 + 0.70 * pct / 100.0, pct);
+        }
+        if (line.Contains("Hash of data verified", StringComparison.OrdinalIgnoreCase)) return new(OpPhase.Verify, 0.88);
+        if (line.Contains("Hard resetting", StringComparison.OrdinalIgnoreCase)) return new(OpPhase.Restart, 0.90);
+        if (line.Contains("Connecting", StringComparison.OrdinalIgnoreCase) || line.Contains("Chip is", StringComparison.OrdinalIgnoreCase))
+            return new(OpPhase.Connect, 0.03);
+        return null;
+    }
 
     public static string? FindEsptool(string directory)
     {
@@ -113,12 +138,14 @@ public sealed class FirmwareUpdater
             return new(false, L.T("flash.noesptoolzip"));
         var args = BuildArguments(portName, chip, address, binPath);
         _log($"> esptool {args}");
+        _progress(new OpProgress(OpPhase.Connect, 0.01));
         int exit;
         try { exit = Run(esptool, args, TimeSpan.FromMinutes(5), null, quiet: false); }
         catch (Exception ex) { return new(false, L.F("flash.nostart", ex.Message)); }
         if (exit != 0)
             return new(false, L.F("flash.failed", exit));
         _log(L.T("flash.written"));
+        _progress(new OpProgress(OpPhase.Restart, 0.90));
         return null;
     }
 
@@ -126,6 +153,7 @@ public sealed class FirmwareUpdater
     private AdapterConnection ConnectAfterFlash(string portName)
     {
         var port = new SerialAdapterPort(portName);
+        _progress(new OpProgress(OpPhase.Check, 0.93));
         var until = DateTime.UtcNow + TimeSpan.FromSeconds(20);
         while (DateTime.UtcNow < until && !port.IsPresent()) Thread.Sleep(200);
         Thread.Sleep(3500); // firmware start-up delay (2 s) + banner
@@ -151,6 +179,7 @@ public sealed class FirmwareUpdater
             if (string.IsNullOrWhiteSpace(line)) return;
             capture?.Invoke(line.Trim());
             if (quiet) return;
+            if (ParseEsptoolLine(line) is { } prog) _progress(prog);
             // esptool prints a progress line per block: keep one every 10 %.
             var m = Progress.Match(line);
             if (m.Success && line.Contains("Writing at", StringComparison.Ordinal))

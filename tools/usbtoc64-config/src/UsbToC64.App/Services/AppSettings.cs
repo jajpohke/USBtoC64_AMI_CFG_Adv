@@ -7,6 +7,9 @@ public sealed class AppSettings
 {
     public bool StartAdvanced { get; set; }
 
+    /// <summary>Details of the progress panel open (default: closed, a link opens them).</summary>
+    public bool ShowProgressDetails { get; set; }
+
     /// <summary>"en", "it", "es", "de"; null = English (default).</summary>
     public string? Language { get; set; }
 

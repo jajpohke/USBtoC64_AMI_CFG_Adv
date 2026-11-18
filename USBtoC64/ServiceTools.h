@@ -624,6 +624,13 @@ inline void handleServiceMenu() {
             dual_println("\n--- ℹ️ SYSTEM INFO (NVS) ---");
             dual_println("Mouse Config Saved: " + String((prefs.isKey("c64_speed") || prefs.isKey("amiga_speed")) ? "YES" : "NO"));
             dual_println("Custom Gamepad Saved: " + String(prefs.getBool("has_custom", false) ? "YES" : "NO"));
+            {
+                NVS_JM_Slot js;
+                dual_printf("Pad Profile Slots: %d of %d used\n", jm_slot_count(), JM_SLOTS);
+                for (int i = 0; i < JM_SLOTS; i++)
+                    if (jm_slot_read(i, js))
+                        dual_printf("  [%d] %04X:%04X  %s\n", i + 1, js.blob.vid, js.blob.pid, js.label[0] ? js.label : "WebConfigured");
+            }
             dual_println("Custom LED Palette: " + String(prefs.getBool("has_colors", false) ? "YES" : "NO"));
             dual_println("Developer Mode: " + String(dev_mode ? "ON" : "OFF"));
             dual_println("Switch Invert Logic: " + String(prefs.getBool("inv_switch", false) ? "ACTIVE" : "INACTIVE"));
@@ -633,29 +640,29 @@ else if (command == "dumppad") {
             dual_println("\n--- 🔍 NVS PAD DUMP ---");
             dual_printf("has_custom   : %s\n", prefs.getBool("has_custom", false) ? "TRUE" : "FALSE");
             
-            size_t jm_size = prefs.getBytesLength("jm_blob");
             size_t cust_size = prefs.getBytesLength("cust_blob");
-            
-            if (jm_size > 0) {
-                dual_println("\n[ TIER 0: HTML DYNAMIC RULES ]");
-                NVS_JM_Blob jm_data;
-                prefs.getBytes("jm_blob", &jm_data, sizeof(NVS_JM_Blob));
+            int jm_used = 0;
+
+            for (int slot = 0; slot < JM_SLOTS; slot++) {
+                NVS_JM_Slot js;
+                if (!jm_slot_read(slot, js)) continue;
+                jm_used++;
+                const NVS_JM_Blob &jm_data = js.blob;
+                dual_printf("\n[ TIER 0: SLOT %d \"%s\" ]\n", slot + 1, js.label[0] ? js.label : "WebConfigured");
                 dual_printf("vid          : 0x%04X\n", jm_data.vid);
                 dual_printf("pid          : 0x%04X\n", jm_data.pid);
                 dual_printf("dpad_index   : %d\n", jm_data.dpad_index);
                 dual_printf("rule_count   : %d\n", jm_data.rule_count);
-                
+
                 const char* op_names[] = { "==", "BIT", "HAT", "S<", "S>" };
                 const char* func_names[] = { "UP", "UP_RIGHT", "RIGHT", "RIGHT_DOWN", "DOWN", "DOWN_LEFT", "LEFT", "LEFT_UP", "FIRE 1", "FIRE 2", "FIRE 3", "AUTO ON", "AUTO OFF", "AUTO HOLD", "AUTO L/R ON", "AUTO L/R OFF" };
-                
+
                 for (int i = 0; i < jm_data.rule_count && i < JM_DYN_MAX_RULES; i++) {
                     JM_Rule r = jm_data.rules[i];
                     const char* op_str = ((uint8_t)r.op <= 4) ? op_names[r.op] : "???";
                     const char* func_str = (r.func <= 15) ? func_names[r.func] : "???";
                     dual_printf("  Rule %02d    : Byte[%d] %-3s %3d  ->  Action: %s\n", i+1, r.index, op_str, r.value, func_str);
                 }
-                
-                dual_printf("jm_blob size : %d bytes\n", (int)jm_size);
 
                 // Analog axes
                 dual_printf("use_analog   : %s\n", jm_data.use_analog ? "YES" : "NO");
@@ -674,7 +681,7 @@ else if (command == "dumppad") {
                     dual_println("]");
                 }
             }
-            
+
             if (cust_size > 0 || prefs.isKey("vid")) {
                 dual_println("\n[ TIER 1: LEGACY / SNIFFER ]");
                 dual_printf("vid          : 0x%04X\n", prefs.getUInt("vid", 0));
@@ -688,7 +695,7 @@ else if (command == "dumppad") {
                 dual_printf("cust_blob    : %d bytes\n", (int)cust_size);
             }
             
-            if (jm_size == 0 && cust_size == 0 && !prefs.isKey("vid")) {
+            if (jm_used == 0 && cust_size == 0 && !prefs.isKey("vid")) {
                 dual_println(">>> NO PROFILE SAVED IN MEMORY <<<");
             }
             dual_println("-----------------------");

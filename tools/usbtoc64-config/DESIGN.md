@@ -344,6 +344,26 @@ Il firmware precedente tratterebbe op 3/4 come `==`: il tool **rifiuta di scrive
 
 ---
 
+### 7.2 Firmware 1.3.0: 8 cassetti con etichetta (proto 2)
+
+- **Memoria:** chiavi NVS `jm_s0`…`jm_s7`, ognuna `NVS_JM_Slot { seq, label[25], NVS_JM_Blob }` (≈176 byte);
+  `jm_seq` conta i salvataggi. Un cassetto per VID/PID. Al primo avvio il vecchio `jm_blob` viene spostato in un
+  cassetto senza etichetta e cancellato.
+- **Uso:** alla connessione il TIER 0 carica il cassetto con VID/PID del pad (non più un solo blob caricato all'avvio).
+- **`save_jm`:** campi opzionali `slot` (0–7) e `label` (≤ 24 byte UTF-8). Senza `slot`: cassetto del pad, poi il
+  primo libero, poi il più vecchio (configuratore web). Senza `label`: un nuovo salvataggio dello stesso pad
+  mantiene l'etichetta; un cassetto nuovo resta senza (il programma mostra *WebConfigured*). Un altro cassetto con
+  lo stesso VID/PID viene svuotato. Risposta `{"status":"ok","slot":n}`, poi riavvio come prima.
+- **Nuovi comandi:** `get_jm` con `slot` (senza: il più recente, come il proto 1, con in più `slot`, `label`,
+  `seq`); `list_jm`; `label_jm` (`slot`, `label`); `del_jm` (`slot`). `get_version` risponde `proto 2, slots 8`.
+- **`clear_mem pad`** svuota tutti i cassetti; `mem_status`, `info`, `dumppad` li riportano.
+- **Compatibilità:** le pagine web usano solo `save_jm` (senza i campi nuovi), `get_info`, `mem_status`, `clear_mem`:
+  stesso comportamento e stesse risposte (`ok` con un campo in più). Il programma con firmware 1.2.x continua a
+  usare il profilo unico.
+- **Programma:** `SlotCommands` (Core) per list/read/rename/delete; scrittura con cassetto ed etichetta e rilettura
+  del cassetto; schede dei pad visti in `%APPDATA%\USBtoC64Config\pads` per la modifica senza pad
+  (`OfflinePad`: scheda → layout Xbox noto → tasti ricostruiti dalle regole; le regole senza tasto restano invariate).
+
 ## 8. Rischi
 
 | Rischio | Mitigazione |

@@ -64,6 +64,7 @@
                             <ui:Button x:Name="AdapterRetry" Content="{l:T simple.retry}" Icon="{ui:SymbolIcon ArrowSync24}" Visibility="Collapsed" Click="AdapterRetry_Click" />
                             <ui:ProgressRing x:Name="AdapterRing" IsIndeterminate="True" Width="20" Height="20" Visibility="Collapsed" />
                         </StackPanel>
+                        <c:ProgressPanel x:Name="FlashProgress" />
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -104,10 +105,7 @@
                         <ui:Button x:Name="SaveBtn" Appearance="Primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                                    Height="56" FontSize="18" FontWeight="Bold" Icon="{ui:SymbolIcon ArrowUpload24}"
                                    Content="{l:T simple.save}" Click="Save_Click" />
-                        <StackPanel x:Name="Saving" Orientation="Horizontal" Margin="0,10,0,0" Visibility="Collapsed">
-                            <ui:ProgressRing IsIndeterminate="True" Width="18" Height="18" Margin="0,0,10,0" />
-                            <TextBlock Text="{l:T simple.saving}" VerticalAlignment="Center" />
-                        </StackPanel>
+                        <c:ProgressPanel x:Name="SaveProgress" />
                         <TextBlock x:Name="SaveHint" Style="{StaticResource Hint}" Margin="0,8,0,0" TextWrapping="Wrap" />
                         <!-- Theme colours (WPF-UI InfoBar success), readable in light and dark. -->
                         <Border x:Name="DoneCard" CornerRadius="8" Padding="14,10" Margin="0,10,0,0" Visibility="Collapsed"
@@ -117,7 +115,7 @@
                                 <ui:SymbolIcon DockPanel.Dock="Left" Symbol="CheckmarkCircle24" Filled="True" FontSize="20" Margin="0,0,10,0"
                                                VerticalAlignment="Top" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
                                 <StackPanel>
-                                    <TextBlock Text="{l:T simple.done.title}" FontWeight="SemiBold"
+                                    <TextBlock x:Name="DoneTitle" Text="{l:T simple.done.title}" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="{l:T simple.done.text}" Margin="0,4,0,0"
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap" />
