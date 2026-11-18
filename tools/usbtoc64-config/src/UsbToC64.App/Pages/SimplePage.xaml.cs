@@ -7,6 +7,7 @@ using UsbToC64.Core.Device;
 using UsbToC64.Core.Model;
 using UsbToC64.Core.Text;
 using UsbToC64.Core.Validation;
+using UsbToC64.Device;
 using MessageBox = System.Windows.MessageBox;
 
 namespace UsbToC64.App.Pages;
@@ -37,6 +38,7 @@ public partial class SimplePage : UserControl
     private AdapterStep _adapter = AdapterStep.Checking;
     private bool _fillingCombo;
     private bool _saving;
+    private bool _flashing;
     private bool _statusSeen;
 
     public SimplePage(MainWindow w)
@@ -47,6 +49,8 @@ public partial class SimplePage : UserControl
         Hub.StatusChanged += () => Dispatcher.BeginInvoke(() => { _statusSeen = true; Refresh(); });
         Hub.BusyChanged += _ => Dispatcher.BeginInvoke(Refresh);
         Session.Changed += () => Dispatcher.BeginInvoke(Refresh);
+        FlashProgress.Attach(Hub);
+        SaveProgress.Attach(Hub);
         L.Changed += () => Dispatcher.BeginInvoke(Refresh);
         _timer.Tick += (_, _) =>
         {
@@ -74,12 +78,19 @@ public partial class SimplePage : UserControl
         var s = Hub.Status;
         var fw = s.Firmware;
         var m = Hub.Manifest;
-        bool checking = Hub.IsBusy && !_saving;
+        bool checking = Hub.IsBusy && !_saving && !_flashing;
 
         // ---- step 1
         AdapterAction.Visibility = AdapterFile.Visibility = AdapterRetry.Visibility = Visibility.Collapsed;
         AdapterRing.Visibility = checking ? Visibility.Visible : Visibility.Collapsed;
-        if ((checking || !_statusSeen) && s.Info == null && !s.NoAnswer)
+        if (_flashing)
+        {
+            // Firmware installation running: the progress panel below tells the rest.
+            SetNum(Num1, Num1Text, "1", CurBg, CurFg);
+            AdapterState.Text = L.T("simple.update.running");
+            AdapterHint.Text = "";
+        }
+        else if ((checking || !_statusSeen) && s.Info == null && !s.NoAnswer)
         {
             _adapter = AdapterStep.Checking;
             SetNum(Num1, Num1Text, "1", CurBg, CurFg);
@@ -256,8 +267,13 @@ public partial class SimplePage : UserControl
         if (MessageBox.Show(_w,
                 L.F("simple.update.confirm", m.Version) + (Hub.StoredPadsWarning() is { } w ? "\n\n" + w : ""),
                 L.T("simple.adapter.update"), MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
-        AdapterState.Text = L.T("simple.update.running");
-        var r = await Hub.FlashAsync();
+        _flashing = true;
+        FlashProgress.Begin();
+        Refresh();
+        FlashResult r;
+        try { r = await Hub.FlashAsync(FlashProgress.Report); }
+        finally { _flashing = false; }
+        FlashProgress.End(r.Success);
         await _w.CheckAdapterAsync(probeIfSilent: false);
         _w.RefreshFirmwareBar();
         if (!r.Success) MessageBox.Show(_w, r.Message, L.T("simple.update.title"), MessageBoxButton.OK, MessageBoxImage.Error);
@@ -265,7 +281,9 @@ public partial class SimplePage : UserControl
 
     private async void AdapterFile_Click(object sender, RoutedEventArgs e)
     {
-        await ((FirmwarePage)_w.Page("firmware")).InstallFromFileAsync();
+        _flashing = true;
+        try { await ((FirmwarePage)_w.Page("firmware")).InstallFromFileAsync(FlashProgress); }
+        finally { _flashing = false; }
         Refresh();
     }
 
@@ -288,15 +306,12 @@ public partial class SimplePage : UserControl
         _saving = true;
         DoneCard.Visibility = Visibility.Collapsed;
         SaveError.Visibility = Visibility.Collapsed;
-        Saving.Visibility = Visibility.Visible;
         SaveBtn.IsEnabled = false;
+        SaveProgress.Begin();
         WriteResult r;
-        try { r = await Hub.WriteAsync(p, slot, label); }
-        finally
-        {
-            _saving = false;
-            Saving.Visibility = Visibility.Collapsed;
-        }
+        try { r = await Hub.WriteAsync(p, slot, label, SaveProgress.Report); }
+        finally { _saving = false; }
+        SaveProgress.End(r.Verified);
         if (r.Verified)
         {
             DoneTitle.Text = r.Slot != null ? L.F("simple.done.titleSlot", r.Label, r.Slot + 1) : L.T("simple.done.title");

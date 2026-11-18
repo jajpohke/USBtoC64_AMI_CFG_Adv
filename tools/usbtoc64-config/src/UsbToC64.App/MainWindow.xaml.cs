@@ -37,7 +37,18 @@ public partial class MainWindow : FluentWindow
         L.Changed += () => Dispatcher.BeginInvoke(() => { UpdateAdapterCard(); UpdateFirmwareBar(Hub.Status); });
         Hub.BusyChanged += busy => Dispatcher.BeginInvoke(() => AdapterCheck.IsEnabled = !busy);
         Loaded += async (_, _) => await StartupAsync();
-        Closing += (_, _) => { Pad.Dispose(); Hub.Dispose(); };
+        Closing += (_, e) =>
+        {
+            // Closing while writing the firmware or a profile can leave the adapter without a working program.
+            if (Hub.IsBusy && System.Windows.MessageBox.Show(this, L.T("main.close.busy"), L.T("main.close.title"),
+                    System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning,
+                    System.Windows.MessageBoxResult.No) != System.Windows.MessageBoxResult.Yes)
+            {
+                e.Cancel = true;
+                return;
+            }
+            Pad.Dispose(); Hub.Dispose();
+        };
         Nav.SelectedIndex = 0;
     }
 

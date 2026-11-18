@@ -207,7 +207,7 @@ public sealed class AdapterHub : IDisposable
             return new FirmwareUpdater(Log).ProbeChip(portName);
         });
 
-    public async Task<FlashResult> FlashFileAsync(string binPath)
+    public async Task<FlashResult> FlashFileAsync(string binPath, Action<OpProgress>? progress = null)
     {
         FlashResult r;
         try
@@ -215,7 +215,7 @@ public sealed class AdapterHub : IDisposable
             r = await Run(L.T("hub.op.flashFile"), portName =>
             {
                 _ports.Remove(portName);
-                return new FirmwareUpdater(Log).UpdateFromFile(portName, binPath);
+                return new FirmwareUpdater(Log, progress).UpdateFromFile(portName, binPath);
             });
         }
         catch (Exception ex) { r = new FlashResult(false, ex.Message); }
@@ -225,13 +225,14 @@ public sealed class AdapterHub : IDisposable
 
     /// <param name="slot">Drawer (0-based, firmware 1.3.0+); null = the pad's drawer, else a free one, else the oldest.</param>
     /// <param name="label">Drawer label (firmware 1.3.0+); null = keep the label the pad already has.</param>
-    public async Task<WriteResult> WriteAsync(JmProfile profile, int? slot = null, string? label = null)
+    public async Task<WriteResult> WriteAsync(JmProfile profile, int? slot = null, string? label = null,
+        Action<OpProgress>? progress = null)
     {
         WriteResult r;
         try
         {
             r = await Run(L.T("hub.op.write"), portName =>
-                new AdapterWriter(PortFor(portName), Log).WriteAndVerify(profile, slot, label));
+                new AdapterWriter(PortFor(portName), Log) { Progress = progress }.WriteAndVerify(profile, slot, label));
         }
         catch (Exception ex) { r = new WriteResult(false, false, null, new(), ex.Message); }
         Log(r.Message);
@@ -324,7 +325,7 @@ public sealed class AdapterHub : IDisposable
         return (s, slot);
     }
 
-    public async Task<FlashResult> FlashAsync()
+    public async Task<FlashResult> FlashAsync(Action<OpProgress>? progress = null)
     {
         if (Manifest == null) return new FlashResult(false, L.T("hub.noFirmware"));
         var m = Manifest;
@@ -334,7 +335,7 @@ public sealed class AdapterHub : IDisposable
             r = await Run(L.T("hub.op.flash"), portName =>
             {
                 _ports.Remove(portName); // the board restarts: forget the DTR/RTS combination learnt before
-                return new FirmwareUpdater(Log).Update(portName, m);
+                return new FirmwareUpdater(Log, progress).Update(portName, m);
             });
         }
         catch (Exception ex) { r = new FlashResult(false, ex.Message); }

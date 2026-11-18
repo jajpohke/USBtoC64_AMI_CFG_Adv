@@ -339,6 +339,8 @@ public sealed class AdapterWriter
     private readonly Action<TimeSpan> _sleep;
 
     public TimeSpan ReplyTimeout { get; init; } = TimeSpan.FromSeconds(3);
+    /// <summary>Phases of the save, for a progress bar.</summary>
+    public Action<OpProgress>? Progress { get; init; }
     public TimeSpan RebootTimeout { get; init; } = TimeSpan.FromSeconds(20);
     /// <summary>The firmware waits 2 s after Serial.begin before accepting commands.</summary>
     public TimeSpan BootDelay { get; init; } = TimeSpan.FromSeconds(3);
@@ -360,6 +362,8 @@ public sealed class AdapterWriter
         // 1) send and wait for the reply
         bool lostAfterSend = false;
         // 0) open + communication test before sending anything
+        void Step(OpPhase ph, double overall) => Progress?.Invoke(new OpProgress(ph, overall));
+        Step(OpPhase.Connect, 0.05);
         AdapterConnection conn;
         try { conn = AdapterConnection.Connect(_port, _log, _sleep, bootDelay: BootDelay); }
         catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or IOException or UnauthorizedAccessException)
@@ -385,6 +389,7 @@ public sealed class AdapterWriter
         try
         {
             JsonDocument? reply;
+            Step(OpPhase.Send, 0.25);
             try
             {
                 reply = session.RequestJson(json, ReplyTimeout);
@@ -424,6 +429,7 @@ public sealed class AdapterWriter
             _log(L.T("proto.probablereboot"));
 
         // 2) wait for the reboot: the port disappears and comes back
+        Step(OpPhase.Restart, 0.45);
         var deadline = DateTime.UtcNow + RebootTimeout;
         var goneUntil = DateTime.UtcNow + TimeSpan.FromSeconds(3);
         while (DateTime.UtcNow < goneUntil && _port.IsPresent()) _sleep(TimeSpan.FromMilliseconds(100));
@@ -441,6 +447,7 @@ public sealed class AdapterWriter
         try
         {
             _log(L.T("proto.readingback"));
+            Step(OpPhase.ReadBack, 0.75);
             using var readConn = AdapterConnection.Connect(_port, _log, _sleep, bootDelay: BootDelay);
             if (drawers)
             {
@@ -460,6 +467,7 @@ public sealed class AdapterWriter
         if (stored.Profile == null)
             return new WriteResult(false, false, stored.Method, new(), L.T("proto.noprofileafter"));
 
+        Step(OpPhase.Compare, 0.95);
         var diff = ProfileComparer.Compare(profile, stored.Profile);
         if (drawer != null && label != null && drawer.Info.Label != label)
             diff.Add(L.F("slot.labeldiff", label, drawer.Info.DisplayLabel));
