@@ -85,11 +85,21 @@
                             <Setter Property="ToolTip" Value="{Binding Note}" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                    <Setter Property="Background" Value="#3346B55A" />
+                                    <Setter Property="Background" Value="#5546B55A" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </DataGrid.RowStyle>
+                    <!-- The WPF-UI cell style paints its own background: the highlight of the pressed control goes on the cells. -->
+                    <DataGrid.CellStyle>
+                        <Style TargetType="DataGridCell" BasedOn="{StaticResource DefaultDataGridCellStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                    <Setter Property="Background" Value="#5546B55A" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.CellStyle>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="" Binding="{Binding Glyph}" Width="34" IsReadOnly="True" />
                         <DataGridTextColumn Header="{l:T gp.col.control}" Binding="{Binding Name}" Width="1.4*" IsReadOnly="True" />

@@ -626,7 +626,7 @@ inline void handleServiceMenu() {
             dual_println("Custom Gamepad Saved: " + String(prefs.getBool("has_custom", false) ? "YES" : "NO"));
             {
                 NVS_JM_Slot js;
-                dual_printf("Pad Drawers: %d of %d used\n", jm_slot_count(), JM_SLOTS);
+                dual_printf("Pad Profile Slots: %d of %d used\n", jm_slot_count(), JM_SLOTS);
                 for (int i = 0; i < JM_SLOTS; i++)
                     if (jm_slot_read(i, js))
                         dual_printf("  [%d] %04X:%04X  %s\n", i + 1, js.blob.vid, js.blob.pid, js.label[0] ? js.label : "WebConfigured");
@@ -648,7 +648,7 @@ else if (command == "dumppad") {
                 if (!jm_slot_read(slot, js)) continue;
                 jm_used++;
                 const NVS_JM_Blob &jm_data = js.blob;
-                dual_printf("\n[ TIER 0: DRAWER %d \"%s\" ]\n", slot + 1, js.label[0] ? js.label : "WebConfigured");
+                dual_printf("\n[ TIER 0: SLOT %d \"%s\" ]\n", slot + 1, js.label[0] ? js.label : "WebConfigured");
                 dual_printf("vid          : 0x%04X\n", jm_data.vid);
                 dual_printf("pid          : 0x%04X\n", jm_data.pid);
                 dual_printf("dpad_index   : %d\n", jm_data.dpad_index);

@@ -342,7 +342,7 @@ void start_sniff(uint8_t addr) {
             jm_apply_blob(jm_slot.blob);
             use_html_configurator = true;
             found_custom = true;
-            dual_printf(">>> TIER 0 MATCH: drawer %d \"%s\"\n", active_slot + 1,
+            dual_printf(">>> TIER 0 MATCH: slot %d \"%s\"\n", active_slot + 1,
                         jm_slot.label[0] ? jm_slot.label : "WebConfigured");
         }
     }
