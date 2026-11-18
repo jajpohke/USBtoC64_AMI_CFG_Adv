@@ -131,3 +131,67 @@ public class SlotTests
         Assert.Equal(2, back.Rules.Count);
     }
 }
+
+/// <summary>Editing a drawer without the pad: controls rebuilt from the rules.</summary>
+public class OfflinePadTests
+{
+    [Theory]
+    [InlineData("JoystickMapping_25.h")]
+    [InlineData("JoystickMapping_24.h")]
+    [InlineData("JoystickMapping_2_1.h")]
+    [InlineData("JoystickMapping_3_1.h")]
+    public void FromRules_EveryRuleFindsItsControl(string fixture)
+    {
+        var text = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", fixture));
+        var profile = UsbToC64.Core.Formats.HeaderImporter.Import(text).Profile;
+        var pad = UsbToC64.Core.Hid.OfflinePad.FromRules(profile);
+        var res = UsbToC64.Core.Mapping.MappingImporter.FromProfile(pad, profile);
+        // Only "==" rules on several bits and AUTO L/R cannot become controls.
+        Assert.All(res.UnmatchedRules, r => Assert.True(
+            (r.Op == JmOp.Eq && (r.Value & (r.Value - 1)) != 0) || r.Func >= JmFunc.AutoLeftRightOn
+            || res.Mapping.Pad.Controls.Any(c => c.ByteIndex == r.Index), r.ToString()));
+        Assert.Empty(res.UnmatchedAxes);
+    }
+
+    [Fact]
+    public void FromRules_ThenRebuild_KeepsButtonsAndAxes()
+    {
+        var p = new JmProfile { Vid = 1, Pid = 2 };
+        p.Rules.Add(new JmRule(5, 0x20, JmOp.BitAny, JmFunc.Fire1));
+        p.Rules.Add(new JmRule(6, 0x01, JmOp.Eq, JmFunc.Fire2));
+        p.Rules.Add(new JmRule(14, unchecked((byte)(sbyte)-51), JmOp.SignedLess, JmFunc.Left));
+        p.Rules.Add(new JmRule(14, 51, JmOp.SignedGreater, JmFunc.Right));
+        p.AnalogY.Add(4);
+        var pad = UsbToC64.Core.Hid.OfflinePad.FromRules(p);
+        var m = UsbToC64.Core.Mapping.MappingImporter.FromProfile(pad, p);
+        Assert.Empty(m.UnmatchedRules);
+        var rebuilt = UsbToC64.Core.Mapping.ProfileBuilder.Build(m.Mapping, 1, 2);
+        Assert.Contains(rebuilt.Rules, r => r.Index == 5 && r.Value == 0x20 && r.Func == JmFunc.Fire1);
+        Assert.Contains(rebuilt.Rules, r => r.Index == 6 && r.Value == 0x01 && r.Func == JmFunc.Fire2);
+        Assert.Contains(rebuilt.Rules, r => r.Index == 14 && r.Op == JmOp.SignedGreater && r.Func == JmFunc.Right);
+        Assert.Equal(new byte[] { 4 }, rebuilt.AnalogY);
+    }
+
+    [Fact]
+    public void Describe_UsesTheCardWhenThePadWasSeen()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "usbtoc64-cards-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var catalog = new UsbToC64.Core.Hid.PadCatalog(dir);
+            catalog.Save(new UsbToC64.Core.Hid.PadCard(0x0810, 0x0001, "USB Gamepad", null,
+                Convert.ToHexString(Descriptors.Ps3Clone0810), DateTime.UtcNow));
+            var card = catalog.Find(0x0810, 0x0001);
+            Assert.NotNull(card);
+            var p = new JmProfile { Vid = 0x0810, Pid = 0x0001 };
+            p.Rules.Add(new JmRule(5, 0x20, JmOp.BitAny, JmFunc.Fire1));
+            var (pad, src) = UsbToC64.Core.Hid.OfflinePad.Describe(p, card);
+            Assert.Equal(UsbToC64.Core.Hid.OfflineSource.Card, src);
+            Assert.True(pad.Controls.Count > 4);
+            Assert.Equal(UsbToC64.Core.Hid.OfflineSource.Rules, UsbToC64.Core.Hid.OfflinePad.Describe(p, null).Source);
+            Assert.Equal(UsbToC64.Core.Hid.OfflineSource.KnownXbox,
+                UsbToC64.Core.Hid.OfflinePad.Describe(new JmProfile { Vid = 0x045E, Pid = 0x02EA }, null).Source);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+}

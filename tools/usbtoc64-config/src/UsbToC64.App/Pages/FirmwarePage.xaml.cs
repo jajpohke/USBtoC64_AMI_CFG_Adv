@@ -93,6 +93,9 @@ public partial class FirmwarePage : UserControl
 
     private async void File_Click(object sender, RoutedEventArgs e) => await InstallFromFileAsync();
 
+    /// <summary>The pad profiles that the installation will erase (warning added to the confirmations).</summary>
+    private string PadsWarning() => Hub.StoredPadsWarning() is { } w ? "\n\n" + w : "";
+
     /// <summary>Full image chosen by the user, always at 0x0 (also used when the adapter is blank).</summary>
     public async Task InstallFromFileAsync()
     {
@@ -100,7 +103,7 @@ public partial class FirmwarePage : UserControl
         var dlg = new OpenFileDialog { Title = L.T("fwp.file.dialogTitle"), Filter = L.T("fwp.file.filter") };
         if (dlg.ShowDialog(_w) != true) return;
         var answer = MessageBox.Show(_w,
-            L.F("fwp.file.confirm", Path.GetFileName(dlg.FileName)),
+            L.F("fwp.file.confirm", Path.GetFileName(dlg.FileName)) + PadsWarning(),
             L.T("fwp.file.confirmTitle"), MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel);
         if (answer != MessageBoxResult.OK) return;
         OpPanel.Begin(L.F("fwp.op.installing", Path.GetFileName(dlg.FileName)));
@@ -118,7 +121,7 @@ public partial class FirmwarePage : UserControl
         var m = Hub.Manifest;
         if (m == null || Hub.IsBusy) return;
         if (confirm && MessageBox.Show(_w,
-                L.F("fwp.included.confirm", m.Version),
+                L.F("fwp.included.confirm", m.Version) + PadsWarning(),
                 L.T("fwp.included.confirmTitle"), MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
         OpPanel.Begin(L.T("fwp.op.installIncluded"));
         var r = await Hub.FlashAsync();
@@ -134,7 +137,7 @@ public partial class FirmwarePage : UserControl
         var m = Hub.Manifest;
         if (m == null || Hub.IsBusy) return;
         var answer = MessageBox.Show(_w,
-            L.F("fwp.update.confirm", m.Version),
+            L.F("fwp.update.confirm", m.Version) + PadsWarning(),
             L.T("fwp.update.title"), MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning, MessageBoxResult.Cancel);
         if (answer != MessageBoxResult.OK) return;
 

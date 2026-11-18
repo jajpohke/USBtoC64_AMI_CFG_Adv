@@ -21,7 +21,7 @@ The zip contains:
 | File | What it is |
 |---|---|
 | `USBtoC64Config.exe` | the program |
-| `USBtoC64_Adv.bin`, `firmware.json` | the adapter firmware included with the program (version 1.2.3) |
+| `USBtoC64_Adv.bin`, `firmware.json` | the adapter firmware included with the program (version 1.3.0) |
 | `esptool.exe` | the tool used to install the firmware |
 | `usbtoc64.exe` | the same functions from the command line (for advanced users) |
 
@@ -57,7 +57,7 @@ Connect the adapter to the PC with the USB-C cable (**without** the C64/Amiga). 
 
 ![Adapter not found](images/windowstool/simple-1-not-found.png)
 
-**Updating the firmware.** The program includes the firmware it needs (1.2.3) and installs it by itself.
+**Updating the firmware.** The program includes the firmware it needs (1.3.0) and installs it by itself.
 
 > ⚠️ The update **erases all the settings saved on the adapter** (controller profile, mouse, LED colours) and
 > restores the defaults, like *Erase all* in the web configurator. Don't unplug the adapter while it runs.
@@ -105,9 +105,26 @@ at the top right (or in *Settings* in the advanced configuration). It changes at
 - **Xbox 360** wired controllers and compatibles.
 - **Xbox One / Series** controllers connected with a USB cable.
 
-Analog sticks are supported with firmware 1.2.3 (included).
+Analog sticks are supported with firmware 1.2.3 and later (1.3.0 is included).
 
 ---
+
+## 🗄️ Profile slots (firmware 1.3.0)
+
+The adapter keeps up to **8 pad profiles**, one per controller, and uses by itself the one of the controller you
+plug in: you can switch pads without setting anything up again.
+
+- **Simple mode:** *Save to USBtoC64* gives the profile a name automatically (from the controller name, e.g.
+  "Xbox One For Windows") and puts it in the controller's own slot, or in a free one. At start-up step 1 lists the
+  pads already configured, so you can see at once whether a pad needs to be saved.
+- **Advanced configuration → Profile slots:** the 8 slots with name, VID:PID and number of rules. You can
+  **rename** a slot, **delete** it, or **edit** it — even without the controller: the program remembers the
+  controllers it has seen; Xbox controllers have a fixed layout; for a controller never connected to this PC only
+  the buttons already in the slot are shown. When writing from the advanced configuration you choose the slot and
+  the name.
+- **Web configurator:** its saves go to the controller's slot (or a free one, or the oldest when all 8 are in use)
+  and appear as **WebConfigured** until you rename them.
+- Updating the firmware erases all the slots: the program lists the configured pads before going on.
 
 ## ⚙️ Advanced configuration
 
@@ -118,7 +135,7 @@ controller mapping, mouse, LED colours, settings, firmware, serial terminal and 
 
 ## ❓ Notes
 
-- **Web configurator:** firmware 1.2.3 is fully compatible with the [web configurator](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html); you can keep using both.
+- **Web configurator:** firmware 1.3.0 is fully compatible with the [web configurator](https://raw.githack.com/jajpohke/USBtoC64_AMI_CFG_Adv/main/configurator/index.html); you can keep using both.
 - **Original firmware:** to go back to the firmware published on this page, use *Firmware → Install from file…*
   in the advanced configuration (any complete `.bin` image, also Emanuele's original one).
 - **Unexpected error:** the program saves the details in `USBtoC64Config-errore.txt` next to the exe; attach it when

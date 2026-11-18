@@ -48,6 +48,9 @@
                     <ListBoxItem Tag="gamepad">
                         <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="XboxController24" Margin="0,0,12,0" /><TextBlock Text="Gamepad" VerticalAlignment="Center" /></StackPanel>
                     </ListBoxItem>
+                    <ListBoxItem Tag="slots">
+                        <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="BoxMultiple24" Margin="0,0,12,0" /><TextBlock Text="{l:T nav.slots}" VerticalAlignment="Center" /></StackPanel>
+                    </ListBoxItem>
                     <ListBoxItem Tag="mouse">
                         <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="CursorClick24" Margin="0,0,12,0" /><TextBlock Text="Mouse" VerticalAlignment="Center" /></StackPanel>
                     </ListBoxItem>

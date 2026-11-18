@@ -128,8 +128,12 @@ public partial class SimplePage : UserControl
                 _adapter = AdapterStep.Ready;
                 SetNum(Num1, Num1Text, "✔", OkBg, OkFg);
                 AdapterState.Text = L.F(cmp == FirmwareStatus.UpToDate ? "simple.adapter.readyUpToDate" : "simple.adapter.ready", s.Port, fwText);
+                var names = s.StoredNames();
                 AdapterHint.Text = L.F("simple.adapter.readyHint", mode)
-                                   + (cmp == FirmwareStatus.OtherBuild ? " " + L.F("simple.adapter.otherBuild", fw!.Build, m!.Build) : "");
+                                   + (cmp == FirmwareStatus.OtherBuild ? " " + L.F("simple.adapter.otherBuild", fw!.Build, m!.Build) : "")
+                                   + "\n" + (names.Count == 0 ? L.T("simple.adapter.noPads")
+                                       : s.HasDrawers ? L.F("simple.adapter.pads", string.Join(", ", names), names.Count, FirmwareLimits.MaxSlots)
+                                       : L.F("simple.adapter.padsOne", names[0]));
             }
         }
 
@@ -152,10 +156,8 @@ public partial class SimplePage : UserControl
         else
         {
             SetNum(Num2, Num2Text, "✔", OkBg, OkFg);
-            bool same = s.StoredPadKnown && s.StoredPad != null && Session.Profile != null
-                        && ProfileComparer.Compare(Session.Profile, s.StoredPad).Count == 0;
             PadState.Foreground = OkFg;
-            PadState.Text = L.T(same ? "simple.pad.readySaved" : "simple.pad.ready");
+            PadState.Text = ReadyText(s);
         }
 
         // ---- step 3
@@ -165,6 +167,37 @@ public partial class SimplePage : UserControl
             SetNum(Num3, Num3Text, "3", canSave ? CurBg : IdleBg, canSave ? CurFg : IdleFg);
         SaveHint.Text = L.T(canSave || _saving ? "simple.save.hint"
             : _adapter != AdapterStep.Ready ? "simple.save.step1First" : "simple.save.step2First");
+    }
+
+    /// <summary>"Ready", with where the profile is or will be saved.</summary>
+    private string ReadyText(AdapterStatus s)
+    {
+        var p = Session.Profile!;
+        var stored = s.StoredFor(p.Vid, p.Pid);
+        bool same = stored != null && ProfileComparer.Compare(p, stored.Value.Profile).Count == 0;
+        if (!s.HasDrawers) return L.T(same ? "simple.pad.readySaved" : "simple.pad.ready");
+        var (slot, label, replaced) = Target(s);
+        if (stored?.Slot is { } own)
+            return same ? L.F("simple.pad.readySavedSlot", own.Number, own.DisplayLabel)
+                        : L.F("simple.pad.readyUpdateSlot", own.Number, own.DisplayLabel);
+        return replaced != null
+            ? L.F("simple.pad.readyReplace", label, slot + 1, replaced.DisplayLabel)
+            : L.F("simple.pad.readyNewSlot", label, slot + 1);
+    }
+
+    /// <summary>
+    /// Where the simple mode saves (firmware 1.3.0): the pad's own drawer, else the first free one, else the oldest;
+    /// label: the one the user gave the pad, else the automatic one (from the pad name).
+    /// </summary>
+    private (int Slot, string Label, SlotInfo? Replaced) Target(AdapterStatus s)
+    {
+        var p = Session.Profile!;
+        var used = s.Slots!.Select(d => d.Info).ToList();
+        int slot = SlotLabels.Choose(used, p.Vid, p.Pid);
+        var occupant = used.FirstOrDefault(u => u.Slot == slot);
+        bool own = occupant != null && occupant.Vid == p.Vid && occupant.Pid == p.Pid;
+        string label = own && !occupant!.IsWebConfigured ? occupant.Label : SlotLabels.Auto(Session.Device?.Name, p.Vid, p.Pid);
+        return (slot, label, own ? null : occupant);
     }
 
     /// <summary>Why the selected pad cannot be saved, in plain words; null when it can.</summary>
@@ -221,7 +254,7 @@ public partial class SimplePage : UserControl
         var m = Hub.Manifest;
         if (m == null || Hub.IsBusy) return;
         if (MessageBox.Show(_w,
-                L.F("simple.update.confirm", m.Version),
+                L.F("simple.update.confirm", m.Version) + (Hub.StoredPadsWarning() is { } w ? "\n\n" + w : ""),
                 L.T("simple.adapter.update"), MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
         AdapterState.Text = L.T("simple.update.running");
         var r = await Hub.FlashAsync();
@@ -240,13 +273,25 @@ public partial class SimplePage : UserControl
     {
         var p = Session.Profile;
         if (p == null || Hub.IsBusy) return;
+        int? slot = null;
+        string? label = null;
+        if (Hub.Status.HasDrawers)
+        {
+            var t = Target(Hub.Status);
+            if (t.Replaced != null &&
+                MessageBox.Show(_w, L.F("simple.save.replaceConfirm", FirmwareLimits.MaxSlots, t.Replaced.Number, t.Replaced.DisplayLabel),
+                    L.T("simple.save.replaceTitle"), MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+            slot = t.Slot;
+            label = t.Label;
+        }
         _saving = true;
         DoneCard.Visibility = Visibility.Collapsed;
         SaveError.Visibility = Visibility.Collapsed;
         Saving.Visibility = Visibility.Visible;
         SaveBtn.IsEnabled = false;
         WriteResult r;
-        try { r = await Hub.WriteAsync(p); }
+        try { r = await Hub.WriteAsync(p, slot, label); }
         finally
         {
             _saving = false;
@@ -254,6 +299,7 @@ public partial class SimplePage : UserControl
         }
         if (r.Verified)
         {
+            DoneTitle.Text = r.Slot != null ? L.F("simple.done.titleSlot", r.Label, r.Slot + 1) : L.T("simple.done.title");
             DoneCard.Visibility = Visibility.Visible;
             SetNum(Num3, Num3Text, "✔", OkBg, OkFg);
         }

@@ -117,7 +117,7 @@
                                 <ui:SymbolIcon DockPanel.Dock="Left" Symbol="CheckmarkCircle24" Filled="True" FontSize="20" Margin="0,0,10,0"
                                                VerticalAlignment="Top" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
                                 <StackPanel>
-                                    <TextBlock Text="{l:T simple.done.title}" FontWeight="SemiBold"
+                                    <TextBlock x:Name="DoneTitle" Text="{l:T simple.done.title}" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="{l:T simple.done.text}" Margin="0,4,0,0"
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap" />

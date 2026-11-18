@@ -13,7 +13,28 @@ public sealed record AdapterStatus(
     JmProfile? StoredPad,
     bool StoredPadKnown,
     string? Error,
-    bool NoAnswer = false);
+    bool NoAnswer = false,
+    IReadOnlyList<SlotContent>? Slots = null)
+{
+    /// <summary>Firmware 1.3.0+: profile drawers (<see cref="Slots"/> is the list).</summary>
+    public bool HasDrawers => Slots != null;
+
+    /// <summary>The profile stored for this pad: its drawer (1.3.0+) or the single stored profile when it is for this pad.</summary>
+    public (JmProfile Profile, SlotInfo? Slot)? StoredFor(ushort vid, ushort pid)
+    {
+        if (Slots != null)
+            return Slots.FirstOrDefault(d => d.Info.Vid == vid && d.Info.Pid == pid) is { } d ? (d.Profile, d.Info) : null;
+        return StoredPad != null && StoredPad.Vid == vid && StoredPad.Pid == pid ? (StoredPad, null) : null;
+    }
+
+    /// <summary>Names of the pads configured on the adapter (labels, or "WebConfigured (VID:PID)").</summary>
+    public List<string> StoredNames()
+    {
+        if (Slots != null)
+            return Slots.Select(d => d.Info.IsWebConfigured ? $"{SlotLabels.WebConfigured} ({d.Info.Ids})" : d.Info.Label).ToList();
+        return StoredPad != null ? new() { $"{SlotLabels.WebConfigured} ({StoredPad.Vid:X4}:{StoredPad.Pid:X4})" } : new();
+    }
+}
 
 /// <summary>
 /// Everything that talks to the adapter: one operation at a time, a shared log (Registro),
@@ -141,13 +162,20 @@ public sealed class AdapterHub : IDisposable
                 Log(L.F("hub.check.onAdapter", fw));
                 JmProfile? pad = null;
                 bool known = false;
-                if (!fw.IsOriginal)
+                List<SlotContent>? slots = null;
+                if (SlotCommands.Supports(fw))
+                {
+                    slots = conn.Session.ReadAllSlots();
+                    Log(L.F("hub.slots.found", slots.Count, FirmwareLimits.MaxSlots));
+                    known = true;
+                }
+                else if (!fw.IsOriginal)
                 {
                     var stored = conn.Session.ReadStored();
                     pad = stored.Profile;
                     known = true;
                 }
-                return new AdapterStatus(portName, conn.Info, fw, pad, known, null);
+                return new AdapterStatus(portName, conn.Info, fw, pad, known, null, Slots: slots);
             });
             SetStatus(s);
             return s;
@@ -195,30 +223,105 @@ public sealed class AdapterHub : IDisposable
         return r;
     }
 
-    public async Task<WriteResult> WriteAsync(JmProfile profile)
+    /// <param name="slot">Drawer (0-based, firmware 1.3.0+); null = the pad's drawer, else a free one, else the oldest.</param>
+    /// <param name="label">Drawer label (firmware 1.3.0+); null = keep the label the pad already has.</param>
+    public async Task<WriteResult> WriteAsync(JmProfile profile, int? slot = null, string? label = null)
     {
         WriteResult r;
         try
         {
             r = await Run(L.T("hub.op.write"), portName =>
-                new AdapterWriter(PortFor(portName), Log).WriteAndVerify(profile));
+                new AdapterWriter(PortFor(portName), Log).WriteAndVerify(profile, slot, label));
         }
         catch (Exception ex) { r = new WriteResult(false, false, null, new(), ex.Message); }
         Log(r.Message);
         foreach (var d in r.Differences) Log("  ≠ " + d);
-        if (r.Verified) SetStatus(Status with { StoredPad = profile, StoredPadKnown = true });
+        if (r.Verified)
+        {
+            if (Status.Slots != null && r.Slot != null)
+            {
+                // Same rules as the firmware: the drawer is replaced and any other drawer of this pad is emptied.
+                uint seq = Status.Slots.Select(d => d.Info.Seq).DefaultIfEmpty(0u).Max() + 1;
+                var info = new SlotInfo(r.Slot.Value, profile.Vid, profile.Pid,
+                    r.Label == SlotLabels.WebConfigured ? "" : r.Label ?? "", profile.Rules.Count, profile.UseAnalog, seq);
+                var list = Status.Slots.Where(d => d.Info.Slot != r.Slot && !(d.Info.Vid == profile.Vid && d.Info.Pid == profile.Pid))
+                    .Append(new SlotContent(info, profile)).OrderBy(d => d.Info.Slot).ToList();
+                SetStatus(Status with { Slots = list });
+            }
+            else SetStatus(Status with { StoredPad = profile, StoredPadKnown = true });
+        }
         return r;
     }
 
-    public async Task<StoredProfile> ReadAsync()
+    // ------------------------------------------------------------------ drawers (firmware 1.3.0)
+
+    private void SetSlots(List<SlotContent> slots) => SetStatus(Status with { Slots = slots });
+
+    /// <summary>Reads all the drawers again.</summary>
+    public async Task<List<SlotContent>> RefreshSlotsAsync()
     {
-        var s = await Run(L.T("hub.op.read"), portName =>
+        var list = await Run(L.T("hub.op.slots"), portName =>
         {
             using var conn = AdapterConnection.Connect(PortFor(portName), Log);
-            return conn.Session.ReadStored();
+            return conn.Session.ReadAllSlots();
         });
-        SetStatus(Status with { StoredPad = s.Profile, StoredPadKnown = true });
-        return s;
+        SetSlots(list);
+        return list;
+    }
+
+    public async Task RenameSlotAsync(int slot, string label)
+    {
+        var list = await Run(L.F("hub.op.rename", slot + 1), portName =>
+        {
+            using var conn = AdapterConnection.Connect(PortFor(portName), Log);
+            conn.Session.RenameSlot(slot, label);
+            return conn.Session.ReadAllSlots();
+        });
+        Log(L.F("hub.slot.renamed", slot + 1, SlotLabels.Clean(label)));
+        SetSlots(list);
+    }
+
+    public async Task DeleteSlotAsync(int slot)
+    {
+        var list = await Run(L.F("hub.op.delete", slot + 1), portName =>
+        {
+            using var conn = AdapterConnection.Connect(PortFor(portName), Log);
+            conn.Session.DeleteSlot(slot);
+            return conn.Session.ReadAllSlots();
+        });
+        Log(L.F("hub.slot.deleted", slot + 1));
+        SetSlots(list);
+    }
+
+    /// <summary>
+    /// Text for the warning shown before a firmware installation, when the adapter holds pad profiles; null otherwise.
+    /// </summary>
+    public string? StoredPadsWarning()
+    {
+        var names = Status.StoredNames();
+        if (names.Count == 0) return null;
+        return L.F("hub.flash.padsWarning", names.Count, string.Join(", ", names));
+    }
+
+    /// <summary>
+    /// The stored profile: on firmware 1.3.0+ the drawer of this pad (vid/pid), else the single stored profile.
+    /// </summary>
+    public async Task<(StoredProfile Stored, SlotInfo? Slot)> ReadAsync(ushort? vid = null, ushort? pid = null)
+    {
+        var (s, slot, slots) = await Run(L.T("hub.op.read"), portName =>
+        {
+            using var conn = AdapterConnection.Connect(PortFor(portName), Log);
+            var fw = conn.Session.GetFirmware();
+            if (SlotCommands.Supports(fw))
+            {
+                var all = conn.Session.ReadAllSlots();
+                var d = all.FirstOrDefault(x => x.Info.Vid == vid && x.Info.Pid == pid);
+                return (new StoredProfile(d?.Profile, ReadMethod.GetJm, all.Count > 0), d?.Info, all);
+            }
+            return (conn.Session.ReadStored(), (SlotInfo?)null, (List<SlotContent>?)null);
+        });
+        SetStatus(slots != null ? Status with { Slots = slots } : Status with { StoredPad = s.Profile, StoredPadKnown = true });
+        return (s, slot);
     }
 
     public async Task<FlashResult> FlashAsync()

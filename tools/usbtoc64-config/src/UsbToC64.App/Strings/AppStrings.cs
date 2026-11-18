@@ -8,5 +8,5 @@ namespace UsbToC64.App;
 /// </summary>
 public static partial class AppStrings
 {
-    public static IEnumerable<Tr> All => Main.Concat(Gamepad).Concat(Pages).Concat(Misc);
+    public static IEnumerable<Tr> All => Main.Concat(Gamepad).Concat(Pages).Concat(Misc).Concat(Slots);
 }

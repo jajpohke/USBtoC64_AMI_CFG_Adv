@@ -5,7 +5,9 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using UsbToC64.App.Dialogs;
 using UsbToC64.App.Services;
+using UsbToC64.Core.Device;
 using UsbToC64.Core.Formats;
 using UsbToC64.Core.Hid;
 using UsbToC64.Core.Mapping;
@@ -90,7 +92,18 @@ public partial class GamepadPage : UserControl
                 : pad.UsesReportIds ? L.T("gp.kind.hidReportId") : "HID";
             CountText.Text = L.F("gp.count", pad.Controls.Count);
         }
-        PadHint.Text = L.T(Session.ViewOnly ? "gp.hint.viewOnly" : "gp.hint.press");
+        PadHint.Text = L.T(Session.ViewOnly ? "gp.hint.viewOnly" : Session.Offline ? "gp.hint.offline" : "gp.hint.press");
+        if (Session.Offline && pad != null)
+        {
+            KindText.Text = L.T(Session.OfflineFrom switch
+            {
+                OfflineSource.Card => "gp.offline.card",
+                OfflineSource.KnownXbox => "gp.offline.xbox",
+                _ => "gp.offline.rules",
+            });
+            CountText.Text = L.F("gp.count", pad.Controls.Count);
+        }
+        ShowEditBar();
 
         EmptyText.Visibility = !hasPad && Session.Profile == null ? Visibility.Visible : Visibility.Collapsed;
         ShowView();
@@ -103,13 +116,30 @@ public partial class GamepadPage : UserControl
         WriteBtn.IsEnabled = p != null && !Hub.IsBusy;
     }
 
+    private void ShowEditBar()
+    {
+        var slot = Session.EditSlot;
+        EditBar.Visibility = slot != null ? Visibility.Visible : Visibility.Collapsed;
+        if (slot == null) return;
+        EditTitle.Text = L.F("gp.slot.title", slot.Number, slot.DisplayLabel, slot.Ids);
+        EditText.Text = !Session.Offline ? L.T("gp.slot.live")
+            : L.T(Session.OfflineFrom switch
+            {
+                OfflineSource.Card => "gp.slot.offlineCard",
+                OfflineSource.KnownXbox => "gp.slot.offlineXbox",
+                _ => "gp.slot.offlineRules",
+            });
+    }
+
+    private void CloseSlot_Click(object sender, RoutedEventArgs e) => Session.CloseSlot();
+
     private void FillPadCombo()
     {
         _fillingCombo = true;
         PadCombo.Items.Clear();
         if (Session.Devices.Count == 0) PadCombo.Items.Add(L.T("gp.noPadItem"));
         foreach (var d in Session.Devices) PadCombo.Items.Add(d.ToString());
-        PadCombo.SelectedIndex = Session.Device == null ? 0 : Math.Max(0, Session.Devices.IndexOf(Session.Device));
+        PadCombo.SelectedIndex = Session.Device == null ? (Session.Offline ? -1 : 0) : Math.Max(0, Session.Devices.IndexOf(Session.Device));
         _fillingCombo = false;
     }
 
@@ -201,6 +231,12 @@ public partial class GamepadPage : UserControl
     {
         if (_fillingCombo || PadCombo.SelectedIndex < 0 || Session.Devices.Count == 0) return;
         if (Session.Device != null && Session.Devices.IndexOf(Session.Device) == PadCombo.SelectedIndex && !Session.ViewOnly) return;
+        if (Session.EditSlot != null &&
+            MessageBox.Show(_w, L.T("gp.slot.leave"), L.T("gp.slot.leaveTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            FillPadCombo();
+            return;
+        }
         var err = Session.Select(PadCombo.SelectedIndex);
         if (err != null) LastResult.Text = err;
     }
@@ -268,10 +304,32 @@ public partial class GamepadPage : UserControl
             MessageBox.Show(_w, L.F("gp.write.otherPad", p.Vid, p.Pid),
                 L.T("gp.write.title"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
 
+        // Firmware 1.3.0: choose the drawer and the label.
+        int? slot = null;
+        string? label = null;
+        var st = Hub.Status;
+        if (st.HasDrawers)
+        {
+            var used = st.Slots!.Select(x => x.Info).ToList();
+            var own = used.FirstOrDefault(x => x.Vid == p.Vid && x.Pid == p.Pid);
+            int proposed = Session.EditSlot?.Slot ?? SlotLabels.Choose(used, p.Vid, p.Pid);
+            string proposedLabel = Session.EditSlot?.Label is { Length: > 0 } el ? el
+                : own is { IsWebConfigured: false } ? own.Label
+                : SlotLabels.Auto(d?.Name, p.Vid, p.Pid);
+            var dlg = SlotDialog.AskSave(_w, used, p.Vid, p.Pid, proposed, proposedLabel);
+            if (dlg == null) return;
+            slot = dlg.Slot;
+            label = dlg.Label;
+        }
+
         OpPanel.Begin(L.T("gp.op.write"));
-        var r = await Hub.WriteAsync(p);
+        var r = await Hub.WriteAsync(p, slot, label);
+        if (r.Verified && r.Slot != null && Hub.Status.Slots?.FirstOrDefault(x => x.Info.Slot == r.Slot) is { } saved)
+            Session.SlotSaved(saved.Info);
         OpPanel.End(L.T(r.Verified ? "gp.op.writeOk" : "gp.op.writeFail"));
-        LastResult.Text = r.Verified ? L.F("gp.saved", DateTime.Now.ToString("HH:mm")) : r.Message;
+        LastResult.Text = r.Verified
+            ? r.Slot != null ? L.F("gp.savedSlot", r.Slot + 1, r.Label, DateTime.Now.ToString("HH:mm")) : L.F("gp.saved", DateTime.Now.ToString("HH:mm"))
+            : r.Message;
         var text = r.Message + (r.Differences.Count > 0 ? "\n\n" + string.Join("\n", r.Differences.Select(x => "• " + x)) : "");
         MessageBox.Show(_w, text, r.Verified ? L.T("gp.written.title") : L.T("gp.write.title"),
             MessageBoxButton.OK, r.Verified ? MessageBoxImage.Information : MessageBoxImage.Warning);
@@ -283,14 +341,15 @@ public partial class GamepadPage : UserControl
         OpPanel.Begin(L.T("gp.op.read"));
         try
         {
-            var s = await Hub.ReadAsync();
+            var (s, slotInfo) = await Hub.ReadAsync(Session.TargetVid, Session.TargetPid);
             var p = s.Profile;
             if (p == null)
             {
                 OpPanel.End(L.T("gp.op.readNone"));
-                LastResult.Text = L.T("gp.read.none");
+                LastResult.Text = Hub.Status.HasDrawers ? L.T("gp.read.noneForPad") : L.T("gp.read.none");
                 return;
             }
+            if (slotInfo != null) Hub.Log(L.F("gp.log.slot", slotInfo.Number, slotInfo.DisplayLabel));
             Hub.Log(L.F("gp.log.profile", p.Vid, p.Pid, p.Rules.Count));
             for (int i = 0; i < p.Rules.Count; i++) Hub.Log($"  {i + 1,2}. {Names.Rule(p.Rules[i])}");
             if (Session.Profile != null)

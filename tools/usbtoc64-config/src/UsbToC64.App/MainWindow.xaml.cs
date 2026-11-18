@@ -4,6 +4,7 @@ using System.Windows.Media;
 using UsbToC64.App.Pages;
 using UsbToC64.App.Services;
 using UsbToC64.Core.Device;
+using UsbToC64.Core.Model;
 using UsbToC64.Core.Text;
 using Wpf.Ui.Controls;
 
@@ -22,6 +23,7 @@ public partial class MainWindow : FluentWindow
     {
         InitializeComponent();
         _pages["gamepad"] = new GamepadPage(this);
+        _pages["slots"] = new SlotsPage(this);
         _pages["mouse"] = new MousePage(this);
         _pages["led"] = new LedPage(this);
         _pages["settings"] = new SettingsPage(this);
@@ -52,6 +54,8 @@ public partial class MainWindow : FluentWindow
     public void ShowAdvanced(bool advanced)
     {
         _advanced = advanced;
+        // The simple mode works on the connected pad: leave a drawer opened for editing.
+        if (!advanced && Pad.EditSlot != null) Pad.CloseSlot();
         AdvancedRoot.Visibility = advanced ? Visibility.Visible : Visibility.Collapsed;
         SimpleHost.Visibility = advanced ? Visibility.Collapsed : Visibility.Visible;
     }
@@ -136,7 +140,8 @@ public partial class MainWindow : FluentWindow
         AdapterTitle.Text = L.F("main.adapter.onPort", s.Port);
         string fw = s.Firmware == null ? "" : s.Firmware.IsOriginal ? L.T("main.fw.original") : L.F("main.fw.version", s.Firmware.Version);
         AdapterLine1.Text = L.F("main.adapter.fwMode", fw, s.Info.IsAmiga ? "Amiga" : "C64");
-        AdapterLine2.Text = !s.StoredPadKnown ? L.T("main.pad.updateToRead")
+        AdapterLine2.Text = s.HasDrawers ? L.F("main.pad.slots", s.Slots!.Count, FirmwareLimits.MaxSlots)
+            : !s.StoredPadKnown ? L.T("main.pad.updateToRead")
             : s.StoredPad == null ? L.T("main.pad.none")
             : L.F("main.pad.stored", $"{s.StoredPad.Vid:X4}:{s.StoredPad.Pid:X4}");
     }

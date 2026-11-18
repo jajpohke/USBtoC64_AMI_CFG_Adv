@@ -36,6 +36,8 @@ ricorda la scelta.
   del tasto premuto evidenziata; a destra cosa riceve il **C64/Amiga su porta DB9** e i controlli del profilo;
   in basso le viste *Anteprima / Regole per il firmware / JSON*, **Leggi dall'adattatore** e
   **Scrivi sull'adattatore e verifica**. Importa/Esporta profili `.h`/`.json`.
+- **Cassetti** (firmware 1.3.0): gli 8 profili salvati sull'adattatore, uno per pad, con etichetta: modifica
+  (anche senza il pad), rinomina, eliminazione. Scrivendo dalla pagina Gamepad si sceglie cassetto ed etichetta.
 - **Mouse**: velocità del puntatore Amiga e C64, rotella, temporizzazione PAL/NTSC (valgono subito).
 - **LED**: colore per ogni evento (tavolozza del firmware), formato GRB/RGB, modalità monocromatica.
 - **Impostazioni**: lingua del programma, modalità C64/Amiga e inversione dello switch, Developer Mode, stato e cancellazione
@@ -76,6 +78,10 @@ usbtoc64 ports
 usbtoc64 ping
 usbtoc64 write profilo.json
 usbtoc64 read
+usbtoc64 slots
+usbtoc64 write profilo.json --slot 3 --label "PS3 nero"
+usbtoc64 slot-rename 3 "PS3 rosso"
+usbtoc64 slot-delete 3
 usbtoc64 --lang it devices
 ```
 

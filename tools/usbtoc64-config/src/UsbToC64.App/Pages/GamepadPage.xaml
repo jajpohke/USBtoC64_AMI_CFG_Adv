@@ -16,6 +16,21 @@
             <TextBlock Text="{l:T gp.title}" Style="{StaticResource PageTitle}" VerticalAlignment="Center" />
         </DockPanel>
 
+        <!-- Editing a drawer (opened from the drawers page) -->
+        <Border x:Name="EditBar" DockPanel.Dock="Top" Margin="0,0,0,12" Padding="14,10" CornerRadius="8" Visibility="Collapsed"
+                Background="{DynamicResource SystemFillColorAttentionBackgroundBrush}"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+            <DockPanel>
+                <ui:Button DockPanel.Dock="Right" Content="{l:T gp.slot.close}" Icon="{ui:SymbolIcon Dismiss24}" VerticalAlignment="Center"
+                           Click="CloseSlot_Click" />
+                <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Edit24" Margin="0,0,10,0" VerticalAlignment="Top" />
+                <StackPanel Margin="0,0,12,0">
+                    <TextBlock x:Name="EditTitle" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock x:Name="EditText" Style="{StaticResource Hint}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
         <!-- Pad selection -->
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
             <TextBlock DockPanel.Dock="Right" x:Name="PadHint" Style="{StaticResource Hint}" VerticalAlignment="Center"
