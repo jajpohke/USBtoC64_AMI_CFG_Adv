@@ -1,5 +1,5 @@
 // ==========================================
-// USB to C64/Amiga Adapter - Advanced v1.2
+// USB to C64/Amiga Adapter - Advanced v1.3
 // File: Globals.h
 // Description: Global variables, Pin definitions, and Shared States (Atomic Blob NVS)
 // ==========================================
@@ -44,15 +44,141 @@ typedef struct {
 
 extern Preferences prefs; // <--- SPOSTATA QUI, PRIMA DELL'USO
 
-inline void load_jm_rules_from_nvs() {
-    use_html_configurator = false;
-    jm_use_analog_dyn = false;
-    jm_analog_x_count_dyn = 0;
-    jm_analog_y_count_dyn = 0;
-    if (!prefs.isKey("jm_blob")) return;
+// ------------------------------------------------------------------
+// Pad profile drawers (firmware 1.3.0): up to JM_SLOTS profiles, one per pad (VID/PID),
+// each with a label. Keys "jm_s0".."jm_s7"; "jm_seq" counts the saves (to find the oldest drawer).
+// The single blob "jm_blob" of firmware <= 1.2.3 is moved into a drawer at boot (label empty).
+// ------------------------------------------------------------------
+#define JM_SLOTS 8
+#define JM_LABEL_LEN 24
+
+typedef struct {
+    uint32_t     seq;                     // save order (0 = empty)
+    char         label[JM_LABEL_LEN + 1]; // UTF-8, "" = no label (saved by the web configurator)
+    NVS_JM_Blob  blob;
+} NVS_JM_Slot;
+
+inline void jm_slot_key(int i, char *key) { snprintf(key, 8, "jm_s%d", i); }
+
+inline bool jm_slot_read(int i, NVS_JM_Slot &out) {
+    if (i < 0 || i >= JM_SLOTS) return false;
+    char key[8]; jm_slot_key(i, key);
+    if (prefs.getBytesLength(key) != sizeof(NVS_JM_Slot)) return false;
+    prefs.getBytes(key, &out, sizeof(NVS_JM_Slot));
+    out.label[JM_LABEL_LEN] = 0;
+    return out.seq != 0;
+}
+
+inline int jm_slot_find(uint16_t vid, uint16_t pid) {
+    NVS_JM_Slot s;
+    for (int i = 0; i < JM_SLOTS; i++)
+        if (jm_slot_read(i, s) && s.blob.vid == vid && s.blob.pid == pid) return i;
+    return -1;
+}
+
+inline int jm_slot_count() {
+    NVS_JM_Slot s; int n = 0;
+    for (int i = 0; i < JM_SLOTS; i++) if (jm_slot_read(i, s)) n++;
+    return n;
+}
+
+/// Drawer for a new save of this pad: its own drawer, else the first free one, else the oldest.
+inline int jm_slot_choose(uint16_t vid, uint16_t pid) {
+    int own = jm_slot_find(vid, pid);
+    if (own >= 0) return own;
+    NVS_JM_Slot s; int oldest = 0; uint32_t oldest_seq = UINT32_MAX;
+    for (int i = 0; i < JM_SLOTS; i++) {
+        if (!jm_slot_read(i, s)) return i;
+        if (s.seq < oldest_seq) { oldest_seq = s.seq; oldest = i; }
+    }
+    return oldest;
+}
+
+/// Copies a label keeping at most JM_LABEL_LEN bytes without cutting a UTF-8 character; control chars are dropped.
+inline void jm_label_copy(char *dst, const char *src) {
+    size_t n = 0;
+    if (src) {
+        size_t len = strlen(src);
+        size_t limit = len < JM_LABEL_LEN ? len : JM_LABEL_LEN;
+        while (limit > 0 && limit < len && ((uint8_t)src[limit] & 0xC0) == 0x80) limit--; // don't split a character
+        for (size_t i = 0; i < limit; i++) {
+            uint8_t c = (uint8_t)src[i];
+            if (c < 0x20 || c == 0x7F) continue;
+            dst[n++] = (char)c;
+        }
+    }
+    dst[n] = 0;
+}
+
+inline void jm_update_has_custom() {
+    bool any = jm_slot_count() > 0 || prefs.getBytesLength("cust_blob") > 0 || prefs.isKey("vid");
+    if (any) prefs.putBool("has_custom", true); else prefs.remove("has_custom");
+}
+
+/// Writes a drawer; a different drawer holding the same pad is emptied (one drawer per pad).
+inline bool jm_slot_write(int i, const NVS_JM_Blob &blob, const char *label) {
+    if (i < 0 || i >= JM_SLOTS) return false;
+    for (int j = 0; j < JM_SLOTS; j++) {
+        NVS_JM_Slot o;
+        if (j != i && jm_slot_read(j, o) && o.blob.vid == blob.vid && o.blob.pid == blob.pid) {
+            char k[8]; jm_slot_key(j, k); prefs.remove(k);
+        }
+    }
+    NVS_JM_Slot s;
+    memset(&s, 0, sizeof(s));
+    uint32_t seq = prefs.getUInt("jm_seq", 0) + 1;
+    prefs.putUInt("jm_seq", seq);
+    s.seq = seq;
+    jm_label_copy(s.label, label);
+    s.blob = blob;
+    char key[8]; jm_slot_key(i, key);
+    bool ok = prefs.putBytes(key, &s, sizeof(NVS_JM_Slot)) == sizeof(NVS_JM_Slot);
+    jm_update_has_custom();
+    return ok;
+}
+
+inline bool jm_slot_set_label(int i, const char *label) {
+    NVS_JM_Slot s;
+    if (!jm_slot_read(i, s)) return false;
+    jm_label_copy(s.label, label);
+    char key[8]; jm_slot_key(i, key);
+    return prefs.putBytes(key, &s, sizeof(NVS_JM_Slot)) == sizeof(NVS_JM_Slot);
+}
+
+inline bool jm_slot_delete(int i) {
+    NVS_JM_Slot s;
+    if (!jm_slot_read(i, s)) return false;
+    char key[8]; jm_slot_key(i, key);
+    prefs.remove(key);
+    jm_update_has_custom();
+    return true;
+}
+
+inline void jm_slot_clear_all() {
+    for (int i = 0; i < JM_SLOTS; i++) { char k[8]; jm_slot_key(i, k); prefs.remove(k); }
+    prefs.remove("jm_seq");
+    prefs.remove("jm_blob");
+}
+
+/// Most recently saved drawer, or -1.
+inline int jm_slot_latest() {
+    NVS_JM_Slot s; int best = -1; uint32_t best_seq = 0;
+    for (int i = 0; i < JM_SLOTS; i++)
+        if (jm_slot_read(i, s) && s.seq > best_seq) { best_seq = s.seq; best = i; }
+    return best;
+}
+
+/// Firmware <= 1.2.3 kept one profile in "jm_blob": move it into a drawer (no label).
+inline void jm_migrate_legacy_blob() {
+    if (prefs.getBytesLength("jm_blob") != sizeof(NVS_JM_Blob)) { if (prefs.isKey("jm_blob")) prefs.remove("jm_blob"); return; }
     NVS_JM_Blob blob;
-    size_t len = prefs.getBytes("jm_blob", &blob, sizeof(NVS_JM_Blob));
-    if (len < sizeof(uint16_t)*2 + 2) return;
+    prefs.getBytes("jm_blob", &blob, sizeof(NVS_JM_Blob));
+    if (blob.rule_count > 0 || blob.use_analog) jm_slot_write(jm_slot_choose(blob.vid, blob.pid), blob, "");
+    prefs.remove("jm_blob");
+}
+
+/// Loads a profile into the dynamic rule engine (TIER 0).
+inline void jm_apply_blob(const NVS_JM_Blob &blob) {
     jm_dpad_index_dyn  = blob.dpad_index;
     jm_rules_dyn_count = (blob.rule_count <= JM_DYN_MAX_RULES) ? blob.rule_count : JM_DYN_MAX_RULES;
     memcpy(jm_rules_dyn, blob.rules, jm_rules_dyn_count * sizeof(JM_Rule));
@@ -61,6 +187,16 @@ inline void load_jm_rules_from_nvs() {
     jm_analog_y_count_dyn  = (blob.analog_y_count <= JM_DYN_MAX_ANALOG) ? blob.analog_y_count : JM_DYN_MAX_ANALOG;
     memcpy(jm_analog_x_dyn, blob.analog_x, jm_analog_x_count_dyn);
     memcpy(jm_analog_y_dyn, blob.analog_y, jm_analog_y_count_dyn);
+}
+
+/// Boot: migrate the old single profile; the drawer of the connected pad is loaded when it connects.
+inline void load_jm_rules_from_nvs() {
+    use_html_configurator = false;
+    jm_use_analog_dyn = false;
+    jm_rules_dyn_count = 0;
+    jm_analog_x_count_dyn = 0;
+    jm_analog_y_count_dyn = 0;
+    jm_migrate_legacy_blob();
 }
 
 //extern Preferences prefs;

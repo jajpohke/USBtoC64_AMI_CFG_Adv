@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text;
 using UsbToC64.Core.Device;
 using UsbToC64.Core.Formats;
@@ -20,6 +21,23 @@ internal sealed class FakeAdapter : IAdapterPort
     public string? LastSettings { get; set; }    // last mouse_save / led_save line
     public int ResetAndDropOnOpen { get; set; }  // ... and the USB reconnection at boot kills the handle (n times)
     public JmProfile? Stored { get; private set; }
+
+    /// <summary>Firmware 1.3.0+: 8 labelled drawers, like Globals.h (one drawer per VID/PID).</summary>
+    public bool HasDrawers => Version != null && !(FirmwareVersion.Parse(Version) < FirmwareVersion.Parse("1.3.0"));
+    public sealed record Drawer(JmProfile Profile, string Label, uint Seq);
+    public Dictionary<int, Drawer> Drawers { get; } = new();
+    private uint _seq;
+
+    public void PutDrawer(int slot, JmProfile p, string label) => Drawers[slot] = new Drawer(p, label, ++_seq);
+
+    /// <summary>Same choice as jm_slot_choose: own drawer, first free, oldest.</summary>
+    public int ChooseDrawer(ushort vid, ushort pid)
+    {
+        var own = Drawers.FirstOrDefault(d => d.Value.Profile.Vid == vid && d.Value.Profile.Pid == pid);
+        if (own.Value != null) return own.Key;
+        for (int i = 0; i < 8; i++) if (!Drawers.ContainsKey(i)) return i;
+        return Drawers.OrderBy(d => d.Value.Seq).First().Key;
+    }
     public int Opens { get; private set; }
     private int _absentPolls;
 
@@ -89,7 +107,10 @@ internal sealed class FakeAdapter : IAdapterPort
             if (line == "{\"cmd\":\"mem_status\"}") { _out.Enqueue("{\"mouse\":true,\"pad\":false,\"led\":true,\"dev\":false,\"inv\":false}"); return; }
             if (line == "{\"cmd\":\"get_version\"}")
             {
-                if (_a.Version != null) _out.Enqueue($"{{\"fw\":\"{_a.Version}\",\"build\":\"abc1234\",\"proto\":1}}");
+                if (_a.Version != null)
+                    _out.Enqueue(_a.HasDrawers
+                        ? $"{{\"fw\":\"{_a.Version}\",\"build\":\"abc1234\",\"proto\":2,\"slots\":8}}"
+                        : $"{{\"fw\":\"{_a.Version}\",\"build\":\"abc1234\",\"proto\":1}}");
                 return;
             }
             if (line.StartsWith("{\"cmd\":\"save_jm\""))
@@ -100,9 +121,53 @@ internal sealed class FakeAdapter : IAdapterPort
                 catch { _out.Enqueue("{\"status\":\"error\",\"reason\":\"json\",\"detail\":\"InvalidInput\"}"); return; }
                 if (_a.CorruptOnSave && p.Rules.Count > 0) p.Rules[0] = p.Rules[0] with { Value = 0x7F };
                 _a.Stored = p;
+                int savedSlot = -1;
+                if (_a.HasDrawers)
+                {
+                    using var req = JsonDocument.Parse(line);
+                    var root = req.RootElement;
+                    savedSlot = root.TryGetProperty("slot", out var sl) ? sl.GetInt32() : _a.ChooseDrawer(p.Vid, p.Pid);
+                    string label = root.TryGetProperty("label", out var lb) ? SlotLabels.Clean(lb.GetString())
+                        : _a.Drawers.TryGetValue(savedSlot, out var prev) && prev.Profile.Vid == p.Vid && prev.Profile.Pid == p.Pid ? prev.Label : "";
+                    foreach (var k in _a.Drawers.Where(d => d.Key != savedSlot && d.Value.Profile.Vid == p.Vid && d.Value.Profile.Pid == p.Pid)
+                                 .Select(d => d.Key).ToList())
+                        _a.Drawers.Remove(k);
+                    _a.PutDrawer(savedSlot, p, label);
+                }
                 _a._absentPolls = 3; // reboot
                 if (_a.RebootBeforeReply) { Lost = true; if (_a.ThrowOnSend) throw new IOException("Un dispositivo collegato al sistema non è in funzione."); return; }
+                _out.Enqueue(savedSlot >= 0 ? $"{{\"status\":\"ok\",\"slot\":{savedSlot}}}" : "{\"status\":\"ok\"}");
+            }
+            else if (_a.HasDrawers && line.StartsWith("{\"cmd\":\"get_jm\""))
+            {
+                using var req = JsonDocument.Parse(line);
+                int slot = req.RootElement.TryGetProperty("slot", out var sl) ? sl.GetInt32()
+                    : _a.Drawers.Count == 0 ? -1 : _a.Drawers.OrderByDescending(d => d.Value.Seq).First().Key;
+                if (!_a.Drawers.TryGetValue(slot, out var d)) { _out.Enqueue($"{{\"status\":\"empty\",\"proto\":2,\"slot\":{slot}}}"); return; }
+                var json = SaveJmJson.Serialize(d.Profile).Replace("{\"cmd\":\"save_jm\",",
+                    $"{{\"status\":\"ok\",\"proto\":2,\"slot\":{slot},\"label\":{JsonSerializer.Serialize(d.Label)},\"seq\":{d.Seq},\"has_custom\":true,");
+                _out.Enqueue(json);
+            }
+            else if (_a.HasDrawers && line == "{\"cmd\":\"list_jm\"}")
+            {
+                var items = string.Join(",", _a.Drawers.OrderBy(d => d.Key).Select(d =>
+                    $"{{\"slot\":{d.Key},\"vid\":{d.Value.Profile.Vid},\"pid\":{d.Value.Profile.Pid},\"label\":{JsonSerializer.Serialize(d.Value.Label)}," +
+                    $"\"rules\":{d.Value.Profile.Rules.Count},\"analog\":{(d.Value.Profile.UseAnalog ? 1 : 0)},\"seq\":{d.Value.Seq}}}"));
+                _out.Enqueue($"{{\"status\":\"ok\",\"proto\":2,\"slots\":8,\"items\":[{items}]}}");
+            }
+            else if (_a.HasDrawers && line.StartsWith("{\"cmd\":\"label_jm\""))
+            {
+                using var req = JsonDocument.Parse(line);
+                int slot = req.RootElement.GetProperty("slot").GetInt32();
+                if (!_a.Drawers.TryGetValue(slot, out var d)) { _out.Enqueue("{\"status\":\"error\",\"reason\":\"empty\",\"detail\":\"\"}"); return; }
+                _a.Drawers[slot] = d with { Label = SlotLabels.Clean(req.RootElement.GetProperty("label").GetString()) };
                 _out.Enqueue("{\"status\":\"ok\"}");
+            }
+            else if (_a.HasDrawers && line.StartsWith("{\"cmd\":\"del_jm\""))
+            {
+                using var req = JsonDocument.Parse(line);
+                int slot = req.RootElement.GetProperty("slot").GetInt32();
+                _out.Enqueue(_a.Drawers.Remove(slot) ? "{\"status\":\"ok\"}" : "{\"status\":\"error\",\"reason\":\"empty\",\"detail\":\"\"}");
             }
             else if (line == "{\"cmd\":\"get_jm\"}")
             {

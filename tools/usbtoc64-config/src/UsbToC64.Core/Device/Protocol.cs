@@ -326,7 +326,10 @@ public sealed class AdapterConnection : IDisposable
     }
 }
 
-public sealed record WriteResult(bool Saved, bool Verified, ReadMethod? Method, List<string> Differences, string Message);
+/// <param name="Slot">Drawer written (firmware 1.3.0+), 0-based.</param>
+/// <param name="Label">Label stored in the drawer, as read back.</param>
+public sealed record WriteResult(bool Saved, bool Verified, ReadMethod? Method, List<string> Differences, string Message,
+    int? Slot = null, string? Label = null);
 
 /// <summary>save_jm → wait for "ok" → wait for the reboot → read back → compare.</summary>
 public sealed class AdapterWriter
@@ -347,9 +350,12 @@ public sealed class AdapterWriter
         _sleep = sleep ?? Thread.Sleep;
     }
 
-    public WriteResult WriteAndVerify(JmProfile profile)
+    /// <param name="slot">Drawer (0-based) on firmware 1.3.0+; null = the pad's own drawer, else a free one, else the oldest.</param>
+    /// <param name="label">Drawer label on firmware 1.3.0+; null = keep the label of the pad's drawer.</param>
+    public WriteResult WriteAndVerify(JmProfile profile, int? slot = null, string? label = null)
     {
-        string json = SaveJmJson.Serialize(profile);
+        if (label != null) label = SlotLabels.Clean(label);
+        int? savedSlot = null;
 
         // 1) send and wait for the reply
         bool lostAfterSend = false;
@@ -363,10 +369,12 @@ public sealed class AdapterWriter
         var link = conn.Link;
         var session = conn.Session;
 
+        var fw = session.GetFirmware();
+        bool drawers = SlotCommands.Supports(fw);
+        string json = drawers ? SaveJmJson.Serialize(profile, slot, label) : SaveJmJson.Serialize(profile);
         // Signed rules need a firmware that knows them: an older one would treat them as "==".
         if (profile.Rules.Any(r => FirmwareLimits.IsSigned(r.Op)))
         {
-            var fw = session.GetFirmware();
             if (fw.IsOriginal || fw.Version < FirmwareVersion.Parse(FirmwareLimits.SignedOpsMinFirmware))
             {
                 conn.Dispose();
@@ -403,7 +411,8 @@ public sealed class AdapterWriter
                     string status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "";
                     if (status != "ok")
                         return new WriteResult(false, false, null, new(), L.F("proto.rejected", root.GetRawText()));
-                    _log(L.T("proto.accepted"));
+                    if (root.TryGetProperty("slot", out var sl) && sl.ValueKind == JsonValueKind.Number) savedSlot = sl.GetInt32();
+                    _log(savedSlot != null ? L.F("slot.accepted", savedSlot + 1) : L.T("proto.accepted"));
                 }
             }
         }
@@ -428,11 +437,20 @@ public sealed class AdapterWriter
         // Without the "ok" reply the save is only presumed: the read-back is the proof.
         bool confirmed = !lostAfterSend;
         StoredProfile stored;
+        SlotContent? drawer = null;
         try
         {
             _log(L.T("proto.readingback"));
             using var readConn = AdapterConnection.Connect(_port, _log, _sleep, bootDelay: BootDelay);
-            stored = readConn.Session.ReadStored();
+            if (drawers)
+            {
+                // The drawer named in the reply; without the reply, the drawer that now holds this pad.
+                int? which = savedSlot ?? slot
+                             ?? readConn.Session.ListSlots().FirstOrDefault(s => s.Vid == profile.Vid && s.Pid == profile.Pid)?.Slot;
+                drawer = which == null ? null : readConn.Session.ReadSlot(which.Value);
+                stored = new StoredProfile(drawer?.Profile, ReadMethod.GetJm, drawer != null);
+            }
+            else stored = readConn.Session.ReadStored();
         }
         catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException or UnauthorizedAccessException or FormatException)
         {
@@ -443,11 +461,17 @@ public sealed class AdapterWriter
             return new WriteResult(false, false, stored.Method, new(), L.T("proto.noprofileafter"));
 
         var diff = ProfileComparer.Compare(profile, stored.Profile);
+        if (drawer != null && label != null && drawer.Info.Label != label)
+            diff.Add(L.F("slot.labeldiff", label, drawer.Info.DisplayLabel));
         string via = stored.Method == ReadMethod.GetJm ? "get_jm" : L.T("proto.via.dumppad");
+        int? where = drawer?.Info.Slot;
+        string? stLabel = drawer?.Info.DisplayLabel;
         if (diff.Count == 0)
-            return new WriteResult(true, true, stored.Method, diff, L.F("proto.verified", via));
+            return new WriteResult(true, true, stored.Method, diff,
+                drawer != null ? L.F("slot.verified", via, drawer.Info.Number, drawer.Info.DisplayLabel) : L.F("proto.verified", via),
+                where, stLabel);
         return new WriteResult(confirmed, false, stored.Method, diff, confirmed
             ? L.F("proto.differs.saved", via)
-            : L.F("proto.differs.notsaved", via));
+            : L.F("proto.differs.notsaved", via), where, stLabel);
     }
 }
